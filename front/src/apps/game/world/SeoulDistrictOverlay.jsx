@@ -38,8 +38,8 @@ function DistrictLine({ coords, color, lineWidth = 1, elevation = 0.5 }) {
   );
 }
 
-/** 구 경계를 10m 높이의 투명한 벽(결계)으로 렌더링 */
-function DistrictWall({ coords, color, wallHeight = 10, elevation = 0.5 }) {
+/** 구 경계를 지정된 높이와 두께를 가진 장엄한 투명 결계로 렌더링 */
+function DistrictWall({ coords, color, wallHeight = 100, wallThickness = 20, elevation = 0.5 }) {
   const geometry = useMemo(() => {
     const pts = coords.map(([lat, lng]) => {
       const { x, z } = gpsToXZ(lat, lng);
@@ -56,22 +56,49 @@ function DistrictWall({ coords, color, wallHeight = 10, elevation = 0.5 }) {
       const p1 = pts[i];
       const p2 = pts[i + 1];
 
-      // v0: p1 bottom, v1: p2 bottom
-      positions.push(p1.x, elevation, p1.z);
-      positions.push(p2.x, elevation, p2.z);
-      // v2: p1 top, v3: p2 top
-      positions.push(p1.x, elevation + wallHeight, p1.z);
-      positions.push(p2.x, elevation + wallHeight, p2.z);
+      const dx = p2.x - p1.x;
+      const dz = p2.z - p1.z;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len === 0) continue;
 
-      const v0 = vertexIndex;
-      const v1 = vertexIndex + 1;
-      const v2 = vertexIndex + 2;
-      const v3 = vertexIndex + 3;
+      // 선분 법선 벡터 (좌우 폭 계산용)
+      const nx = -dz / len;
+      const nz = dx / len;
+      const hw = wallThickness / 2;
 
-      // 두 개의 삼각형으로 쿼드(사각형 벽) 구성
-      indices.push(v0, v1, v2);
-      indices.push(v1, v3, v2);
+      // 4 모서리 (좌측/우측)
+      const v0x = p1.x + nx * hw, v0z = p1.z + nz * hw;
+      const v1x = p1.x - nx * hw, v1z = p1.z - nz * hw;
+      const v2x = p2.x + nx * hw, v2z = p2.z + nz * hw;
+      const v3x = p2.x - nx * hw, v3z = p2.z - nz * hw;
 
+      // 수직 벽(Quad) 헬퍼 함수
+      const addVerticalQuad = (ax, az, bx, bz) => {
+        const base = vertexIndex;
+        positions.push(
+          ax, elevation, az,               // 바닥 A 
+          bx, elevation, bz,               // 바닥 B
+          ax, elevation + wallHeight, az,  // 상단 A
+          bx, elevation + wallHeight, bz   // 상단 B
+        );
+        indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+        vertexIndex += 4;
+      };
+
+      // 1. 좌측 외벽
+      addVerticalQuad(v0x, v0z, v2x, v2z);
+      // 2. 우측 내벽
+      addVerticalQuad(v3x, v3z, v1x, v1z);
+
+      // 3. 상단 뚜껑 (Top Lid)
+      const base = vertexIndex;
+      positions.push(
+        v0x, elevation + wallHeight, v0z,
+        v1x, elevation + wallHeight, v1z,
+        v2x, elevation + wallHeight, v2z,
+        v3x, elevation + wallHeight, v3z
+      );
+      indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
       vertexIndex += 4;
     }
 
@@ -80,14 +107,14 @@ function DistrictWall({ coords, color, wallHeight = 10, elevation = 0.5 }) {
     geom.setIndex(indices);
     geom.computeVertexNormals();
     return geom;
-  }, [coords, elevation, wallHeight]);
+  }, [coords, elevation, wallHeight, wallThickness]);
 
   return (
     <mesh geometry={geometry}>
       <meshBasicMaterial
         color={color}
         transparent
-        opacity={0.15}
+        opacity={0.12} // 폭이 생겨 면적/중첩이 많으므로 불투명도를 살짝 낮춤
         side={THREE.DoubleSide}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
@@ -119,11 +146,12 @@ const SeoulDistrictOverlay = ({
               color={color}
               elevation={elevation}
             />
-            {/* 구 경계벽 (투명 결계, 10m) */}
+            {/* 구 경계벽 (투명 결계, 높이 100m 두께 20m) */}
             <DistrictWall
               coords={district.coords}
               color={color}
-              wallHeight={10}
+              wallHeight={100}
+              wallThickness={20}
               elevation={elevation}
             />
             {/* 구 이름 레이블 (중심점) */}
