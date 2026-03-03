@@ -1,0 +1,250 @@
+.youtube-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: black;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 20000;
+  /* GlobalCollector(9999) 보다 높게 */
+  animation: fadeIn 0.2s ease-out;
+}
+
+.youtube-modal-content {
+  position: relative;
+  width: 95%;
+  /* 더 넓게 */
+  max-width: 1200px;
+  /* PC에서 시원하게 보이도록 */
+  background: black;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.youtube-iframe-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  /* 16:9 Aspect Ratio */
+  height: 0;
+}
+
+.youtube-iframe-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.youtube-close-btn {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+  transition: transform 0.2s;
+}
+
+.youtube-close-btn:hover {
+  transform: scale(1.1);
+  color: #ff4b4b;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* 다음 영상 로딩 오버레이 */
+.next-video-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  /* Loader는 제일 위에 */
+  backdrop-filter: blur(5px);
+}
+
+.spinner-icon {
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+  color: #ff4757;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 스크롤 힌트 (이제 숨김 처리) */
+.scroll-hint {
+  display: none !important;
+}
+
+.bounce-icon {
+  animation: bounce 1.5s infinite;
+  margin-top: 5px;
+}
+
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+/* =========================================
+   우측 투명 터치 영역 (다음 영상 넘기기)
+   ========================================= */
+.next-video-touch-area {
+  position: absolute;
+  top: 0;
+  /* 상단부터 시작 */
+  right: 0;
+  width: 20%;
+  /* 영역 조금 더 넓힘 */
+  min-width: 80px;
+  height: 40%;
+  /* 높이도 좀 더 여유있게 */
+
+  /* 투명하지만 클릭 가능 */
+  background: transparent;
+  cursor: pointer;
+  z-index: 500;
+  /* iframe 및 다른 요소보다 확실히 위에 */
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* 모바일 터치 하이라이트 제거 */
+  -webkit-tap-highlight-color: transparent;
+  border-bottom-left-radius: 20px;
+  /* 상단은 둥글게 만들 필요 없음 */
+}
+
+/* 마우스를 올렸을 때 희미하게 보이게 (UX 개선) */
+.next-video-touch-area:hover {
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.1), transparent);
+}
+
+/* 힌트 아이콘/텍스트 (처음에만 보임) */
+.next-video-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: bold;
+  font-size: 1.2rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: slideInRight 0.5s ease-out;
+  pointer-events: none;
+}
+
+.hint-text {
+  font-size: 0.8rem;
+  margin-top: 5px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .next-video-touch-area {
+    width: 25%;
+    min-width: 90px;
+    height: 40%;
+    /* 모바일에서는 조금 더 넓게 (손가락 터치) */
+  }
+}
+
+/* =========================================
+   심플 오버레이 구독 버튼 (중앙 하단, 페이드 아웃)
+   ========================================= */
+.simple-subscribe-btn {
+  position: absolute;
+  bottom: 20px !important;
+  /* 더 아래로 강제 이동 */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 30px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s, opacity 1.5s ease-out;
+  /* 페이드 길게 */
+  backdrop-filter: blur(4px);
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.simple-subscribe-btn:hover {
+  background: #FF6B6B;
+  border-color: #FF6B6B;
+  transform: translateX(-50%) scale(1.05);
+  /* 중앙 정렬 유지하면서 확대 */
+  opacity: 1 !important;
+  /* 마우스 올리면 다시 보이게 */
+}
+
+.simple-subscribe-btn:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.simple-subscribe-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+  /* 클릭 불가 */
+}

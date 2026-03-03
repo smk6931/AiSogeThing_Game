@@ -1,0 +1,75 @@
+=== 도메인 구매부터 HTTPS 적용까지 완벽 가이드 ===
+
+1. 도메인 구매 및 DNS 설정 (가비아 등)
+   - 도메인 구매 완료 (예: sogething.com)
+   - [DNS 관리] 메뉴에서 'A 레코드' 2개 추가
+     1) 호스트: @   | 값: 168.107.52.201 (TTL 600)
+     2) 호스트: www | 값: 168.107.52.201 (TTL 600)
+
+2. 오라클 클라우드 방화벽 해제 (중요!)
+   - 오라클 사이트 접속 -> 네트워킹 -> VCN -> 보안 목록(Security List)
+   - [수신 규칙 추가 (Ingress Rules)]
+   - 소스 CIDR: 0.0.0.0/0
+   - 포트: 80, 443 (HTTP/HTTPS) 허용
+   (이거 안 하면 '연결 시간 초과' 뜸)
+
+3. 서버 내부 설정 (Nginx 설치)
+   - SSH 접속 후 아래 명령어 실행:
+     sudo apt update
+     sudo apt install -y nginx
+   - 설정 파일(`nginx_sogething.conf`)을 `/etc/nginx/sites-available/`로 복사.
+   - 심볼릭 링크 생성:
+     sudo ln -sf /etc/nginx/sites-available/sogething /etc/nginx/sites-enabled/
+   - 기본 설정 삭제: sudo rm /etc/nginx/sites-enabled/default
+   - Nginx 재시작: sudo systemctl restart nginx
+
+4. HTTPS 보안 인증서 적용 (Certbot)
+   - Certbot 설치:
+     sudo apt install -y certbot python3-certbot-nginx
+   - 인증서 발급 명령어:
+     sudo certbot --nginx -d sogething.com -d www.sogething.com
+   - 이메일 입력 -> Y(동의) -> Y -> 성공 메시지(Congratulations) 확인.
+   - (참고: Certbot이 Nginx 설정을 자동으로 수정하여 443 포트를 엽니다.)
+
+5. 프론트엔드 코드 수정 (도메인 호환성)
+   - `front/vite.config.js` 수정:
+     server: { host: '0.0.0.0', allowedHosts: ['sogething.com', 'www.sogething.com'] }
+   - `front/.env` 수정:
+     VITE_API_URL= (빈 값으로 설정하여 상대 경로 사용)
+
+6. 프론트엔드 재시작 (필수)
+   - 기존에 떠있는 npm 프로세스를 확실히 죽여야 함.
+   - 범인(PID) 찾기: sudo lsof -i :3000
+   - 죽이기: sudo kill -9 <PID>
+   - 다시 실행:
+     nohup npm run dev -- --host 0.0.0.0 --port 3000 > front.log 2>&1 &
+
+=== 트러블 슈팅 메모 ===
+- 연결 거부(Refused): Nginx가 꺼져있거나 443 포트 설정이 없는 경우. (Nginx 재시작 확인)
+- 연결 시간 초과(Timeout): 오라클 클라우드 방화벽(웹 콘솔)이 닫힌 경우.
+- API 무한 로딩: 프론트엔드 재시작 안 해서 옛날 주소(localhost) 찾고 있는 경우.
+
+=== [Q&A] 개념 정리 및 심화 이해 ===
+Q1. 오라클 클라우드 방화벽 해제는 도메인 주소랑 Nginx 포트를 허용해주는 것인가?
+A1. 정확히는 'IP와 포트'를 허용하는 것입니다. 도메인(`sogething.com`)은 사람을 위한 이름일 뿐이고, 실제 통신은 168.107.52.201(IP)로 들어옵니다. 우리는 "누구나(0.0.0.0/0) 80번(HTTP)과 443번(HTTPS) 문으로 들어와도 좋다"고 허용한 것입니다.
+
+Q2. Nginx 설치 이유는 도메인 연결(우회)과 HTTPS 보안 적용을 위한 것인가?
+A2. 네, 맞습니다. Nginx는 **'리버스 프록시(Reverse Proxy)'** 역할을 합니다.
+    - **우회(Routing)**: 사용자는 `sogething.com` (80/443번)만 알고 들어오지만, Nginx가 내부적으로 `3000번(프론트)`이나 `8080번(백엔드)`으로 몰래 연결해줍니다. 덕분에 주소창에 지저분한 `:3000`을 안 써도 됩니다.
+    - **보안(SSL)**: HTTPS 암호화 통신을 Nginx가 가장 앞에서 처리해주므로, 백엔드나 프론트엔드는 보안 설정을 몰라도 됩니다.
+
+Q3. HTTPS 보안 인증서를 위해 Certbot을 설치한 것인가? Certbot의 역할은?
+A3. 네, 맞습니다.
+    - **HTTPS 인증서**: 원래는 연 10만원 이상 주고 사야 하는 '신분증' 같은 파일입니다.
+    - **Certbot의 역할**: 무료 인증서 발급 기관인 'Let's Encrypt'와 통신하는 **자동화 로봇**입니다.
+      1) 인증서 발급 신청 ("저 이 도메인 주인 맞아요!")
+      2) 인증서 파일 다운로드 (fullchain.pem, privkey.pem)
+      3) **Nginx 설정 파일 자동 수정** (이게 핵심! 사람이 직접 설정하려면 실수하기 쉬운데, 알아서 코드를 넣어줌)
+      4) 3개월마다 만료되기 전에 **자동 갱신**
+
+Q4. 로컬과 서버의 API 주소 흐름 차이와 분기점은?
+A4. 코드는 똑같지만 `.env` 환경변수에 따라 경로가 갈립니다. (client.js의 분기 로직)
+    - **로컬 환경**: `.env`에 `VITE_API_URL`이 없으므로, 기본값(Fallback)인 `http://localhost:8001`이 붙어서 나갑니다.
+      (흐름: 프론트 -> http://localhost:8001 -> 백엔드 직통)
+    - **서버 환경**: `.env`에 `VITE_API_URL=""`처럼 설정이 있어서, `https://sogething.com/api/...` 처럼 쌩 주소(상대 경로)가 나갑니다.
+      (흐름: 프론트 -> /api/... -> Nginx(여기서 localhost:8080을 붙여줌) -> 백엔드)

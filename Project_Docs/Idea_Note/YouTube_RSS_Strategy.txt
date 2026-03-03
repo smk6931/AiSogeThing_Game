@@ -1,0 +1,59 @@
+=== YouTube API 비용 절감 & RSS 큐레이션 전략 ===
+
+1. 배경 및 문제점
+   - YouTube Data API (v3)는 하루 할당량(Quota)이 10,000점으로 제한적임.
+   - 'Search' API 호출 1회당 100점 소모 (가장 비쌈).
+   - 'Videos' (인기 리스트) 호출은 1점이지만, 실시간성이 떨어짐.
+   - 사용자가 매번 검색하거나 리스트를 갱신할 때마다 API를 호출하면 할당량이 금방 고갈됨.
+
+2. 핵심 전략: "한 번 찾고(Seed), 평생 무료로 보기(Harvest)"
+   - [Phase 1: Seed] AI/검색을 통한 채널 발굴 (High Cost)
+     - 사용자가 관심 키워드를 입력하거나, AI가 트렌드 키워드를 추천.
+     - Search API를 **단 한 번** 사용하여 상위 유명 채널 5~10개의 ID를 확보.
+     - 비용: 100점 (1회성 투자).
+   
+   - [Phase 2: Harvest] RSS 기반 실시간 피드 (Zero Cost)
+     - 확보된 Channel ID를 이용해 YouTube RSS Feed(`feeder.google.com/...`)를 요청.
+     - 이 요청은 API Quota를 전혀 소모하지 않음 (Cost 0).
+     - XML 파싱을 통해 최신 영상 목록, 썸네일, 제목을 추출.
+   
+   - [Phase 3: Shuffle & Display]
+     - 여러 채널의 RSS 데이터를 병합.
+     - 최신순(Date) 정렬 또는 랜덤 셔플(Shuffle)을 통해 피드를 구성.
+     - 결과적으로 사용자는 "실시간으로 업데이트되는 방대한 피드"를 느끼지만, 실제 API 비용은 0.
+
+3. 구현 로직 (Workflow)
+
+   [User Action] 주제 선택 (예: "축구", "먹방")
+        ↓
+   [Backend] 해당 키워드로 'Channel Search API' 1회 호출
+        ↓
+   [System] 상위 5개 채널 ID 추출 -> 'interest_channels.json'에 저장 (중복 방지)
+        ↓
+   [System] 저장된 채널들의 RSS Feed 요청 (병렬 처리)
+        ↓
+   [Frontend] 수집된 영상들을 최신순으로 정렬하여 렌더링
+   
+4. 기대 효과
+   - API 비용 99% 절감 (검색 할 때만 소모).
+   - RSS는 비교적 실시간으로 영상이 올라오므로 "죽어있는 리스트" 문제 해결.
+   - 대형 유튜버 위주로 구독 리스트를 자동 생성해주므로 콘텐츠 품질 보장.
+
+5. 파일 구조
+   - `back/client/youtube_rss.py`: RSS 파싱 및 로직 전담.
+   - `back/data/channels/`: 사용자/주제별 채널 리스트 저장.
+
+6. [보강] 사용자별 채널 발굴 및 DB 연동 (My Interest Discovery)
+   - 개념: "AI 자동 구독 매니저"
+     - 사용자가 유튜브에 가서 일일이 채널을 찾고 구독하는 대신, "주식", "요리" 키워드만 던지면 AI가 관련 인기 채널을 찾아내어 자동으로 내 피드에 추가.
+   
+   - 데이터 확장성 (Future Work):
+     - 현재 단계: `interest_channels.json` 파일에 모든 발굴된 채널을 공용으로 저장 (MVP).
+     - 발전 단계: RDBMS (PostgreSQL/MySQL) 도입 시 `user_channel_subscriptions` 테이블 생성.
+       - 컬럼: `user_id`, `channel_id`, `channel_name`, `category_keyword`
+       - 효과: 유저 A는 "주식" 채널만 보고, 유저 B는 "게임" 채널만 보도록 개인화 가능.
+   
+   - 사용자 경험(UX):
+     - 사용자는 "발굴된 채널" 리스트를 UI에서 확인 가능.
+     - 특정 채널을 클릭하여 필터링하거나, 마음에 안 드는 채널은 삭제(구독 취소)할 수 있음.
+     - 이 모든 과정에서 동영상 시청은 RSS(무료)로 이루어짐.

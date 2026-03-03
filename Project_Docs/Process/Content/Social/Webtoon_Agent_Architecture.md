@@ -1,0 +1,82 @@
+# Webtoon AI Agent Architecture & Logic Analysis
+
+## 1. Workflow Verification (LangGraph Steps)
+사용자님이 분석하신 6단계 프로세스는 **LangGraph State(상태 저장소)**를 활용한 전형적인 에이전트 파이프라인이며, 분석하신 내용이 대부분 정확합니다.
+
+### 📜 Step 1: ScriptWriter (줄거리 생성)
+- **Input:** Topic, Character Count, Descriptions (from User)
+- **Action:** LLM이 `[Summary]`(요약)와 `[Scene N]`(장면) 포맷으로 전체 대본을 작성합니다.
+- **State Update:** `full_script` (DB 저장)
+
+### 🎨 Step 2: CoverDesigner (표지 생성)
+- **Input:** Topic
+- **Action:** 소설의 주제(Topic)만으로 매력적인 썸네일을 생성합니다.
+- **State Update:** `thumbnail_url` (DB 저장)
+
+### 🎭 Step 3: CharacterDesigner (캐릭터 시각화)
+- **Input:** Full Script, Character Count
+- **Action:** 대본 전체를 분석하여 각 캐릭터의 외모(머리색, 눈, 의상, 분위기)를 **텍스트(JSON)**로 구체화합니다.
+- **State Update:** `character_visuals` (JSON List: `[{name: "A", description: "Blue hair..."}]`)
+- **Key Point:** 여기서 생성된 **텍스트 묘사**가 이후 모든 이미지 생성의 기준(Seed)이 됩니다.
+
+### 🖼️ Step 4: CharacterImageGenerator (캐릭터 프로필)
+- **Input:** `character_visuals`
+- **Action:** 위에서 정의된 텍스트 묘사를 바탕으로 각 캐릭터의 프로필(증명사진)을 생성합니다.
+- **State Update:** `character_visuals[i].image_url`
+
+### ✂️ Step 5: SceneSplitter (씬 분할)
+- **Input:** `full_script`
+- **Action:**
+  1. `[Summary]`를 제외하고 실제 본문만 추출.
+  2. `[Scene N]` 태그를 기준으로 텍스트를 물리적으로 쪼갭니다.
+  3. 각 조각을 `novel_cuts` 테이블에 텍스트 데이터로 선저장합니다.
+- **State Update:** `scenes` (List of Scene Objects)
+
+### 🎨 Step 6: SceneImageGenerator (컷 생성)
+- **Input:** `scenes`, `character_visuals`
+- **Action:** 각 씬의 상황 묘사(`text`) + **캐릭터 외모 묘사(`character_visuals`)**를 합쳐서 이미지를 생성합니다.
+
+---
+
+## 2. "어떻게 캐릭터가 똑같이 나오는가?" (Consistency Secret)
+
+> **"각 컷마다 말로만 정의해줘도 어떻게 똑같은 인물을 비슷하게 생성해내는거지?"**
+
+이 부분의 핵심 기술은 **"프롬프트 인젝션 (Prompt Injection)"**과 **"상태 유지 (State Preservation)"**입니다.
+
+### 🔍 원리 분석
+현재 코드는 이미지-to-이미지(이전 그림을 보고 그리는 방식)를 사용하는 것이 **아닙니다.** 대신, **"절대적인 텍스트 설계도"**를 매번 주입하는 방식을 사용합니다.
+
+1.  **Visual DNA 생성 (Step 3)**:
+    - 초반에 `CharacterDesigner`가 "철수는 검은 머리에 빨간 눈, 찢어진 청바지"라는 **Visual DNA(텍스트설계도)**를 확정 짓습니다.
+    - 이 정보는 `WebtoonState`라는 **메모리**에 영구 저장됩니다.
+
+2.  **무한 반복 주입 (Step 6)**:
+    - 6번째 단계에서 그림을 그릴 때, 단순히 "철수가 밥을 먹는다"라고 프롬프트를 보내지 않습니다.
+    - **실제 전송되는 프롬프트:**
+      ```text
+      [IMPORTANT] Strictly maintain character appearance:
+      - Cheolsu: Black hair, red eyes, ripped jeans, sharp vibe.
+      
+      Scene Action: Cheolsu is eating rice.
+      ```
+    - 즉, 100컷을 그리든 1000컷을 그리든, **모든 컷마다 똑같은 "외모 설정값"을 강제로 끼워 넣기** 때문에 AI는 매번 비슷한 캐릭터를 그려낼 수밖에 없습니다.
+
+---
+
+## 3. 면접 대비: 기술 아키텍처 설명 가이드
+
+면접관에게 이 프로젝트를 설명할 때 사용할 수 있는 **전문적인 답변 스크립트**입니다.
+
+### 🗣️ 핵심 요약 (Elevator Pitch)
+"저는 **LangGraph**를 활용하여 상태 기반(Stateful)의 웹툰 생성 에이전트 파이프라인을 구축했습니다. 단순히 LLM을 한 번 호출하는 것이 아니라, **기획 -> 캐릭터 설정 -> 컷 분할 -> 이미지 생성**으로 이어지는 작업 흐름을 **노드(Node)** 단위로 설계하여, 일관성 있는 콘텐츠를 자동으로 생성하도록 구현했습니다."
+
+### 💡 예상 질문 & 답변
+
+**Q. 컷마다 캐릭터의 일관성(Consistency)은 어떻게 유지했나요?**
+"**Context Injection(컨텍스트 주입)** 기법을 사용했습니다.
+초기 단계에서 LLM을 통해 캐릭터의 외형적 특징(Visual Features)을 상세한 텍스트 프롬프트로 추출하여 **Global State**에 저장합니다. 이후 각 컷을 생성하는 노드(Node)에서 이 외형 프롬프트를 시스템 프롬프트 레벨에 강제로 주입(Prepend)하여, 모델이 매번 동일한 캐릭터 특징을 참조하고 그려내도록 강제했습니다. 이를 통해 LoRA나 비싼 Fine-tuning 없이도 프롬프트 엔지니어링만으로 높은 수준의 일관성을 확보했습니다."
+
+**Q. 왜 LangGraph를 사용했나요?**
+"웹툰 생성은 단일 단계가 아니라, 앞 단계의 결과물(예: 대본, 캐릭터 설정)이 뒷 단계(이미지 생성)에 **엄격하게 전달**되어야 하는 순차적 프로세스입니다. 
+LangGraph의 **`StateGraph`** 구조를 통해 각 단계의 데이터를 `TypedDict` 형태로 관리하면서, 데이터 흐름을 명시적으로 제어하고 에러 발생 시 특정 단계부터 재시도하거나 롤백하는 로직을 구현하기 위해 채택했습니다."

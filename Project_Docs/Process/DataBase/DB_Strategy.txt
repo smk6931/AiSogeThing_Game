@@ -1,0 +1,85 @@
+========================================================================
+[ AiSogeThing Database Strategy ]
+========================================================================
+
+[PART 1: 관리 및 배포 전략 (Management & Deployment)]
+
+1. 핵심 원칙: 환경 분리 (Isolation)
+   - 로컬(Local)과 서버(Server)의 데이터베이스는 철저히 분리한다.
+   - 로컬 DB: 개발자가 임의로 생성한 '가짜 데이터(Dummy Data)'를 사용하여 기능 테스트.
+   - 서버 DB: 실제 사용자가 쌓는 '운영 데이터(Production Data)' 보존.
+   - 절대 금기 사항: 로컬 개발 환경에서 서버 DB(Production)에 직접 연결하여 DELETE/UPDATE 테스트를 하지 않는다.
+
+2. 스키마 관리 (Schema Migration)
+   - 도구: Alembic + SQLAlchemy
+   - 역할: 데이터(내용물)는 건드리지 않고, 테이블 구조(뼈대)만 동기화한다.
+   - 프로세스:
+     1) 로컬: 모델 코드 수정 -> alembic revision (변경사항 파일 생성) -> 로컬 DB 적용 테스트.
+     2) Git Push: 변경된 모델 코드와 alembic 버전 파일을 GitHub에 업로드.
+     3) 서버: Git Pull -> alembic upgrade head (서버 DB에 구조 변경사항만 안전하게 반영).
+
+3. 배포 자동화 (Deployment)
+   - 서버 업데이트 시 수동으로 하지 않고 스크립트(deploy.sh)를 사용한다.
+   - 스크립트 실행 시 동작 순서:
+     1) git pull (최신 코드 받기)
+     2) pip install (의존성 설치)
+     3) alembic upgrade head (DB 구조 최신화)
+     4) npm run build (프론트엔드 빌드)
+     5) systemctl restart (서비스 재시작)
+
+4. 운영 데이터 디버깅 (Backup & Dump)
+   - 실제 서버 데이터로 버그를 재현해야 할 경우:
+   - "서버 DB에 직접 접속"하지 않고 "덤프(Dump) 파일"을 떠서 로컬로 가져온다.
+   - Workflow: 서버에서 pg_dump -> 로컬로 파일 전송(scp) -> 로컬 DB에 pg_restore.
+
+
+[참고: 주요 명령어 모음]
+# Docker 실행
+docker run -d --name aisogething-db -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=0000 -e POSTGRES_DB=aisogething pgvector/pgvector:pg16
+
+# Alembic 명령어
+python -m alembic revision --autogenerate -m "메시지"
+python -m alembic upgrade head
+
+
+========================================================================
+
+[PART 2: 아키텍처 전략 (The Hybrid Sync Architecture)]
+
+1. Architecture Philosophy (아키텍처 철학)
+   - "Performance via Simplicity" (단순함이 곧 성능이다)
+   - ORM의 불필요한 추상화(Overhead)를 제거하고, SQL 본연의 강력함을 그대로 사용한다.
+   - 하지만 DB Connection Pool, Transaction Management 같은 '어려운 일'은 검증된 엔진에게 맡긴다.
+
+2. Technical Stack (기술 스택)
+   - Engine: SQLAlchemy Core (Sync)
+     => 이유: Python 생태계에서 가장 안정적이며, Connection Pool 관리가 탁월함.
+   - Query: Raw SQL (text)
+     => 이유: ORM 변환 비용 Zero. 가장 빠르고 직관적임.
+   - Interface: Custom Wrapper (execute, fetch_one, fetch_all)
+     => 이유: 쿼리 실행의 복잡도를 함수 하나로 압축하여 생산성 극대화.
+
+3. Implementation Details (구현 상세)
+   A. Connection Pool Configuration
+      - Pool Size: 5 (평시 유지 연결 수)
+      - Max Overflow: 10 (트래픽 폭주 시 추가 생성)
+      - Strategy: 스레드당 1개의 연결을 할당하여 Race Condition 원천 차단.
+
+   B. Wrapper Functions
+      - execute(sql, params): 
+        자동으로 Transaction을 시작하고(begin), 성공 시 즉시 Commit, 실패 시 Rollback.
+      
+      - fetch_one(sql, params): 
+        결과 Row를 즉시 Python Dictionary로 변환하여 반환 (Not Object).
+      
+      - fetch_all(sql, params): 
+        대량 조회 시 List[Dictionary] 구조로 매우 가볍게 반환.
+
+4. Performance Benefit (성능 이점)
+   - ORM 객체 매핑 시간: 0ms (완전 제거)
+   - 쿼리 가독성: DBA 수준의 최적화 가능
+   - 유지보수: "SQL만 알면 누구나 수정 가능"
+
+5. vs Async (비동기 방식과의 비교)
+   - 현재 규모(동시접속 < 1,000)에서는 Async의 오버헤드(단일 요청 처리 시간 증가)보다 Sync의 직관성과 디버깅 용이성이 더 큰 가치를 가짐.
+   - FastAPI의 ThreadPool 실행 모델 덕분에 Sync DB 연결도 I/O Blocking 문제를 효과적으로 회피함.

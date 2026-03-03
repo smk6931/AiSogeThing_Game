@@ -1,0 +1,87 @@
+.match-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.match-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary-gradient);
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.match-card:hover::before {
+  opacity: 1;
+}
+
+.match-card__header {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.match-card__photo {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(102, 126, 234, 0.5);
+}
+
+.match-card__match-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--primary-gradient);
+  padding: 8px 12px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.match-card__percentage {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.match-card__text {
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.match-card__body {
+  text-align: center;
+}
+
+.match-card__name {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.match-card__tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.match-card__tag {
+  padding: 6px 12px;
+  background: rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 16px;
+  font-size: 13px;
+  color: var(--text-primary);
+}

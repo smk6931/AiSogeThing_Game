@@ -1,0 +1,26 @@
+.app {
+  position: relative;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+/* 페이지 전환 애니메이션 준비 */
+.page-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.3s ease;
+}
+
+.page-exit {
+  opacity: 1;
+}
+
+.page-exit-active {
+  opacity: 0;
+  transition: all 0.2s ease;
+}

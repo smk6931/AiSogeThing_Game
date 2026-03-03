@@ -1,0 +1,142 @@
+/* ===== 글로벌 스타일 ===== */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+:root {
+  /* 컬러 팔레트 */
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --dark-gradient: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+
+  --purple-500: #667eea;
+  --purple-600: #764ba2;
+  --pink-500: #f093fb;
+  --pink-600: #f5576c;
+  --blue-500: #4facfe;
+
+  /* 배경색 */
+  --bg-primary: #0f0f1e;
+  --bg-secondary: #1a1a2e;
+  --bg-card: rgba(30, 30, 46, 0.8);
+
+  /* 텍스트 */
+  --text-primary: #ffffff;
+  --text-secondary: #b4b4c8;
+  --text-muted: #6b6b7f;
+
+  /* 기타 */
+  --border-radius: 16px;
+  --border-radius-sm: 8px;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overscroll-behavior: none; /* 스크롤 바운싱 방지 */
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* 스크롤바 스타일 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--purple-500), var(--pink-500));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--purple-600), var(--pink-600));
+}
+
+/* 유틸리티 클래스 */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.gradient-text {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glass-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+/* ===== 모바일 우선 반응형 설정 ===== */
+
+/* 모바일: 하단 네비게이션 공간 확보 */
+@media (max-width: 767px) {
+  .container {
+    padding: 0 12px;
+    /* 모바일에서 좌우 여백 축소 */
+  }
+
+  body {
+    font-size: 14px;
+    /* 모바일 기본 폰트 크기 */
+  }
+
+  .glass-card {
+    padding: 16px;
+    /* 모바일에서 카드 패딩 축소 */
+    border-radius: var(--border-radius-sm);
+    /* 둥근 모서리 약간 축소 */
+  }
+
+  /* 모든 페이지 컨텐츠에 하단 네비게이션 공간 확보 */
+  .matching,
+  .chat,
+  .community,
+  .mypage,
+  .home,
+  .hotplace,
+  .youtube-board {
+    padding-bottom: 80px !important;
+    /* 하단 네비 높이(60px) + 여유(20px) */
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* 데스크탑: 사이드바 공간 확보 */
+@media (min-width: 768px) {
+
+  .matching,
+  .chat,
+  .community,
+  .mypage,
+  .home,
+  .hotplace,
+  .youtube-board {
+    padding-left: 260px !important;
+    /* 사이드바 너비(240px) + 여백(20px) */
+    padding-bottom: 40px !important;
+    min-height: 100vh;
+  }
+}
