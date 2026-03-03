@@ -24,6 +24,7 @@ const GameCanvas = ({
   showLanduseZones,
   landuseFilters,
   showHeightMap,
+  showDistrictBoundaries,
   cameraMode
 }) => {
   const orbitRef = useRef();
@@ -85,6 +86,7 @@ const GameCanvas = ({
           showLanduseZones={showLanduseZones}
           landuseFilters={landuseFilters}
           showHeightMap={showHeightMap}
+          showDistrictBoundaries={showDistrictBoundaries}
           cameraMode={cameraMode}
           orbitRef={orbitRef}
         />

@@ -74,6 +74,7 @@ const GameEntry = () => {
     cemetery: true, transport: true, port: true, unexplored: true
   });
   const [showHeightMap, setShowHeightMap] = useState(true);
+  const [showDistrictBoundaries, setShowDistrictBoundaries] = useState(false);
   const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
 
 
@@ -161,6 +162,7 @@ const GameEntry = () => {
           showLanduseZones={showLanduseZones}
           landuseFilters={landuseFilters}
           showHeightMap={showHeightMap}
+          showDistrictBoundaries={showDistrictBoundaries}
           cameraMode={cameraMode}
         />
       </div>
@@ -239,6 +241,7 @@ const GameEntry = () => {
         showLanduseZones={showLanduseZones} setShowLanduseZones={setShowLanduseZones}
         landuseFilters={landuseFilters} setLanduseFilters={setLanduseFilters}
         showHeightMap={showHeightMap} setShowHeightMap={setShowHeightMap}
+        showDistrictBoundaries={showDistrictBoundaries} setShowDistrictBoundaries={setShowDistrictBoundaries}
         cameraMode={cameraMode} setCameraMode={setCameraMode}
       />
 

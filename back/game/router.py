@@ -10,6 +10,7 @@ from game.managers.PlayerManager import player_manager
 from game.managers.MonsterManager import monster_manager
 from game.terrain_service import terrain_service
 from game.zone_service import fetch_zones
+from game.district_service import fetch_seoul_districts, get_current_district as _get_current_district
 
 import asyncio
 import os
@@ -96,6 +97,28 @@ async def get_zone_data(lat: float, lng: float, dist: int = 2000, categories: st
     loop = asyncio.get_event_loop()
     data = await loop.run_in_executor(None, fetch_zones, lat, lng, dist, categories)
     return data
+
+
+@router.get("/districts")
+async def get_districts(refresh: bool = False):
+    """
+    서울시 25개 구 행정 경계 데이터를 반환합니다.
+    첫 호출 시 Overpass API로 패치, 이후 로켄 캐시에서 즉시 응답.
+    refresh=true 전달 시 강제 재패치.
+    """
+    loop = asyncio.get_event_loop()
+    data = await loop.run_in_executor(None, fetch_seoul_districts, refresh)
+    return data
+
+
+@router.get("/district/current")
+async def get_current_district(lat: float, lng: float):
+    """
+    주어진 GPS 쬨표가 서울시 어느 구(시도 행정구역)에 속하는지 반환합니다.
+    """
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, _get_current_district, lat, lng)
+    return result or {"name": None, "name_en": None, "id": None}
 
 @router.on_event("startup")
 async def start_monster_ai():

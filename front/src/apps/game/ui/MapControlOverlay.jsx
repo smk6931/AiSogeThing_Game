@@ -13,11 +13,12 @@ const GLOW = '0 0 12px rgba(200, 168, 75, 0.2)';
 
 const BUTTONS = [
   { key: 'showOsmMap', label: '지도', icon: '🗺', colorOn: 'rgba(30,80,160,0.7)' },
-  { key: 'showSeoulRoads', label: '도로 동선', icon: '🛣️', colorOn: 'rgba(255,100,0,0.7)' }, // 주황색 강조 (핵심 동선)
+  { key: 'showSeoulRoads', label: '도로 동선', icon: '🛣️', colorOn: 'rgba(255,100,0,0.7)' },
   { key: 'showSeoulNature', label: '자연 지형', icon: '🌲', colorOn: 'rgba(30,120,50,0.7)' },
   { key: 'showCityBlocks', label: '블록 텍스처', icon: '🏙️', colorOn: 'rgba(120,60,160,0.7)' },
   { key: 'showLanduseZones', label: '용도 구역', icon: '🏷️', colorOn: 'rgba(200,80,120,0.7)' },
   { key: 'showHeightMap', label: '등고선', icon: '⛰', colorOn: 'rgba(160,100,30,0.7)' },
+  { key: 'showDistrictBoundaries', label: '구 경계', icon: '🏛️', colorOn: 'rgba(0,180,200,0.7)' },
 ];
 
 const MapControlOverlay = ({
@@ -28,6 +29,7 @@ const MapControlOverlay = ({
   showLanduseZones, setShowLanduseZones,
   landuseFilters, setLanduseFilters,
   showHeightMap, setShowHeightMap,
+  showDistrictBoundaries, setShowDistrictBoundaries,
   cameraMode, setCameraMode,
 }) => {
   const stateMap = {
@@ -37,6 +39,7 @@ const MapControlOverlay = ({
     showCityBlocks: { value: showCityBlocks, setter: setShowCityBlocks },
     showLanduseZones: { value: showLanduseZones, setter: setShowLanduseZones },
     showHeightMap: { value: showHeightMap, setter: setShowHeightMap },
+    showDistrictBoundaries: { value: showDistrictBoundaries, setter: setShowDistrictBoundaries },
   };
 
   return (

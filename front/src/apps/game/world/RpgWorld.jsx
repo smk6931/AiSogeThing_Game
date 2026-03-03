@@ -19,6 +19,9 @@ import SeoulHeightMap from './SeoulHeightMap';
 import SeoulSubwayLines from './SeoulSubwayLines';
 import ZoneOverlay from './ZoneOverlay';
 import CityBlockOverlay from './CityBlockOverlay';
+import SeoulDistrictOverlay from './SeoulDistrictOverlay';
+import { useSeoulDistricts } from '../hooks/useSeoulDistricts';
+import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
 // 각도 보간 함수 (Shortest path lerp for angles)
 const lerpAngle = (start, end, t) => {
@@ -135,6 +138,7 @@ const RpgWorld = ({
   showLanduseZones,
   landuseFilters = {},
   showHeightMap,
+  showDistrictBoundaries = false,
   orbitRef,
   cameraMode
 }) => {
@@ -198,6 +202,25 @@ const RpgWorld = ({
 
   // [Zone Painting] ZoneOverlay에서 로드된 데이터를 SeoulHeightMap과 공유
   const [sharedZoneData, setSharedZoneData] = useState(null);
+
+  // 서울 구 경계 데이터 + 현재 구 판별
+  const { districts, getDistrictAt } = useSeoulDistricts();
+  const [currentDistrictId, setCurrentDistrictId] = useState(null);
+
+  // 플레이어 GPS 위치 기반 현재 구 판별 (1초마다 체크)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!playerRef.current) return;
+      const { x, z } = playerRef.current.position;
+      const lat = GIS_ORIGIN.lat - (z / LAT_TO_M);
+      const lng = GIS_ORIGIN.lng + (x / LNG_TO_M);
+      const found = getDistrictAt(lat, lng);
+      if (found && found.id !== currentDistrictId) {
+        setCurrentDistrictId(found.id);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [getDistrictAt, currentDistrictId]);
 
   const playerRef = useRef();
   // [삭제] 인위적인 스케일(15) 대신 현실 미터(0.55) 기반 스케일을 직접 사용합니다.
@@ -383,6 +406,14 @@ const RpgWorld = ({
         zoneData={sharedZoneData}
         visible={showCityBlocks}
         heightScale={debugConfig.terrainHeightScale}
+      />
+
+      {/* 서울 구 행정 경계 오버레이 */}
+      <SeoulDistrictOverlay
+        districts={districts}
+        currentDistrictId={currentDistrictId}
+        visible={showDistrictBoundaries}
+        elevation={debugConfig.mapElevation + 0.3}
       />
 
       {/* 2. Remote Players (지면보다 높게 렌더링) */}
