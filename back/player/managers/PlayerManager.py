@@ -1,8 +1,9 @@
 from typing import Dict, List, Optional
 from fastapi import WebSocket
-from sqlalchemy.future import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from player.models.models import GameCharacter
+# [임시 비활성] DB 관련 임포트 (DB 연결 시 복원 필요)
+# from sqlalchemy.future import select
+# from sqlalchemy.ext.asyncio import AsyncSession
+# from player.models.models import GameCharacter
 
 class PlayerManager:
     """
@@ -13,37 +14,18 @@ class PlayerManager:
         # 접속 중인 플레이어 목록 {user_id: {socket, nickname, position, ...}}
         self.active_connections: Dict[str, dict] = {}
 
-    async def connect(self, websocket: WebSocket, user_id: str, nickname: str, db: AsyncSession):
+    async def connect(self, websocket: WebSocket, user_id: str, nickname: str, db=None):
         """새로운 플레이어 접속 처리"""
         await websocket.accept()
         
-        # 1. DB에서 캐릭터 정보 로드 (없으면 생성)
-        try:
-            result = await db.execute(select(GameCharacter).where(GameCharacter.user_id == int(user_id)))
-            character = result.scalars().first()
-            
-            if not character:
-                character = GameCharacter(
-                    user_id=int(user_id),
-                    level=1, hp=100, max_hp=100, 
-                    mp=50, max_mp=50, exp=0
-                )
-                db.add(character)
-                await db.commit()
-                await db.refresh(character)
-                print(f"✨ New Character Created for {nickname}")
-        except Exception as e:
-            print(f"⚠️ DB Loading Error: {e}")
-            # DB 에러나도 접속은 시켜주되 기본값 사용
-            character = GameCharacter(level=1, hp=100, max_hp=100, mp=50, max_mp=50)
-
+        # [임시] DB 없이 기본 스탯 사용 (DB 연결 시 복원 필요)
         stats = {
-            "level": character.level,
-            "hp": character.hp,
-            "maxHp": character.max_hp,
-            "mp": character.mp,
-            "maxMp": character.max_mp,
-            "exp": character.exp
+            "level": 1,
+            "hp": 100,
+            "maxHp": 100,
+            "mp": 50,
+            "maxMp": 50,
+            "exp": 0
         }
 
         # 초기 상태 설정

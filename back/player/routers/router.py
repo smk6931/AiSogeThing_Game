@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
-from sqlalchemy.ext.asyncio import AsyncSession
+# from sqlalchemy.ext.asyncio import AsyncSession  # [임시 비활성]
 from typing import Annotated, List, Dict
-from core.database import get_db
+# from core.database import get_db  # [임시 비활성]
 import asyncio
 
 from player.managers.PlayerManager import player_manager
@@ -23,9 +23,9 @@ async def get_game_status():
     return {"status": "online", "active_players": len(player_manager.active_connections)}
 
 @router.websocket("/ws/{user_id}/{nickname}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str, db: AsyncSession = Depends(get_db)):
-    # 1. 연결 수락 및 등록 (DB 세션 전달)
-    stats = await player_manager.connect(websocket, user_id, nickname, db)
+async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
+    # 1. 연결 수락 및 등록 (DB 임시 비활성)
+    stats = await player_manager.connect(websocket, user_id, nickname)
     
     # 1.5. 내 정보(스탯) 전송
     await websocket.send_json({"type": "init_stats", "stats": stats})

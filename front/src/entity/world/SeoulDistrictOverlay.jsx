@@ -112,7 +112,6 @@ function DistrictWall({ coords, color, wallHeight = 150, wallThickness = 25, ele
         opacity={opacity}
         side={THREE.DoubleSide}
         depthWrite={false}
-        blending={THREE.AdditiveBlending}
       />
     </mesh>
   );
@@ -153,7 +152,7 @@ const SeoulDistrictOverlay = ({
               wallHeight={150}
               wallThickness={25}
               elevation={elevation}
-              opacity={0.15}
+              opacity={0.25}
             />
             {/* 구 이름 레이블 (중심점) */}
             {district.center && district.center.length === 2 && (() => {

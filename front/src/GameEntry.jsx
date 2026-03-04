@@ -108,20 +108,20 @@ const GameEntry = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 접속자 수 폴링
+  // 접속자 수 폴링 [임시 비활성 - auth 라우터 미연결]
   useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const response = await userApi.getOnlineStats();
-        setWebsiteOnlineCount(response.data.online_users);
-      } catch (error) {
-        console.error('Status Error:', error);
-      }
-    };
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 10000);
+    // const fetchStatus = async () => {
+    //   try {
+    //     const response = await userApi.getOnlineStats();
+    //     setWebsiteOnlineCount(response.data.online_users);
+    //   } catch (error) {
+    //     console.error('Status Error:', error);
+    //   }
+    // };
+    // fetchStatus();
+    // const interval = setInterval(fetchStatus, 10000);
     loadHeightMap(); // 지형 데이터 미리 로드
-    return () => clearInterval(interval);
+    // return () => clearInterval(interval);
   }, []);
 
   return (
