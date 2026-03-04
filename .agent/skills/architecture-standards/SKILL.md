@@ -1,66 +1,66 @@
 # 프로젝트 아키텍처 및 구조 가이드 (Architecture Standards)
 
-## 1. 개요: 모듈러 모놀리스 (Modular Monolith)
-이 프로젝트는 **도메인(기능) 중심**으로 폴더를 구성하는 모듈러 모놀리스 아키텍처를 따릅니다. 계층별(routers, services 등)로 상위 폴더를 나누지 않고, 하나의 기능을 수행하는 모든 파일을 하나의 도메인 폴더에 응집시킵니다.
+## 1. 개요: 복합 모듈러 모놀리스 (Domain + Layered)
+이 프로젝트는 **도메인(기능) 중심**으로 최상위 폴더를 세팅하되, 그 세부 도메인 내부에서 다시 **역할(Layer)별 폴더**로 코드를 관리하는 복잡하고 고도화된 아키텍처를 따릅니다.
 
 ---
 
 ## 2. 백엔드 구조 (`back/`)
 
-### 핵심 원칙: Identity와 Context의 분리
-- **`user/` (Identity)**: 계정의 근본(회원가입, 로그인, 탈퇴)만 다루며 최상위 독립 도메인입니다. (API 경로: `/api/auth`)
-- **`content/` (Service Context)**: 소개팅 앱의 핵심 기능(유튜브, 챗봇, 매칭 등)이 하위 도메인으로 존재합니다. (API 경로: `/api/content/...`)
-- **`game/` (Game Context)**: 3D RPG 게임 관련 로직이 존재합니다. (API 경로: `/api/game/...`)
-- **`core/`**: DB 연결(`database.py`), 전역 설정 등 모든 도메인이 공유하는 엔진 역할을 합니다.
+### 핵심 원칙: 도메인 기반 분리 + 계층형(Layered) 폴더화
+기존의 `content/` 등의 찌꺼기를 날려버리고, 모든 핵심 기능은 `back/`의 **최상단 도메인 폴더**로 나뉩니다.
+각 도메인(Ex: `user`, `player`, `world`, `monster`)의 내부에는 다음과 같은 서브 폴더들이 필수적으로 존재하여 계층을 분리합니다.
+
+- **`routers/`**: FastAPI 엔드포인트 정의 (예: `router.py`)
+- **`services/`**: 비즈니스 로직 작성 (예: `*_service.py`)
+- **`models/`**: SQLAlchemy DB 모델 정의 (예: `models.py`)
+- **`schemas/`**: Pydantic 스키마 정의 (예: `schemas.py`)
+- **`repositories/`**: DB 트랜잭션 등 데이터 접근 계층 (필요 시 구성)
+- **`managers/`**: WebSocket 소켓 통신 매니저나, 싱글톤 객체 등 특별한 상태 관리 모듈
+
+### 현재 최상단 도메인
+- **`user/`**: 회원가입, 로그인 등 계정 관리 도메인
+- **`player/`**: 인게임 유저 캐릭터 동기화, 소켓 통신 제어 (WebSocket 로직 포함)
+- **`monster/`**: 몬스터 AI 제어, 타격 등 상호작용 도메인
+- **`world/`**: OSM API 기반 실시간 지형 로딩 파이프라인(terrain, zone, district) 담당 도메인
+- **`common/`**: 기타 프로젝트 공용 설정
+- **`client/`**: 3D Asset 텍스처, 프롬프트 연동 등을 위한 OpenAI, Gemini 등 외부 생성형 AI 전송 모듈 보관 (보존)
+- **`core/`**: DB 커넥션, 앱 설정 등을 관리하는 엔진 레이어
 
 ---
 
 ## 3. 프론트엔드 구조 (`front/src/`)
 
 ### 앱 중심 구조 (`apps/`)
-- 모든 화면과 도메인 로직은 `apps/` 폴더 산하의 독립된 앱 공간에 위치합니다.
-  - `apps/auth/`: 로그인, 회원가입 관련 페이지.
-  - `apps/content/`: 홈, 배너, 매칭, 커뮤니티 등 서비스 메인 기능.
-  - `apps/game/`: RPG 월드, 캐릭터 엔티티, 게임 전용 UI.
+모든 화면과 도메인 로직은 `apps/` 폴더 산하의 독립된 앱 공간에 위치합니다.
+- `apps/auth/`: 로그인 로직, 진입 지점
+- `apps/game/`: WebGL 기반 3D World (Three.js/Fiber 기반 코어 게임 뷰)
+- `apps/gameEdit/`: HDRI 등 개발 에셋 에디터
 
 ### 중앙 집중형 API 관리 (`shared/api/`)
-- **가장 중요한 규칙**: 모든 API 호출 로직은 각 앱 폴더가 아닌 `src/shared/api/` 폴더에서 중앙 관리합니다.
-- **폴더 구성**:
-  - `shared/api/client.js`: 공통 Axios 인스턴스.
-  - `shared/api/auth/`: 인증 관련 API.
-  - `shared/api/content/`: 유튜브, 챗봇, 노벨 등 콘텐츠 API.
-  - `shared/api/game/`: 게임 동기화 및 데이터 API.
+모든 API 호출 기능은 `src/shared/api/` 폴더에서 중앙 관리합니다.
+- `shared/api/auth.js`: 로그인/유저 관련 API
+- `shared/api/game.js`: 게임 데이터 및 REST API
+- `shared/api/client.js`: 공통 Axios 인스턴스
 
 ---
 
-## 4. 절대 경로 별칭 (Alias) 사용 규칙
-상대 경로(`../../../../`)의 복잡성을 방지하기 위해 반드시 다음 별칭을 사용해야 합니다:
+## 4. 가상 환경 설정 (Virtual Environment)
+백엔드 가상 환경의 권장 위치는 `back/venv` 입니다. 
+- 프론트엔드(npm) 모듈과 파이썬 의존성을 완전히 공간적으로 분리함으로써 의존성 탐색 충돌을 예방합니다. 
+- 프로젝트 최상위 루트가 아니라 서버 코드가 위치한 `back/` 도메인 산하에서 Python 관련 패키지를 독립적으로 관리하는 것이 모노레포에서의 표준 관리법입니다.
 
-- **`@api`**: `src/shared/api` (API 호출 시 필수 사용)
-- **`@shared`**: `src/shared` (공통 컨텍스트, 훅 등)
+---
+
+## 5. 절대 경로 별칭 (Alias) 사용 규칙
+- **`@api`**: `src/shared/api`
+- **`@shared`**: `src/shared`
 - **`@auth`**: `src/apps/auth`
-- **`@content`**: `src/apps/content`
 - **`@game`**: `src/apps/game`
 - **`@`**: `src/`
 
 ---
 
-## 5. API 통신 규정 (HTTP & WebSocket)
-
-### 중앙 클라이언트 (`@api/client.js`)
-- 모든 통신 주소는 `@api/client.js`를 통해 관리됩니다.
-- **HTTP**: `import client from '@api/client'`를 사용하여 Axios 인스턴스를 활용합니다.
-- **WebSocket**: `import { getWebSocketUrl } from '@api/client'`를 사용하여 현재 배포 환경(Secure 여부 포함)에 맞는 소켓 URL을 동적으로 생성합니다.
-
-### 도메인 API 레이어 (@api/[domain]/[file])
-- 비즈니스 로직(Hook/Component)에서 직접 `axios.post`나 `new WebSocket`을 호출하지 않습니다.
-- 반드시 `@api/content/youtube.js`와 같이 정의된 API 레이어 함수를 호출하십시오.
-- **WebSocket 예시**: `gameApi.createSocket()`과 같은 형태로 소켓 객체 생성을 위임합니다.
-
----
-
-## 6. 코딩 시 주의사항 (Updated)
-- **임포트 금지**: 도메인 간의 직접적인 참조는 가급적 피하며, 필요한 경우 `shared`를 통해 소통합니다.
-- **파일명 준수**: API 파일명과 폴더명은 도메인 이름을 따라 일관성을 유지합니다. (예: `@api/content/youtube`)
-- **파일 이동**: 새로운 기능을 추가할 때 위 구조를 위반하는 위치(예: `apps/content/api/...`)에 파일을 생성하지 마십시오.
-- **경로 정규화**: 임포트 시 상대 경로(`../../`) 대신 반드시 `@api`, `@content` 등 Alias를 우선 사용합니다.
+## 6. 코딩 시 주의사항 (New Rules)
+- **임포트 경로 관리**: 백엔드 내부의 각 도메인은 완전 독립적이나, `models` 나 `services`를 호출할 때는 반드시 절대경로(예: `from player.services.skill_service import ...`)를 사용합니다.
+- **파일명 준수**: 하위 폴더(`routers`, `services`)가 생겼으므로 각 폴더 안의 Python 파일명은 `xxx_service.py` 또는 단순하게 `router.py`, `models.py`로 직관적으로 네이밍합니다.

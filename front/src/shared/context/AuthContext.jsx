@@ -1,6 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import apiClient from '@api/client';
-import userApi from '@api/auth/auth';
+import userApi from '@api/auth';
 
 const AuthContext = createContext(null);
 
@@ -58,6 +58,30 @@ export function AuthProvider({ children }) {
       return { success: false, error: errorMsg };
     }
   };
+  // 임시 관리자/게스트 우회 로그인 함수
+  const guestLogin = async () => {
+    try {
+      const response = await userApi.guestLogin();
+      const { access_token, user_id, nickname } = response.data;
+
+      // 상태 업데이트
+      setToken(access_token);
+      const userData = { id: user_id, email: "admin@guest.com", nickname };
+      setUser(userData);
+
+      // 로컬스토리지 저장
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      // Axios 기본 헤더 설정
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+
+      return { success: true };
+    } catch (error) {
+      console.error(error);
+      return { success: false, error: '게스트 로그인에 실패했습니다.' };
+    }
+  };
 
   // 로그아웃 함수
   const logout = async () => {
@@ -79,7 +103,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, signup, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, guestLogin, signup, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

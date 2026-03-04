@@ -12,9 +12,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '@api': path.resolve(__dirname, './src/shared/api'),
       '@auth': path.resolve(__dirname, './src/apps/auth'),
-      '@content': path.resolve(__dirname, './src/apps/content'),
-      '@game': path.resolve(__dirname, './src/apps/game'),
+      '@world': path.resolve(__dirname, './src/apps/world'),
+      '@entities': path.resolve(__dirname, './src/apps/entities'),
+      '@game-core': path.resolve(__dirname, './src/apps/game-core'),
+      '@game-ui': path.resolve(__dirname, './src/apps/game-ui'),
+      '@game-hooks': path.resolve(__dirname, './src/apps/game-hooks'),
       '@shared': path.resolve(__dirname, './src/shared'),
+      '@apps': path.resolve(__dirname, './src/apps'),
     }
   },
   server: {

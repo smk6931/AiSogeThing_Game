@@ -3,14 +3,10 @@ load_dotenv(override=True) # .env 파일 로드 (시스템 환경변수 덮어�
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from content.hotplace.router import router as hotplace_router
-from content.youtube.router import router as youtube_router
-from content.user.router import router as user_router
-from content.chatbot.router import router as chatbot_router
-from content.admin.router import router as admin_router
-from content.search.router import router as search_router
-from content.novel.router import router as novel_router
-from game.router import router as game_router
+from user.routers.router import router as auth_router
+from player.routers.router import router as player_router
+from world.routers.router import router as world_router
+from common.routers.router import router as common_router
 
 app = FastAPI()
 
@@ -48,14 +44,10 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(hotplace_router)
-app.include_router(youtube_router)
-app.include_router(user_router)
-app.include_router(chatbot_router)
-app.include_router(admin_router)
-app.include_router(search_router)  # 스마트 검색 추가
-app.include_router(novel_router)
-app.include_router(game_router)
+app.include_router(auth_router)
+app.include_router(player_router)
+app.include_router(world_router)
+app.include_router(common_router)
 
 
 @app.get("/")
