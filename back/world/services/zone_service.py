@@ -11,7 +11,8 @@ import math
 import os
 
 # 캐시 디렉토리 설정
-CACHE_DIR = "static/cache/zones"
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "cache", "zones")
+# static/cache/zones 대신 cache/zones 사용 (통합 캐시 구조)
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 # Overpass API 미러 서버 목록

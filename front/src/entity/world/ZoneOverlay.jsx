@@ -13,6 +13,7 @@
  * - residential: 주거지역
  */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import worldApi from '@api/world';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
@@ -298,12 +299,13 @@ const ZoneOverlay = ({
       setLoadingGroups(prev => ({ ...prev, [groupName]: true }));
 
       try {
-        const catsQuery = categories.join(',');
-        const url = `/api/game/zones?lat=${playerGps.lat.toFixed(6)}&lng=${playerGps.lng.toFixed(6)}&dist=${zoneRadius}&categories=${catsQuery}`;
-
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const response = await worldApi.getZones(
+          playerGps.lat,
+          playerGps.lng,
+          zoneRadius,
+          categories.join(',')
+        );
+        const data = response.data;
         data._timestamp = Date.now();
 
         updateState(data);

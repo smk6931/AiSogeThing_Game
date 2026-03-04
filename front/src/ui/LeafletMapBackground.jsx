@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@world/mapConfig';
+import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
 // 맵의 중심을 캐릭터 위치에 맞게 업데이트하는 컴포넌트
 const MapController = ({ center, zoom }) => {

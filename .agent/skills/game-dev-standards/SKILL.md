@@ -3,7 +3,7 @@
 ## 1. 투사체(Projectile) 구현 원칙
 - **단일 책임 원칙:** 투사체 컴포넌트(예: `Projectile.jsx`)는 오직 **"주어진 방향과 속도로 이동"**하는 역할만 수행한다.
 - **언리얼 스타일:** `ProjectileMovement` 컴포넌트처럼 초기 위치(`startPos`)와 속도(`velocity`) 혹은 방향/속도 조합을 받아 독립적으로 움직이도록 설계한다.
-- **로직 분리:** 분열(Split), 유도(Homing), 특수 효과 등 복잡한 비즈니스 로직은 투사체가 아닌 **스킬 서비스(`usePlayerSkills.js`)**나 **매니저 훅(`useProjectiles.js`)**에서 제어한다.
+- **로직 분리:** 분열(Split), 유도(Homing), 특수 효과 등 복잡한 비즈니스 로직은 투사체가 아닌 **스킬 서비스(`entity/player/logic/usePlayerSkills.js`)**나 **매니저 훅(`hooks/useProjectiles.js`)**에서 제어한다.
 
 ## 2. 주석 및 파라미터화 규칙
 - **쉬운 수정:** 사용자가 코드를 직접 수정하기 쉽도록 핵심 파라미터는 변수로 빼고, 상단에 명확한 주석을 단다.

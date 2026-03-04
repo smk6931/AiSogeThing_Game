@@ -1,9 +1,9 @@
 import React, { Suspense, useRef } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import RpgWorld from '@world/RpgWorld';
-import EnvironmentEffects from '@world/EnvironmentEffects';
-import ZoomController from '@game-core/ZoomController';
+import RpgWorld from '@entity/world/RpgWorld';
+import EnvironmentEffects from '@entity/world/EnvironmentEffects';
+import ZoomController from '@engine/ZoomController';
 
 // 시점 제어용 줌 컨트롤러 (실제 카메라는 RpgWorld에서 동적 렌더링)
 const ZoomSystem = ({ zoomLevel }) => {

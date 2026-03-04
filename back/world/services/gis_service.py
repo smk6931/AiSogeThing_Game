@@ -3,6 +3,10 @@ import geopandas as gpd
 from shapely.geometry import box
 import os
 
+# osmnx 캐시 설정 (라이브러리 원본 캐시를 raw 폴더로 격리)
+ox.settings.use_cache = True
+ox.settings.cache_folder = os.path.join(os.path.dirname(__file__), "..", "..", "cache", "raw")
+
 class GisService:
     def __init__(self):
         # 강남역 사거리 기준
@@ -68,5 +72,5 @@ if __name__ == "__main__":
     gangnam_lat, gangnam_lng = 37.4979, 127.0276
     edges = service.fetch_area_features(gangnam_lat, gangnam_lng, dist=500)
     if edges is not None:
-        os.makedirs("static/maps/skeletons", exist_ok=True)
-        service.export_skeleton_svg(edges, "static/maps/skeletons/gangnam_skeleton.png")
+        os.makedirs("cache/maps/skeletons", exist_ok=True)
+        service.export_skeleton(edges, "cache/maps/skeletons/gangnam_skeleton.png")

@@ -12,7 +12,7 @@ import json
 import os
 import time
 
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache", "districts")
 DISTRICT_CACHE_FILE = os.path.join(CACHE_DIR, "seoul_districts.json")
 OVERPASS_MIRRORS = [
     "https://overpass-api.de/api/interpreter",

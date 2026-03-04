@@ -1,8 +1,8 @@
 import React, { forwardRef } from 'react';
 import { Html } from '@react-three/drei';
-import PlayerChat from './player/PlayerChat';
-import { usePlayerMovement } from './player/usePlayerMovement';
-import { usePlayerSkills } from './player/usePlayerSkills';
+import PlayerChat from './logic/PlayerChat';
+import { usePlayerMovement } from './logic/usePlayerMovement';
+import { usePlayerSkills } from './logic/usePlayerSkills';
 
 /**
  * 로컬 플레이어 컴포넌트

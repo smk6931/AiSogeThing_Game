@@ -1,6 +1,6 @@
 import React from 'react';
 import { Sky, ContactShadows, Environment } from '@react-three/drei';
-import { useGameConfig } from '@shared/context/GameConfigContext';
+import { useGameConfig } from '@contexts/GameConfigContext';
 
 /**
  * 게임의 전체적인 분위기를 담당하는 환경 설정 컴포넌트

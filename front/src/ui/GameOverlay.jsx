@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Shield, Zap, Sword, Settings, Home, LogOut, Users, Flame } from 'lucide-react';
-import { useAuth } from '@shared/context/AuthContext';
+import { useAuth } from '@contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import LeafletMapBackground from './LeafletMapBackground';
-import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M, getAllMaps } from '@world/mapConfig';
-import { useSeoulDistricts } from '@game-hooks/useSeoulDistricts';
+import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M, getAllMaps } from '@entity/world/mapConfig';
+import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 
 // =============================
 // 공통 가이드 & 유틸리티

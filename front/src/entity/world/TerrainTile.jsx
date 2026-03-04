@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import client from '@api/client';
+import worldApi from '@api/world';
 import { getTerrainHeight } from './terrainHandler';
 
 const COLORS = {
@@ -72,7 +72,7 @@ const TerrainTile = ({ lat, lng, centerX, centerZ, size = 1000 }) => {
 
   useEffect(() => {
     if (fetched.current) return;
-    client.get(`/api/game/terrain?lat=${lat}&lng=${lng}&dist=${size / 2}`)
+    worldApi.getTerrain(lat, lng, size / 2)
       .then(res => {
         setData(res.data);
         fetched.current = true;

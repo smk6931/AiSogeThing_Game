@@ -2,26 +2,26 @@ import React, { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useTexture, OrbitControls, Html, TransformControls, Environment, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
-import Player from '@entities/Player';
-import RemotePlayer from '@entities/RemotePlayer';
-import ZoomController from '@game-core/ZoomController';
-import { useAuth } from '@shared/context/AuthContext';
-import { PunchProjectile } from '@entities/projectile/PunchProjectile';
-import Monster from '@entities/Monster';
-import SceneLoader from '@world/SceneLoader';
-import WorldDebugger from '@world/WorldDebugger';
+import Player from '@entity/player/Player';
+import RemotePlayer from '@entity/player/RemotePlayer';
+import ZoomController from '@engine/ZoomController';
+import { useAuth } from '@contexts/AuthContext';
+import { PunchProjectile } from '@entity/player/projectile/PunchProjectile';
+import Monster from '@entity/monster/Monster';
+import SceneLoader from '@entity/world/SceneLoader';
+import WorldDebugger from '@entity/world/WorldDebugger';
 import { useState, useMemo } from 'react';
 
-import { getAllMaps, getMap } from '@world/mapConfig';
-import Portal from '@world/Portal';
-import MapTiles from '@world/MapTiles';
-import SeoulHeightMap from '@world/SeoulHeightMap';
-import SeoulSubwayLines from '@world/SeoulSubwayLines';
-import ZoneOverlay from '@world/ZoneOverlay';
-import CityBlockOverlay from '@world/CityBlockOverlay';
-import SeoulDistrictOverlay from '@world/SeoulDistrictOverlay';
-import { useSeoulDistricts } from '@game-hooks/useSeoulDistricts';
-import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@world/mapConfig';
+import { getAllMaps, getMap } from '@entity/world/mapConfig';
+import Portal from '@entity/world/Portal';
+import MapTiles from '@entity/world/MapTiles';
+import SeoulHeightMap from '@entity/world/SeoulHeightMap';
+import SeoulSubwayLines from '@entity/world/SeoulSubwayLines';
+import ZoneOverlay from '@entity/world/ZoneOverlay';
+import CityBlockOverlay from '@entity/world/CityBlockOverlay';
+import SeoulDistrictOverlay from '@entity/world/SeoulDistrictOverlay';
+import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
+import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
 // 각도 보간 함수 (Shortest path lerp for angles)
 const lerpAngle = (start, end, t) => {

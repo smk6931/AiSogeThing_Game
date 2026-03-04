@@ -20,8 +20,9 @@ description: Maintain consistent naming conventions and architectural patterns a
 - **No Random Aliasing:** 줄임말 쓰지 마라. `pm = PlayerManager()` (X) -> `playerManager` (O).
 
 ## 2. WebSocket Standard (공통 모듈 상속)
-- **Inherit ConnectionManager:** 웹소켓 기능이 필요하면 바닥부터 짜지 말고 `back.utils.websocket.ConnectionManager`를 상속받아라.
-- **Why:** `connect`, `disconnect`, `broadcast` 같은 기본 통신 로직은 Chat, Game, Notification 모두 동일하다. 중복 코드를 없애라.
+- **Inherit ConnectionManager:** 웹소켓 기능이 필요하면 바닥부터 짜지 말고 `back/utils/websocket.py`의 `ConnectionManager`를 상속받아라.
+- **Why:** `connect`, `disconnect`, `broadcast` 같은 기본 통신 로직은 player, monster 모두 동일하다. 중복 코드를 없애라.
+- **매니저 위치**: 각 도메인의 `managers/` 서브폴더에 클래스를 정의하고, 파일 최하단에 `instance = ClassName()` 형태로 싱글톤 생성.
 
 ## 3. Import Rules (Import 시 원본 이름 유지)
 - **제멋대로 이름을 바꾸지 마라.**

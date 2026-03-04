@@ -10,15 +10,13 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@api': path.resolve(__dirname, './src/shared/api'),
-      '@auth': path.resolve(__dirname, './src/apps/auth'),
-      '@world': path.resolve(__dirname, './src/apps/world'),
-      '@entities': path.resolve(__dirname, './src/apps/entities'),
-      '@game-core': path.resolve(__dirname, './src/apps/game-core'),
-      '@game-ui': path.resolve(__dirname, './src/apps/game-ui'),
-      '@game-hooks': path.resolve(__dirname, './src/apps/game-hooks'),
-      '@shared': path.resolve(__dirname, './src/shared'),
-      '@apps': path.resolve(__dirname, './src/apps'),
+      '@api': path.resolve(__dirname, './src/api'),
+      '@contexts': path.resolve(__dirname, './src/contexts'),
+      '@hooks': path.resolve(__dirname, './src/hooks'),
+      '@engine': path.resolve(__dirname, './src/engine'),
+      '@entity': path.resolve(__dirname, './src/entity'),
+      '@ui': path.resolve(__dirname, './src/ui'),
+      '@screens': path.resolve(__dirname, './src/screens'),
     }
   },
   server: {

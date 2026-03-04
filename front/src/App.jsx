@@ -1,10 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from '@shared/context/AuthContext';
-import { GameConfigProvider } from '@shared/context/GameConfigContext';
+import { AuthProvider } from '@contexts/AuthContext';
+import { GameConfigProvider } from '@contexts/GameConfigContext';
 
-import Login from './apps/auth/pages/Login/Login';
+import Login from '@screens/Login/Login';
 
-import GameEntry from './apps/GameEntry';
+import GameEntry from './GameEntry';
 
 import './App.css';
 

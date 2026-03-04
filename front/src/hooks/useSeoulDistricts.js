@@ -4,6 +4,7 @@
  * 이후 호출은 캐시에서 즉시 반환. (구 경계 폴리곤 + 현재 구 판별 함수 제공)
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
+import worldApi from '@api/world';
 
 const CACHE_KEY = 'seoul-districts-cache-v2';
 const CACHE_TTL = 86400000 * 30; // 30일 (행정 경계는 거의 불변)
@@ -50,9 +51,8 @@ export function useSeoulDistricts() {
       // 2. 백엔드 API 패치
       setLoading(true);
       try {
-        const res = await fetch('/api/game/districts');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const response = await worldApi.getDistricts();
+        const data = response.data;
         const list = data.districts || [];
         console.log(`[useSeoulDistricts] 서버에서 ${list.length}개 구 경계 로드`);
         setDistricts(list);

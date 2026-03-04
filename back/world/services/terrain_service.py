@@ -5,6 +5,11 @@ import time
 import urllib.request
 import urllib.parse
 from shapely.geometry import Polygon, LineString, MultiPolygon, MultiLineString
+import os
+
+# osmnx 캐시 설정 (라이브러리 원본 데이터는 raw 폴더로 격리)
+ox.settings.use_cache = True
+ox.settings.cache_folder = os.path.join(os.path.dirname(__file__), "..", "..", "cache", "raw")
 
 class TerrainService:
     def __init__(self):

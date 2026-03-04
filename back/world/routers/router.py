@@ -4,7 +4,7 @@ from world.services.terrain_service import terrain_service
 from world.services.zone_service import fetch_zones
 from world.services.district_service import fetch_seoul_districts, get_current_district as _get_current_district
 
-router = APIRouter(prefix="/api/game", tags=["Game World"])
+router = APIRouter(prefix="/api/world", tags=["World"])
 
 @router.get("/terrain")
 async def get_terrain_data(lat: float, lng: float, dist: int = 500):

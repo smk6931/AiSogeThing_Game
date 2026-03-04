@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MAPS } from '@world/mapConfig';
+import { MAPS } from '@entity/world/mapConfig';
 
 const WorldMapModal = ({ isOpen, onClose, onSelectMap }) => {
   if (!isOpen) return null;

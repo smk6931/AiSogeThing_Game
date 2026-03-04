@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Joystick } from 'react-joystick-component';
-import { useAuth } from '@shared/context/AuthContext';
+import { useAuth } from '@contexts/AuthContext';
 import userApi from '@api/auth';
-import { useGameInput } from '@game-core/useGameInput';
-import { useProjectiles } from '@game-hooks/useProjectiles';
-import { useGameSocket } from '@game-core/useGameSocket';
-import GameOverlay from '@game-ui/GameOverlay';
-import ChatBox from '@game-ui/ChatBox';
-import WorldMapModal from '@game-ui/WorldMapModal';
-import { getMap } from '@world/mapConfig';
-import LeafletMapBackground from '@game-ui/LeafletMapBackground'; // [NEW] 실시간 지도 모듈
-import { loadHeightMap } from '@world/terrainHandler';
-import MapControlOverlay from '@game-ui/MapControlOverlay';
-import { useGameConfig } from '@shared/context/GameConfigContext';
-import GameCanvas from '@game-core/GameCanvas';
+import { useGameInput } from '@engine/useGameInput';
+import { useProjectiles } from '@hooks/useProjectiles';
+import { useGameSocket } from '@engine/useGameSocket';
+import GameOverlay from '@ui/GameOverlay';
+import ChatBox from '@ui/ChatBox';
+import WorldMapModal from '@ui/WorldMapModal';
+import { getMap } from '@entity/world/mapConfig';
+import LeafletMapBackground from '@ui/LeafletMapBackground'; // [NEW] 실시간 지도 모듈
+import { loadHeightMap } from '@entity/world/terrainHandler';
+import MapControlOverlay from '@ui/MapControlOverlay';
+import { useGameConfig } from '@contexts/GameConfigContext';
+import GameCanvas from '@engine/GameCanvas';
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();

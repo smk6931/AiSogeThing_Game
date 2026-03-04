@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '@shared/context/AuthContext';
+import { useAuth } from '@contexts/AuthContext';
 import gameApi from '@api/game';
 
 export const useGameSocket = (addProjectile) => {
