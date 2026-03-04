@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polyline, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Polygon, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
@@ -59,6 +59,17 @@ const LeafletMapBackground = ({ playerPositionRef, zoomLevel, districts = [], cu
         <TileLayer
           url="https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png"
         />
+
+        {/* 서울 외곽 어둡게 마스크 (미니맵 시야 제한용) */}
+        {districts && districts.length > 0 && (
+          <Polygon
+            positions={[
+              [[-90, -180], [90, -180], [90, 180], [-90, 180]], // 전 세계 박스
+              ...districts.map(d => d.coords) // 서울 구역들 구멍(hole)으로 뚫림
+            ]}
+            pathOptions={{ color: 'transparent', fillColor: '#050510', fillOpacity: 0.85 }}
+          />
+        )}
 
         {/* 서울 구 경계선 렌더링 */}
         {districts.map((district) => {

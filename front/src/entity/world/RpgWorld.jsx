@@ -206,6 +206,7 @@ const RpgWorld = ({
   // 서울 구 경계 데이터 + 현재 구 판별
   const { districts, getDistrictAt } = useSeoulDistricts();
   const [currentDistrictId, setCurrentDistrictId] = useState(null);
+  const [currentDistrict, setCurrentDistrict] = useState(null); // 구 전체 객체 (coords, center 포함)
 
   // 플레이어 GPS 위치 기반 현재 구 판별 (1초마다 체크)
   useEffect(() => {
@@ -217,6 +218,8 @@ const RpgWorld = ({
       const found = getDistrictAt(lat, lng);
       if (found && found.id !== currentDistrictId) {
         setCurrentDistrictId(found.id);
+        setCurrentDistrict(found); // coords 포함 전체 객체 저장
+        console.log(`[RpgWorld] 구 전환: ${found.name}`);
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -355,14 +358,15 @@ const RpgWorld = ({
         playerPos={playerRef.current ? playerRef.current.position : { x: 0, z: 0 }}
         zoomLevel={zoomLevel || 16}
         showOsmMap={showOsmMap}
-
         cameraMode={cameraMode}
         elevation={debugConfig.mapElevation}
+        districts={districts} // 전체 서울 마스크를 위해 전달
       />
 
       {/* Zone 오버레이 시스템 (지도 위에 반투명 구역 표시) + 데이터를 SeoulHeightMap에 공급 */}
       <ZoneOverlay
         playerPos={playerRef.current ? playerRef.current.position : { x: 0, z: 0 }}
+        currentDistrict={currentDistrict}  // [구 기반 스트리밍] 현재 구 객체 전달
         visible={(showSeoulRoads || showSeoulNature || showCityBlocks || showLanduseZones)}
         enabledZones={{
           water: showSeoulNature,
@@ -399,6 +403,7 @@ const RpgWorld = ({
           playerRef={playerRef}
           heightScale={debugConfig.terrainHeightScale}
           zoneData={sharedZoneData}
+          currentDistrict={currentDistrict} // 구 마스크를 위한 데이터 전달
         />
       </group>
 

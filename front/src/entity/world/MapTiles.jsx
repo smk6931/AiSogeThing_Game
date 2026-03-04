@@ -83,9 +83,50 @@ const FixedOverlayTile = ({ originGps }) => {
   );
 };
 
+// [NEW] 서울 구역 이외의 배경을 어둡게 마스크 처리하는 오버레이
+const SeoulMask = ({ districts, elevation }) => {
+  const geometry = useMemo(() => {
+    if (!districts || districts.length === 0) return null;
+
+    const shape = new THREE.Shape();
+    shape.moveTo(-300000, -300000);
+    shape.lineTo(300000, -300000);
+    shape.lineTo(300000, 300000);
+    shape.lineTo(-300000, 300000);
+    shape.closePath();
+
+    districts.forEach(d => {
+      if (!d.coords || d.coords.length === 0) return;
+      const hole = new THREE.Path();
+
+      // 주의: Three.js ShapeGeometry 평면 좌표계(x, y) = 3D 월드의 (x, -worldZ)
+      const firstX = (d.coords[0][1] - GIS_ORIGIN.lng) * LNG_TO_M;
+      const firstY = -((GIS_ORIGIN.lat - d.coords[0][0]) * LAT_TO_M);
+      hole.moveTo(firstX, firstY);
+
+      for (let i = 1; i < d.coords.length; i++) {
+        const px = (d.coords[i][1] - GIS_ORIGIN.lng) * LNG_TO_M;
+        const py = -((GIS_ORIGIN.lat - d.coords[i][0]) * LAT_TO_M);
+        hole.lineTo(px, py);
+      }
+      hole.closePath();
+      shape.holes.push(hole);
+    });
+
+    return new THREE.ShapeGeometry(shape);
+  }, [districts]);
+
+  if (!geometry) return null;
+
+  return (
+    <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, elevation, 0]} renderOrder={-10}>
+      <meshBasicMaterial color="#050510" transparent opacity={0.88} depthWrite={false} side={THREE.DoubleSide} />
+    </mesh>
+  );
+};
 
 
-const MapTiles = ({ playerPos, zoomLevel = 16, showOsmMap = true, cameraMode = 'isometric', elevation = -0.05 }) => {
+const MapTiles = ({ playerPos, zoomLevel = 16, showOsmMap = true, cameraMode = 'isometric', elevation = -0.05, districts = [] }) => {
   const zoom = Math.max(13, Math.floor(zoomLevel || 16)); // 최소 줌 레벨 13 보장 (흐려짐 방지)
 
   // 현재 플레이어의 GPS 위치 계산
@@ -124,6 +165,11 @@ const MapTiles = ({ playerPos, zoomLevel = 16, showOsmMap = true, cameraMode = '
           />
         </React.Suspense>
       ))}
+
+      {/* 2. 서울 외곽 스크린 마스크 */}
+      {showOsmMap && districts.length > 0 && (
+        <SeoulMask districts={districts} elevation={elevation + 0.01} />
+      )}
 
     </group>
   );

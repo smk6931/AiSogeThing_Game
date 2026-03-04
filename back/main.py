@@ -3,7 +3,7 @@ load_dotenv(override=True) # .env 파일 로드 (시스템 환경변수 덮어�
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from user.routers.router import router as auth_router
+# from user.routers.router import router as auth_router
 from player.routers.router import router as player_router
 from world.routers.router import router as world_router
 from common.routers.router import router as common_router
@@ -44,7 +44,7 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(auth_router)
+# app.include_router(auth_router)
 app.include_router(player_router)
 app.include_router(world_router)
 app.include_router(common_router)

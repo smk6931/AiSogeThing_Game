@@ -2,8 +2,8 @@
  * SeoulDistrictOverlay.jsx
  * 서울 25개 구 행정 경계를 Three.js 씬 위에 렌더링하는 컴포넌트.
  * - 각 구의 GPS 폴리곤 → 게임 XZ 좌표로 변환 → 지면 위 라인으로 표시
- * - 현재 플레이어가 위치한 구는 밝은 황금색으로 강조
- * - 구 이름 레이블은 Html 2D 오버레이로 표시
+ * - [업데이트] 현재 플레이어가 위치한 구는 강렬한 빨간색(#ff3333)으로 표시
+ * - [업데이트] 현재 구 외의 다른 지역은 렌더링하지 않음 (레이어 마스크 효과)
  */
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
@@ -19,7 +19,7 @@ function gpsToXZ(lat, lng) {
 }
 
 /** 구 경계를 Three.js Line으로 렌더링 */
-function DistrictLine({ coords, color, lineWidth = 1, elevation = 0.5 }) {
+function DistrictLine({ coords, color, lineWidth = 2, elevation = 0.5 }) {
   const geometry = useMemo(() => {
     const pts = coords.map(([lat, lng]) => {
       const { x, z } = gpsToXZ(lat, lng);
@@ -33,13 +33,13 @@ function DistrictLine({ coords, color, lineWidth = 1, elevation = 0.5 }) {
 
   return (
     <line geometry={geometry}>
-      <lineBasicMaterial color={color} linewidth={lineWidth} transparent opacity={0.85} />
+      <lineBasicMaterial color={color} linewidth={lineWidth} transparent opacity={0.9} />
     </line>
   );
 }
 
 /** 구 경계를 지정된 높이와 두께를 가진 장엄한 투명 결계로 렌더링 */
-function DistrictWall({ coords, color, wallHeight = 100, wallThickness = 20, elevation = 0.5 }) {
+function DistrictWall({ coords, color, wallHeight = 150, wallThickness = 25, elevation = 0.5, opacity = 0.2 }) {
   const geometry = useMemo(() => {
     const pts = coords.map(([lat, lng]) => {
       const { x, z } = gpsToXZ(lat, lng);
@@ -61,36 +61,31 @@ function DistrictWall({ coords, color, wallHeight = 100, wallThickness = 20, ele
       const len = Math.sqrt(dx * dx + dz * dz);
       if (len === 0) continue;
 
-      // 선분 법선 벡터 (좌우 폭 계산용)
       const nx = -dz / len;
       const nz = dx / len;
       const hw = wallThickness / 2;
 
-      // 4 모서리 (좌측/우측)
       const v0x = p1.x + nx * hw, v0z = p1.z + nz * hw;
       const v1x = p1.x - nx * hw, v1z = p1.z - nz * hw;
       const v2x = p2.x + nx * hw, v2z = p2.z + nz * hw;
       const v3x = p2.x - nx * hw, v3z = p2.z - nz * hw;
 
-      // 수직 벽(Quad) 헬퍼 함수
       const addVerticalQuad = (ax, az, bx, bz) => {
         const base = vertexIndex;
         positions.push(
-          ax, elevation, az,               // 바닥 A 
-          bx, elevation, bz,               // 바닥 B
-          ax, elevation + wallHeight, az,  // 상단 A
-          bx, elevation + wallHeight, bz   // 상단 B
+          ax, elevation, az,
+          bx, elevation, bz,
+          ax, elevation + wallHeight, az,
+          bx, elevation + wallHeight, bz
         );
         indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
         vertexIndex += 4;
       };
 
-      // 1. 좌측 외벽
-      addVerticalQuad(v0x, v0z, v2x, v2z);
-      // 2. 우측 내벽
-      addVerticalQuad(v3x, v3z, v1x, v1z);
+      addVerticalQuad(v0x, v0z, v2x, v2z); // 외벽
+      addVerticalQuad(v3x, v3z, v1x, v1z); // 내벽
 
-      // 3. 상단 뚜껑 (Top Lid)
+      // 뚜껑
       const base = vertexIndex;
       positions.push(
         v0x, elevation + wallHeight, v0z,
@@ -114,7 +109,7 @@ function DistrictWall({ coords, color, wallHeight = 100, wallThickness = 20, ele
       <meshBasicMaterial
         color={color}
         transparent
-        opacity={0.12} // 폭이 생겨 면적/중첩이 많으므로 불투명도를 살짝 낮춤
+        opacity={opacity}
         side={THREE.DoubleSide}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
@@ -135,45 +130,55 @@ const SeoulDistrictOverlay = ({
     <group name="seoul-district-overlay">
       {districts.map((district) => {
         const isActive = district.id === currentDistrictId;
-        const color = isActive ? '#ffd700' : '#4488ff';
-        const labelColor = isActive ? '#ffd700' : '#88aaff';
+
+        // [레이어 마스크] 현재 속한 구가 아닐 경우 렌더링 스킵
+        if (!isActive) return null;
+
+        const color = '#ff3333'; // 캐릭터가 속한 구는 레드로 강조
+        const labelColor = '#ff5555';
 
         return (
           <group key={district.id}>
-            {/* 구 경계선 (바닥) */}
+            {/* 바닥 경계선 */}
             <DistrictLine
               coords={district.coords}
               color={color}
+              lineWidth={2}
               elevation={elevation}
             />
-            {/* 구 경계벽 (투명 결계, 높이 100m 두께 20m) */}
+            {/* 거대한 경계벽 (Mask Effect) */}
             <DistrictWall
               coords={district.coords}
               color={color}
-              wallHeight={100}
-              wallThickness={20}
+              wallHeight={150}
+              wallThickness={25}
               elevation={elevation}
+              opacity={0.15}
             />
             {/* 구 이름 레이블 (중심점) */}
             {district.center && district.center.length === 2 && (() => {
               const { x, z } = gpsToXZ(district.center[0], district.center[1]);
               return (
                 <Html
-                  position={[x, elevation + 0.2, z]}
+                  position={[x, elevation + 10, z]}
                   center
-                  zIndexRange={[0, 10]}
+                  zIndexRange={[0, 100]}
                 >
                   <div style={{
                     color: labelColor,
-                    fontSize: isActive ? '14px' : '11px',
-                    fontWeight: isActive ? 'bold' : 'normal',
-                    textShadow: '0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8)',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    textShadow: '0 0 10px rgba(0,0,0,1)',
                     whiteSpace: 'nowrap',
                     pointerEvents: 'none',
+                    background: 'rgba(0,0,0,0.6)',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    border: `1px solid ${color}`,
                     fontFamily: "'Noto Sans KR', sans-serif",
-                    letterSpacing: '0.5px',
+                    letterSpacing: '1px',
                   }}>
-                    {district.name}
+                    {district.name} (ACTIVE ZONE)
                   </div>
                 </Html>
               );

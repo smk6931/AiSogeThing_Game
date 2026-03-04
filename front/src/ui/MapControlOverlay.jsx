@@ -32,12 +32,24 @@ const MapControlOverlay = ({
   showDistrictBoundaries, setShowDistrictBoundaries,
   cameraMode, setCameraMode,
 }) => {
+  // 용도 구역 세부 설정 패널의 독립적인 표시 상태
+  const [isLandusePanelOpen, setIsLandusePanelOpen] = React.useState(false);
+
+  // 레이어 토글 시 패널 상태 연동
+  const toggleLanduse = () => {
+    const nextValue = !showLanduseZones;
+    setShowLanduseZones(nextValue);
+    // 켜질 때는 패널도 같이 열어줌
+    if (nextValue) setIsLandusePanelOpen(true);
+    else setIsLandusePanelOpen(false);
+  };
+
   const stateMap = {
     showOsmMap: { value: showOsmMap, setter: setShowOsmMap },
     showSeoulRoads: { value: showSeoulRoads, setter: setShowSeoulRoads },
     showSeoulNature: { value: showSeoulNature, setter: setShowSeoulNature },
     showCityBlocks: { value: showCityBlocks, setter: setShowCityBlocks },
-    showLanduseZones: { value: showLanduseZones, setter: setShowLanduseZones },
+    showLanduseZones: { value: showLanduseZones, setter: toggleLanduse }, // 커스텀 토글 핸들러 사용
     showHeightMap: { value: showHeightMap, setter: setShowHeightMap },
     showDistrictBoundaries: { value: showDistrictBoundaries, setter: setShowDistrictBoundaries },
   };
@@ -93,7 +105,7 @@ const MapControlOverlay = ({
             </button>
 
             {/* 용도 구역 세부 필터 드롭다운 패널 */}
-            {isLanduseBtn && isOn && landuseFilters && (
+            {isLanduseBtn && isOn && isLandusePanelOpen && landuseFilters && (
               <div style={{
                 position: 'absolute', top: '100%', left: 0, marginTop: '8px',
                 background: PANEL_BG, border: `1px solid ${BORDER_OFF}`,
@@ -120,6 +132,27 @@ const MapControlOverlay = ({
                     {fLabel}
                   </label>
                 ))}
+
+                {/* 닫기 버튼 수정: 레이어는 끄지 않고 패널만 닫음 */}
+                <button
+                  onClick={() => setIsLandusePanelOpen(false)}
+                  style={{
+                    marginTop: '4px',
+                    padding: '6px',
+                    fontSize: '11px',
+                    background: 'rgba(160, 50, 50, 0.4)',
+                    color: '#ffaaaa',
+                    border: '1px solid rgba(160, 50, 50, 0.6)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontFamily: GAME_FONT,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = 'rgba(160, 50, 50, 0.6)'}
+                  onMouseOut={(e) => e.target.style.background = 'rgba(160, 50, 50, 0.4)'}
+                >
+                  ✕ 팝업만 가리기
+                </button>
               </div>
             )}
           </div>

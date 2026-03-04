@@ -219,16 +219,34 @@ const ZoneLineMesh = React.memo(({ geometry, color, opacity, elevation }) => {
 });
 
 /**
+ * 구(District) coords 배열에서 bbox 중심 lat/lng와 dist(m)을 계산
+ */
+const calcDistrictBbox = (coords) => {
+  if (!coords || coords.length === 0) return null;
+  const lats = coords.map(c => c[0]);
+  const lngs = coords.map(c => c[1]);
+  const latMin = Math.min(...lats), latMax = Math.max(...lats);
+  const lngMin = Math.min(...lngs), lngMax = Math.max(...lngs);
+  const centerLat = (latMin + latMax) / 2;
+  const centerLng = (lngMin + lngMax) / 2;
+  const latDist = (latMax - latMin) * 111000 / 2 * 1.1;
+  const lngDist = (lngMax - lngMin) * 88200 / 2 * 1.1;
+  const dist = Math.ceil(Math.max(latDist, lngDist));
+  return { lat: centerLat, lng: centerLng, dist };
+};
+
+/**
  * 메인 Zone 오버레이 컴포넌트
- * 
+ *
  * Props:
- * - playerPos: { x, z } 플레이어 위치 
+ * - playerPos: { x, z } 플레이어 위치
+ * - currentDistrict: { id, name, coords, center } 현재 구 객체
  * - visible: 전체 표시 여부
  * - enabledZones: { water: true, park: true, ... } 카테고리별 표시 여부
  * - elevation: Y축 높이 (지도 위에 올려야 함)
  */
 const ZoneOverlay = ({
-  playerPos, elevation = 0.05, heightScale = 1.0, onZoneLoaded, visible = true, enabledZones = {},
+  playerPos, currentDistrict = null, elevation = 0.05, heightScale = 1.0, onZoneLoaded, visible = true, enabledZones = {},
   zoneRadius = 2500
 }) => {
   const [zoneData, setZoneData] = useState({ zones: {}, categories: {} });
@@ -239,109 +257,136 @@ const ZoneOverlay = ({
   // 프론트엔드 세션 캐시
   const zoneCache = useRef(new Map());
 
-  const FETCH_DISTANCE = 2000; // 2km 이동 시 새 데이터 요청
+  const FETCH_DISTANCE = 2000; // currentDistrict 없을 때 fallback 기준
 
   // 마운트 시 heightmap 한 번만 로드
   useEffect(() => {
     loadHeightmap().then(hm => setHeightmap(hm));
   }, []);
 
-  // 현재 플레이어의 GPS 좌표 (소수점 6자리까지)
+  // 현재 플레이어의 GPS 좌표
   const playerGps = useMemo(() => ({
     lat: GIS_ORIGIN.lat - ((playerPos?.z || 0) / LAT_TO_M),
     lng: GIS_ORIGIN.lng + ((playerPos?.x || 0) / LNG_TO_M)
   }), [playerPos?.x, playerPos?.z]);
 
-  // 플레이어 이동 시 Zone 데이터 로드
+  // 공통 상태 업데이트 함수
+  const updateState = (data) => {
+    setZoneData(prev => ({
+      ...prev,
+      zones: { ...prev.zones, ...data.zones },
+      categories: { ...prev.categories, ...data.categories }
+    }));
+  };
+
+  // [핵심] 구(District) 기반 Zone 로드 — 구가 바뀔 때만 fetch
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !currentDistrict) return;
 
-    // 현재 격자 확인 (소수점 2자리 기준 약 1km 단위 캐싱)
-    const gridKey = `${playerGps.lat.toFixed(2)}_${playerGps.lng.toFixed(2)}`;
+    const cacheKey = `world_zones_district_${currentDistrict.id}`;
 
-    // 마지막 요청 위치와 현재 위치의 거리 확인
-    const dx = (playerPos?.x || 0) - lastFetchPos.current.x;
-    const dz = (playerPos?.z || 0) - lastFetchPos.current.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-
-    if (dist < FETCH_DISTANCE && Object.keys(zoneData.zones).length > 0) return;
-
-    lastFetchPos.current = { x: playerPos?.x || 0, z: playerPos?.z || 0 };
-
-    // 그룹별 비동기 로딩 함수
-    const fetchGroup = async (groupName, categories) => {
-      const cacheKey = `${groupName}_${gridKey}`;
-
-      // 1. 메모리 캐시 확인
+    const fetchForDistrict = async () => {
+      // 1. 메모리 캐시
       if (zoneCache.current.has(cacheKey)) {
+        console.log(`[ZoneOverlay] 구 메모리 캐시: ${currentDistrict.name}`);
+        setZoneData({ zones: {}, categories: {} });
         updateState(zoneCache.current.get(cacheKey));
         return;
       }
-
-      // 2. 브라우저 영구 캐시(Cache API) 확인
+      // 2. 브라우저 영구 캐시
       try {
         const browserCache = await caches.open('zone-data-v8');
         const cachedRes = await browserCache.match(cacheKey);
         if (cachedRes) {
           const data = await cachedRes.json();
-          const ts = data._timestamp || 0;
-          if (Date.now() - ts < 86400000 * 7) { // 7일 유효
-            console.log(`[ZoneOverlay] 유저 로컬 캐시 사용: ${cacheKey}`);
+          if (Date.now() - (data._timestamp || 0) < 86400000 * 7) {
+            console.log(`[ZoneOverlay] 구 로컬 캐시: ${currentDistrict.name}`);
+            setZoneData({ zones: {}, categories: {} });
             updateState(data);
             zoneCache.current.set(cacheKey, data);
             return;
           }
         }
-      } catch (e) {
-        console.warn('Browser Cache Error:', e);
-      }
+      } catch (e) { console.warn('Browser Cache Error:', e); }
 
-      setLoadingGroups(prev => ({ ...prev, [groupName]: true }));
+      // 3. 구 bbox 계산 후 서버 패치
+      const bbox = calcDistrictBbox(currentDistrict.coords);
+      if (!bbox) return;
+      console.log(`[ZoneOverlay] 구 서버 패치: ${currentDistrict.name} (dist=${bbox.dist}m)`);
+      setLoadingGroups({ world_zones: true });
+      setZoneData({ zones: {}, categories: {} }); // 이전 구 데이터 클리어
 
       try {
-        const response = await worldApi.getZones(
-          playerGps.lat,
-          playerGps.lng,
-          zoneRadius,
-          categories.join(',')
-        );
+        const ALL_CATS = [
+          'water', 'park', 'forest', 'natural_site',
+          'residential', 'commercial', 'industrial', 'institutional', 'educational', 'medical', 'parking',
+          'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
+          'road_major', 'road_minor', 'unexplored'
+        ];
+        const response = await worldApi.getZones(bbox.lat, bbox.lng, bbox.dist, ALL_CATS.join(','));
         const data = response.data;
         data._timestamp = Date.now();
-
         updateState(data);
-
-        // 3. 메모리 및 브라우저 영구 캐시 저장
         zoneCache.current.set(cacheKey, data);
         const browserCache = await caches.open('zone-data-v8');
         browserCache.put(cacheKey, new Response(JSON.stringify(data)));
-        console.log(`[ZoneOverlay] 로드 완료 (From Server): ${groupName}`);
+        console.log(`[ZoneOverlay] 구 로드 완료: ${currentDistrict.name}`);
+      } catch (err) {
+        console.error('[ZoneOverlay] 구 패치 실패:', err);
+      } finally {
+        setLoadingGroups({});
+      }
+    };
+
+    fetchForDistrict();
+  }, [visible, currentDistrict?.id]); // 구 ID가 바뀔 때만
+
+  // [Fallback] currentDistrict 없을 때 기존 이동거리 방식 유지
+  useEffect(() => {
+    if (!visible || currentDistrict) return; // 구가 있으면 위 effect가 담당
+
+    const gridKey = `${playerGps.lat.toFixed(2)}_${playerGps.lng.toFixed(2)}`;
+    const dx = (playerPos?.x || 0) - lastFetchPos.current.x;
+    const dz = (playerPos?.z || 0) - lastFetchPos.current.z;
+    const moveDist = Math.sqrt(dx * dx + dz * dz);
+    if (moveDist < FETCH_DISTANCE && Object.keys(zoneData.zones).length > 0) return;
+    lastFetchPos.current = { x: playerPos?.x || 0, z: playerPos?.z || 0 };
+
+    const fetchGroup = async (groupName, categories) => {
+      const cacheKey = `${groupName}_${gridKey}`;
+      if (zoneCache.current.has(cacheKey)) { updateState(zoneCache.current.get(cacheKey)); return; }
+      try {
+        const browserCache = await caches.open('zone-data-v8');
+        const cachedRes = await browserCache.match(cacheKey);
+        if (cachedRes) {
+          const data = await cachedRes.json();
+          if (Date.now() - (data._timestamp || 0) < 86400000 * 7) {
+            updateState(data); zoneCache.current.set(cacheKey, data); return;
+          }
+        }
+      } catch (e) { console.warn('Browser Cache Error:', e); }
+      setLoadingGroups(prev => ({ ...prev, [groupName]: true }));
+      try {
+        const response = await worldApi.getZones(playerGps.lat, playerGps.lng, zoneRadius, categories.join(','));
+        const data = response.data;
+        data._timestamp = Date.now();
+        updateState(data);
+        zoneCache.current.set(cacheKey, data);
+        const browserCache = await caches.open('zone-data-v8');
+        browserCache.put(cacheKey, new Response(JSON.stringify(data)));
       } catch (err) {
         console.error(`[ZoneOverlay] ${groupName} 로드 실패:`, err);
       } finally {
         setLoadingGroups(prev => ({ ...prev, [groupName]: false }));
       }
     };
-
-    const updateState = (data) => {
-      setZoneData(prev => ({
-        ...prev,
-        zones: { ...prev.zones, ...data.zones },
-        categories: { ...prev.categories, ...data.categories }
-      }));
-    };
-
-    // 여러 그룹을 동시에(Parallel) 요청
-    // 모든 구역 데이터를 하나의 그룹으로 통합 요청
-    // (서버가 모든 레이어의 위치를 알아야 그 사이의 '미개척 지형(빈 공간)'을 정확히 계산할 수 있습니다)
     const ALL_CATS = [
       'water', 'park', 'forest', 'natural_site',
       'residential', 'commercial', 'industrial', 'institutional', 'educational', 'medical', 'parking',
       'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
-      'road_major', 'road_minor',
-      'unexplored'
+      'road_major', 'road_minor', 'unexplored'
     ];
     fetchGroup('world_zones', ALL_CATS);
-
   }, [visible, playerGps.lat, playerGps.lng]);
 
   // Zone 데이터가 축적될 때마다 부모(RpgWorld)에게 전달 → SeoulHeightMap 텍스처 페인팅용

@@ -94,7 +94,7 @@ const getDetailedColor = (relElev) => {
 // 메인 컴포넌트 (Memoized for stability)
 // ===========================
 
-const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.0, zoneData = null }) => {
+const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.0, zoneData = null, currentDistrict = null }) => {
 
   const [data, setData] = useState(null);
   const built = useRef(false);
@@ -161,18 +161,46 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
 
     const positions = geo.attributes.position.array;
     const vertCount = grid_size * grid_size;
-    const colors = new Float32Array(vertCount * 3);
+    const colors = new Float32Array(vertCount * 4); // RGBA (알파 채널 추가)
 
-    // [1단계] 고도 기반 기본 색상
+    // 마스크 최적화를 위한 BBox 사전 계산
+    let maskBBox = null;
+    if (currentDistrict?.coords) {
+      maskBBox = { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 };
+      for (const [lat, lng] of currentDistrict.coords) {
+        if (lat < maskBBox.minLat) maskBBox.minLat = lat;
+        if (lat > maskBBox.maxLat) maskBBox.maxLat = lat;
+        if (lng < maskBBox.minLng) maskBBox.minLng = lng;
+        if (lng > maskBBox.maxLng) maskBBox.maxLng = lng;
+      }
+    }
+
+    // [1단계] 고도 기반 기본 색상 & 마스크(Alpha) 판별
     for (let i = 0; i < vertCount; i++) {
       const rawElev = elevations[i] ?? elev_min;
       const relElev = Math.max(0, rawElev - elev_min);
       positions[i * 3 + 1] = relElev * heightScale;
 
       const c = getDetailedColor(relElev);
-      colors[i * 3 + 0] = c.r;
-      colors[i * 3 + 1] = c.g;
-      colors[i * 3 + 2] = c.b;
+      colors[i * 4 + 0] = c.r;
+      colors[i * 4 + 1] = c.g;
+      colors[i * 4 + 2] = c.b;
+
+      // 마스크 (알파) 적용 로직
+      let alpha = 1.0;
+      if (currentDistrict?.coords) {
+        const worldX = posX + positions[i * 3 + 0];
+        const worldZ = posZ + positions[i * 3 + 2];
+        const vLat = GIS_ORIGIN.lat - worldZ / LAT_TO_M;
+        const vLng = GIS_ORIGIN.lng + worldX / LNG_TO_M;
+
+        if (vLat < maskBBox.minLat || vLat > maskBBox.maxLat || vLng < maskBBox.minLng || vLng > maskBBox.maxLng) {
+          alpha = 0.0;
+        } else if (!pointInPolygon(vLat, vLng, currentDistrict.coords)) {
+          alpha = 0.0;
+        }
+      }
+      colors[i * 4 + 3] = alpha;
     }
 
     // [2단계] Zone 데이터가 있으면 각 정점의 GPS 역산 → Zone 판정 → 색상 덮어쓰기
@@ -202,16 +230,16 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
 
         if (matched) {
           const [r, g, b] = ZONE_PAINT[matched];
-          colors[i * 3 + 0] = r;
-          colors[i * 3 + 1] = g;
-          colors[i * 3 + 2] = b;
+          colors[i * 4 + 0] = r;
+          colors[i * 4 + 1] = g;
+          colors[i * 4 + 2] = b;
         }
       }
       console.log(`[HeightMap] Zone 페인팅 완료: ${(performance.now() - t0).toFixed(0)}ms`);
     }
 
     geo.attributes.position.needsUpdate = true;
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 4));
     geo.computeVertexNormals();
     geo.computeBoundingBox();
     geo.computeBoundingSphere();
@@ -241,6 +269,8 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
         <meshStandardMaterial
           ref={materialRef}
           vertexColors={true}
+          transparent={true} // 마스크 적용을 위해 투명화 지원
+          alphaTest={0.5}
           roughness={0.9}
           metalness={0.0}
           onBeforeCompile={(shader) => {
@@ -328,6 +358,11 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
               float ao = 0.82 + 0.18 * smoothstep(0.0, 100.0, vWorldPos.y);
               diffuseColor.rgb *= ao;
 
+              // 5. [마스크 처리] 구별 경계 외부는 렌더링 스킵
+              diffuseColor.a = vColor.a;
+              if (diffuseColor.a < 0.2) {
+                  discard;
+              }
               `
             );
           }}
