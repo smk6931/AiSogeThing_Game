@@ -215,10 +215,25 @@ const TexturePaletteUI = ({ images, selectedBlock, onSelectImage, onClose }) => 
   </div>
 );
 
+// Ray-casting Point-in-Polygon
+const pointInPolygon = (lat, lng, coords) => {
+  let inside = false;
+  const n = coords.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const yi = coords[i][0], xi = coords[i][1];
+    const yj = coords[j][0], xj = coords[j][1];
+    if (((yi > lat) !== (yj > lat)) &&
+      (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+};
+
 // ==============================================
 // 메인 컴포넌트
 // ==============================================
-const CityBlockOverlay = ({ zoneData, visible = true, heightScale = 1.0 }) => {
+const CityBlockOverlay = ({ zoneData, visible = true, heightScale = 1.0, currentDistrict = null }) => {
   const [hm, setHm] = useState(null);
   const textures = useTexture(BLOCK_IMAGES);
   const [selectedBlock, setSelectedBlock] = useState(null);
@@ -233,26 +248,35 @@ const CityBlockOverlay = ({ zoneData, visible = true, heightScale = 1.0 }) => {
   const blocks = useMemo(() => {
     if (!zoneData?.zones || !hm) return [];
 
+    const districtCoords = currentDistrict?.coords;
+
     // 여러 카테고리의 폴리곤들을 하나의 배열로 통합
     let allPolygons = [];
     ['residential', 'commercial', 'industrial', 'institutional', 'educational', 'medical', 'parking',
       'natural_site', 'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
       'park', 'forest'].forEach(cat => {
         if (zoneData.zones[cat]) {
-          allPolygons = allPolygons.concat(
-            zoneData.zones[cat].filter(f => f.type === 'polygon' && f.coords?.length >= 3)
-          );
+          const filtered = districtCoords
+            ? zoneData.zones[cat].filter(f => {
+              if (f.type !== 'polygon' || !f.coords?.length) return false;
+              // [성능 최적화] 첫 번째 좌표만 검사하여 구 역내 데이터인지 판별 (엄격한 마스킹)
+              const [lat, lng] = f.coords[0];
+              return pointInPolygon(lat, lng, districtCoords);
+            })
+            : zoneData.zones[cat].filter(f => f.type === 'polygon' && f.coords?.length >= 3);
+
+          allPolygons = allPolygons.concat(filtered);
         }
       });
 
-    console.log(`[CityBlock] ${allPolygons.length}개 블록 통합 빌드 (지형 밀착)`);
+    console.log(`[CityBlock] ${allPolygons.length}개 블록 통합 빌드 (구 마스킹 적용)`);
 
     return allPolygons.map((f, idx) => {
       const geoData = buildTerrainBlock(f.coords, hm, heightScale);
       const defaultTexIdx = idx % BLOCK_IMAGES.length;
       return { idx, geoData, defaultTexIdx };
     }).filter(b => b.geoData !== null);
-  }, [zoneData, hm, heightScale]);
+  }, [zoneData, hm, heightScale, currentDistrict]);
 
   const handleBlockClick = useCallback((e, blockIdx) => {
     e.stopPropagation();

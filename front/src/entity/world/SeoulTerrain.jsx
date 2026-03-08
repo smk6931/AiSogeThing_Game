@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getTerrainHeight, loadHeightMap } from './terrainHandler';
+import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
 // ===========================
 // 레이어별 색상
@@ -21,18 +22,54 @@ const ROAD_CLASS = {
   secondary: 'mid', tertiary: 'mid',
 };
 
+// GPS → 게임 좌표 변환
+const gpsToGame = (lat, lng) => ({
+  x: (lng - GIS_ORIGIN.lng) * LNG_TO_M,
+  z: (GIS_ORIGIN.lat - lat) * LAT_TO_M,
+});
+
+// Ray-casting Point-in-Polygon
+const pointInPolygon = (lat, lng, coords) => {
+  let inside = false;
+  const n = coords.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const yi = coords[i][0], xi = coords[i][1];
+    const yj = coords[j][0], xj = coords[j][1];
+    if (((yi > lat) !== (yj > lat)) &&
+      (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+};
+
 // ===========================
 // 폴리곤 → merged geometry
 // ===========================
-function buildPolygonGeometry(features) {
+function buildPolygonGeometry(features, currentDistrict = null) {
   const geos = [];
+  const districtCoords = currentDistrict?.coords;
+
   for (const f of features) {
     if (!f.coords || f.coords.length < 3) continue;
+
+    // [최적화] 구 경계선 밖의 데이터는 원천 배제
+    if (districtCoords) {
+      const [lat, lng] = f.coords[0];
+      if (!pointInPolygon(lat, lng, districtCoords)) continue;
+    }
+
     try {
       const shape = new THREE.Shape();
-      shape.moveTo(f.coords[0][0], f.coords[0][1]);
+      // 데이터가 GPS인 경우 변환
+      const isGps = f.coords[0][0] > 30; // 37.xxx 위도 판별
+
+      const first = isGps ? gpsToGame(f.coords[0][0], f.coords[0][1]) : { x: f.coords[0][0], z: f.coords[0][1] };
+      shape.moveTo(first.x, first.z);
+
       for (let i = 1; i < f.coords.length; i++) {
-        shape.lineTo(f.coords[i][0], f.coords[i][1]);
+        const p = isGps ? gpsToGame(f.coords[i][0], f.coords[i][1]) : { x: f.coords[i][0], z: f.coords[i][1] };
+        shape.lineTo(p.x, p.z);
       }
       shape.closePath();
       geos.push(new THREE.ShapeGeometry(shape));
@@ -45,13 +82,21 @@ function buildPolygonGeometry(features) {
 // ===========================
 // 선 → merged geometry
 // ===========================
-function buildLineGeometry(features) {
+function buildLineGeometry(features, currentDistrict = null) {
   const geos = [];
-  // 내부 shift 제거 (Group position으로 조절)
-
+  const districtCoords = currentDistrict?.coords;
 
   for (const f of features) {
     const coords = f.coords;
+    if (!coords || coords.length < 2) continue;
+
+    // [최적화] 구 경계선 밖의 데이터는 원천 배제
+    if (districtCoords) {
+      const [lat, lng] = coords[0];
+      if (!pointInPolygon(lat, lng, districtCoords)) continue;
+    }
+
+    const isGps = coords[0][0] > 30;
     // 브릿지 속성이 있거나 한강 위인 경우 두께와 높이 보정용 플래그
     const isBridge = f.bridge === 'yes' || f.highway === 'motorway_link';
     // [수정] 도로 폭을 더 과감하게 확장 (RPG 동선 느낌)
@@ -63,8 +108,11 @@ function buildLineGeometry(features) {
     if (!coords || coords.length < 2) continue;
 
     for (let i = 0; i < coords.length - 1; i++) {
-      const ax = coords[i][0], az = coords[i][1];
-      const bx = coords[i + 1][0], bz = coords[i + 1][1];
+      const p1 = isGps ? gpsToGame(coords[i][0], coords[i][1]) : { x: coords[i][0], z: coords[i][1] };
+      const p2 = isGps ? gpsToGame(coords[i + 1][0], coords[i + 1][1]) : { x: coords[i + 1][0], z: coords[i + 1][1] };
+
+      const ax = p1.x, az = p1.z;
+      const bx = p2.x, bz = p2.z;
 
       const dx = bx - ax, dz = bz - az;
       const len = Math.sqrt(dx * dx + dz * dz);
@@ -159,6 +207,7 @@ const SeoulTerrain = ({
   showNature = true,
   roadTextureUrl = null,
   districtId = null, // [신규] 특정 구 ID
+  currentDistrict = null, // [신규] 구 기반 마스킹용
   shiftX = -450,
   shiftZ = 320
 }) => {
@@ -195,7 +244,7 @@ const SeoulTerrain = ({
     loadData();
   }, [visible, districtId]);
 
-  // 2. 지오메트리 생성/업데이트 (데이터가 있거나 Shift값이 바뀔 때 실행)
+  // 2. 지오메트리 생성/업데이트
   useEffect(() => {
     if (!data) return;
 
@@ -205,23 +254,31 @@ const SeoulTerrain = ({
 
       if (typeof loadHeightMap === 'function') await loadHeightMap();
 
+      // GPS 기반 데이터면 shift를 무시하고 0,0 기준으로 정렬 (gpsToGame이 처리함)
+      const isGpsData = (grass[0]?.coords?.[0]?.[0] > 30) || (roads[0]?.coords?.[0]?.[0] > 30);
+      const activeShiftX = isGpsData ? 0 : shiftX;
+      const activeShiftZ = isGpsData ? 0 : shiftZ;
+
       setGeos({
-        grass: buildPolygonGeometry(grass.filter(f => f.type === 'polygon')),
-        forest: buildPolygonGeometry(forest.filter(f => f.type === 'polygon')),
-        waterPoly: buildPolygonGeometry(water.filter(f => f.type === 'polygon')),
-        waterLine: buildLineGeometry(water.filter(f => f.type === 'line')),
-        roadMajor: buildLineGeometry(roadMajor),
+        grass: buildPolygonGeometry(grass.filter(f => f.type === 'polygon'), currentDistrict),
+        forest: buildPolygonGeometry(forest.filter(f => f.type === 'polygon'), currentDistrict),
+        waterPoly: buildPolygonGeometry(water.filter(f => f.type === 'polygon'), currentDistrict),
+        waterLine: buildLineGeometry(water.filter(f => f.type === 'line'), currentDistrict),
+        roadMajor: buildLineGeometry(roadMajor, currentDistrict),
+        isGps: isGpsData,
+        shiftX: activeShiftX,
+        shiftZ: activeShiftZ
       });
-      console.log('[SeoulTerrain] 레이어 데이터 빌드 완료 (Shift:', shiftX, shiftZ, ')');
+      console.log(`[SeoulTerrain] 레이어 빌드 완료 (Type: ${isGpsData ? 'GPS' : 'Offset'}, Shift: ${activeShiftX}, ${activeShiftZ})`);
     };
 
     build();
-  }, [data, shiftX, shiftZ]);
+  }, [data, shiftX, shiftZ, currentDistrict]);
 
   if (!visible || !geos) return null;
 
   return (
-    <group name="seoul-terrain-group" position={[shiftX, 0, shiftZ]}>
+    <group name="seoul-terrain-group" position={[geos.shiftX, 0, geos.shiftZ]}>
       {/* 1. 자연 지형 레이어 (Nature) */}
       {showNature && (
         <group name="nature-layer">

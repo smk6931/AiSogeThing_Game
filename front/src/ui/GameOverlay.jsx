@@ -40,17 +40,18 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
   // 서울 구 경계 데이터 로드 (최초 1회, 30일 로컬 캐시)
   const { districts, getDistrictAt } = useSeoulDistricts();
 
-  // 실시간 GPS 및 구역 추적
+  // 실시간 GPS 및 구역 추적 (성능 최적화를 위해 500ms 주기로 샘플링)
   useEffect(() => {
-    let frameId;
     const updateGps = () => {
       if (myPositionRef && myPositionRef.current) {
         const { x, z } = myPositionRef.current;
         const lat = GIS_ORIGIN.lat - (z / LAT_TO_M);
         const lng = GIS_ORIGIN.lng + (x / LNG_TO_M);
+
+        // 1. GPS 위치 업데이트 (지도의 중심)
         setGpsCoords({ lat, lng });
 
-        // 실제 서울 구 경계 폴리곤 기반 판별
+        // 2. 실제 서울 구 경계 폴리곤 기반 판별
         if (getDistrictAt) {
           const found = getDistrictAt(lat, lng);
           const distName = found ? found.name : null;
@@ -62,10 +63,10 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
           }
         }
       }
-      frameId = requestAnimationFrame(updateGps);
     };
-    updateGps();
-    return () => cancelAnimationFrame(frameId);
+
+    const interval = setInterval(updateGps, 500);
+    return () => clearInterval(interval);
   }, [myPositionRef, getDistrictAt]);
 
   // 초기화 및 글로벌 스타일 주입

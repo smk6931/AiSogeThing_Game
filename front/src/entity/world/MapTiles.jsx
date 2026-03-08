@@ -166,7 +166,7 @@ const MapTiles = ({ playerPos, zoomLevel = 16, showOsmMap = true, cameraMode = '
         </React.Suspense>
       ))}
 
-      {/* 2. 서울 외곽 스크린 마스크 */}
+      {/* 2. 서울 외곽 스크린 마스크 (구 경계 외부를 어둡게 처리) */}
       {showOsmMap && districts.length > 0 && (
         <SeoulMask districts={districts} elevation={elevation + 0.01} />
       )}

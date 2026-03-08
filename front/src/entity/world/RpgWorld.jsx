@@ -20,6 +20,7 @@ import SeoulSubwayLines from '@entity/world/SeoulSubwayLines';
 import ZoneOverlay from '@entity/world/ZoneOverlay';
 import CityBlockOverlay from '@entity/world/CityBlockOverlay';
 import SeoulDistrictOverlay from '@entity/world/SeoulDistrictOverlay';
+import SeoulTerrain from '@entity/world/SeoulTerrain';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
@@ -352,7 +353,6 @@ const RpgWorld = ({
       {/* [NEW] Three.js Editor와 협업: public/scene.json 파일을 커스텀 배치용으로 사용 */}
       <SceneLoader url="/scene.json" />
 
-
       {/* [NEW] 3D 공간의 실제 바닥 지도로 렌더링 */}
       <MapTiles
         playerPos={playerRef.current ? playerRef.current.position : { x: 0, z: 0 }}
@@ -363,11 +363,28 @@ const RpgWorld = ({
         districts={districts} // 전체 서울 마스크를 위해 전달
       />
 
-      {/* Zone 오버레이 시스템 (지도 위에 반투명 구역 표시) + 데이터를 SeoulHeightMap에 공급 */}
+      {/* 2. 서울 지형 레이어 (수동 추출 데이터) - 구 기반 필터 지원 */}
+      <SeoulTerrain
+        visible={showSeoulNature || showSeoulRoads}
+        showRoads={showSeoulRoads}
+        showNature={showSeoulNature}
+        districtId={currentDistrictId}
+        currentDistrict={currentDistrict}
+      />
+
+      {/* 3. 지하철 노선도 */}
+      <SeoulSubwayLines />
+
+      {/* 4. OSM 구역 오버레이 (영도구역 등 실시간 데이터) */}
       <ZoneOverlay
-        playerPos={playerRef.current ? playerRef.current.position : { x: 0, z: 0 }}
-        currentDistrict={currentDistrict}  // [구 기반 스트리밍] 현재 구 객체 전달
         visible={(showSeoulRoads || showSeoulNature || showCityBlocks || showLanduseZones)}
+        categories={landuseFilters}
+        playerPos={playerRef.current ? playerRef.current.position : { x: 0, z: 0 }}
+        currentDistrict={currentDistrict}
+        onZoneLoaded={setSharedZoneData}
+        elevation={debugConfig.mapElevation + 0.1}
+        heightScale={debugConfig.terrainHeightScale}
+        zoneRadius={debugConfig.zoneFetchRadius}
         enabledZones={{
           water: showSeoulNature,
           park: showSeoulNature,
@@ -390,10 +407,14 @@ const RpgWorld = ({
           port: showLanduseZones && landuseFilters.port,
           unexplored: showLanduseZones && landuseFilters.unexplored
         }}
-        elevation={debugConfig.mapElevation + 0.1}
+      />
+
+      {/* 5. 시티 블록 (도로 중심 텍스처) */}
+      <CityBlockOverlay
+        zoneData={sharedZoneData}
+        visible={showCityBlocks}
         heightScale={debugConfig.terrainHeightScale}
-        onZoneLoaded={setSharedZoneData}
-        zoneRadius={debugConfig.zoneFetchRadius}
+        currentDistrict={currentDistrict}
       />
 
       {/* 등고선 지형 (Zone 데이터로 텍스쳐 페인팅) */}
@@ -403,15 +424,9 @@ const RpgWorld = ({
           playerRef={playerRef}
           heightScale={debugConfig.terrainHeightScale}
           zoneData={sharedZoneData}
-          currentDistrict={currentDistrict} // 구 마스크를 위한 데이터 전달
+          currentDistrict={currentDistrict}
         />
       </group>
-
-      <CityBlockOverlay
-        zoneData={sharedZoneData}
-        visible={showCityBlocks}
-        heightScale={debugConfig.terrainHeightScale}
-      />
 
       {/* 서울 구 행정 경계 오버레이 */}
       <SeoulDistrictOverlay

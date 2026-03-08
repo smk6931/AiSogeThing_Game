@@ -457,6 +457,12 @@ def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: 
                 if gap.is_empty or gap.area < min_area:
                     continue
 
+                # 6. 폴리곤 정규화 (Artifact 방지 핵심: simplify + buffer(0))
+                # 너무 복잡한 정점은 ShapeGeometry에서 스파이크 에러를 일으킴
+                gap = gap.simplify(1.0, preserve_topology=True)
+                if not gap.is_valid:
+                    gap = make_valid(gap)
+
                 # MultiPolygon 처리
                 geoms = gap.geoms if hasattr(gap, 'geoms') else [gap]
                 for g in geoms:
@@ -464,6 +470,10 @@ def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: 
                         continue
                     if not hasattr(g, 'exterior') or not g.exterior:
                         continue
+                    
+                    # 마지막으로 한번 더 정교하게 다듬기
+                    g = g.simplify(1.5, preserve_topology=True)
+                    
                     ext_pts = list(g.exterior.coords)
                     coords_gps = [xy_to_gps(x, y) for x, y in ext_pts]
                     unexplored.append({
@@ -475,7 +485,7 @@ def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: 
                 # print(f"Cell Processing Error: {e}")
                 continue
 
-        print(f"[ZoneService] {('구' if poly_coords else '반경')} 미개척 지형 {len(unexplored)}개 폴리곤 계산 완료")
+        print(f"[ZoneService] {('구' if poly_coords else '반경')} 미개척 지형 {len(unexplored)}개 폴리곤 계산 완료 (Simplification Applied)")
         return unexplored
 
     except ImportError:

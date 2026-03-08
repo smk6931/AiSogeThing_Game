@@ -270,7 +270,11 @@ const ZoneOverlay = ({
     lng: GIS_ORIGIN.lng + ((playerPos?.x || 0) / LNG_TO_M)
   }), [playerPos?.x, playerPos?.z]);
 
-  // 공통 상태 업데이트 함수
+  // 공통 상태 업데이트 함수 (District 기반일 땐 덮어쓰기, 아닐 땐 누적)
+  const setZoneDataStrict = (data) => {
+    setZoneData(data);
+  };
+
   const updateState = (data) => {
     setZoneData(prev => ({
       ...prev,
@@ -283,38 +287,36 @@ const ZoneOverlay = ({
   useEffect(() => {
     if (!visible || !currentDistrict) return;
 
-    const cacheKey = `world_zones_district_${currentDistrict.id}`;
+    const cacheKey = `world_zones_district_v2_${currentDistrict.id}`;
 
     const fetchForDistrict = async () => {
       // 1. 메모리 캐시
       if (zoneCache.current.has(cacheKey)) {
         console.log(`[ZoneOverlay] 구 메모리 캐시: ${currentDistrict.name}`);
-        setZoneData({ zones: {}, categories: {} });
-        updateState(zoneCache.current.get(cacheKey));
+        setZoneDataStrict(zoneCache.current.get(cacheKey));
         return;
       }
       // 2. 브라우저 영구 캐시
       try {
-        const browserCache = await caches.open('zone-data-v8');
+        const browserCache = await caches.open('zone-data-v9');
         const cachedRes = await browserCache.match(cacheKey);
         if (cachedRes) {
           const data = await cachedRes.json();
           if (Date.now() - (data._timestamp || 0) < 86400000 * 7) {
             console.log(`[ZoneOverlay] 구 로컬 캐시: ${currentDistrict.name}`);
-            setZoneData({ zones: {}, categories: {} });
-            updateState(data);
+            setZoneDataStrict(data);
             zoneCache.current.set(cacheKey, data);
             return;
           }
         }
-      } catch (e) { console.warn('Browser Cache Error:', e); }
+      } catch (e) { }
 
       // 3. 구 bbox 계산 후 서버 패치
       const bbox = calcDistrictBbox(currentDistrict.coords);
       if (!bbox) return;
       console.log(`[ZoneOverlay] 구 서버 패치: ${currentDistrict.name} (dist=${bbox.dist}m)`);
       setLoadingGroups({ world_zones: true });
-      setZoneData({ zones: {}, categories: {} }); // 이전 구 데이터 클리어
+      setZoneData({ zones: {}, categories: {} }); // 이전 구 데이터 즉각 클리어
 
       try {
         const ALL_CATS = [
@@ -326,9 +328,9 @@ const ZoneOverlay = ({
         const response = await worldApi.getZones(bbox.lat, bbox.lng, bbox.dist, ALL_CATS.join(','), currentDistrict.id);
         const data = response.data;
         data._timestamp = Date.now();
-        updateState(data);
+        setZoneDataStrict(data); // MERGE 하지 않고 REPLACED
         zoneCache.current.set(cacheKey, data);
-        const browserCache = await caches.open('zone-data-v8');
+        const browserCache = await caches.open('zone-data-v9');
         browserCache.put(cacheKey, new Response(JSON.stringify(data)));
         console.log(`[ZoneOverlay] 구 로드 완료: ${currentDistrict.name}`);
       } catch (err) {
@@ -390,8 +392,11 @@ const ZoneOverlay = ({
   }, [visible, playerGps.lat, playerGps.lng]);
 
   // Zone 데이터가 축적될 때마다 부모(RpgWorld)에게 전달 → SeoulHeightMap 텍스처 페인팅용
+  const lastReportedData = useRef(null);
   useEffect(() => {
     if (onZoneLoaded && zoneData && Object.keys(zoneData.zones).length > 0) {
+      if (lastReportedData.current === zoneData) return;
+      lastReportedData.current = zoneData;
       onZoneLoaded(zoneData);
     }
   }, [zoneData, onZoneLoaded]);
