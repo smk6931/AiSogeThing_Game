@@ -16,12 +16,12 @@ async def get_terrain_data(lat: float, lng: float, dist: int = 500):
     return data
 
 @router.get("/zones")
-async def get_zone_data(lat: float, lng: float, dist: int = 2000, categories: str = None):
+async def get_zone_data(lat: float, lng: float, dist: int = 2000, categories: str = None, district_id: int = None):
     """
     특정 좌표 중심, 반경(dist)m 내의 구역(Zone) 데이터를 카테고리별로 반환
     """
     loop = asyncio.get_event_loop()
-    data = await loop.run_in_executor(None, fetch_zones, lat, lng, dist, categories)
+    data = await loop.run_in_executor(None, fetch_zones, lat, lng, dist, categories, district_id)
     return data
 
 @router.get("/districts")
@@ -41,3 +41,15 @@ async def get_current_district(lat: float, lng: float):
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, _get_current_district, lat, lng)
     return result or {"name": None, "name_en": None, "id": None}
+
+
+@router.get("/terrain/district/{district_id}")
+async def get_district_terrain(district_id: int):
+    """
+    특정 구 고유의 지형 데이터를 반환합니다. (기존 거대한 seoul_terrain.json 대신 사용 가능)
+    """
+    loop = asyncio.get_event_loop()
+    data = await loop.run_in_executor(None, terrain_service.extract_district_terrain, district_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="District not found")
+    return data

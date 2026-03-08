@@ -151,11 +151,14 @@ function MergedMesh({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
   );
 }
 
+import worldApi from '@api/world';
+
 const SeoulTerrain = ({
   visible = true,
   showRoads = true,
   showNature = true,
   roadTextureUrl = null,
+  districtId = null, // [신규] 특정 구 ID
   shiftX = -450,
   shiftZ = 320
 }) => {
@@ -163,22 +166,34 @@ const SeoulTerrain = ({
   const [geos, setGeos] = useState(null);
   const loadingRef = useRef(false);
 
-  // 1. 데이터 로딩 (한 번만 실행)
+  // 1. 데이터 로딩
   useEffect(() => {
-    if (!visible || data || loadingRef.current) return;
+    if (!visible || loadingRef.current) return;
 
-    loadingRef.current = true;
-    fetch('/seoul_terrain.json')
-      .then(res => res.json())
-      .then(json => {
-        setData(json);
-        loadingRef.current = false;
-      })
-      .catch(err => {
+    const loadData = async () => {
+      loadingRef.current = true;
+      try {
+        let terrainData;
+        if (districtId) {
+          // [개선] 구별로 OSM에서 직접 추출한 데이터를 가져옵니다 (Artifact 방지)
+          console.log(`[SeoulTerrain] '${districtId}' 구 데이터 API 요청...`);
+          const res = await worldApi.getDistrictTerrain(districtId);
+          terrainData = res.data;
+        } else {
+          // Fallback: 기존 정적 파일
+          const res = await fetch('/seoul_terrain.json');
+          terrainData = await res.json();
+        }
+        setData(terrainData);
+      } catch (err) {
         console.error('[SeoulTerrain] 로딩 실패:', err);
+      } finally {
         loadingRef.current = false;
-      });
-  }, [visible]);
+      }
+    };
+
+    loadData();
+  }, [visible, districtId]);
 
   // 2. 지오메트리 생성/업데이트 (데이터가 있거나 Shift값이 바뀔 때 실행)
   useEffect(() => {

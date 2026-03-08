@@ -4,7 +4,7 @@ import axios from 'axios';
 const client = axios.create({
   // 환경변수(.env)에 설정된 주소를 그대로 사용합니다.
   // 로컬에서는 http://localhost:8001, 서버에서는 https://sogething.com 이 적용됩니다.
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8400',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8100',
   withCredentials: true, // 쿠키 기반 인증 활성화
   headers: {
     'Content-Type': 'application/json',

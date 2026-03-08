@@ -137,6 +137,121 @@ class TerrainService:
         return obj
 
 
+    def extract_district_terrain(self, district_id: int):
+        """
+        특정 구(district_id)의 경계 polygon을 기준으로 OSM 데이터를 추출합니다.
+        """
+        from world.services.district_service import get_district_by_id
+        district = get_district_by_id(district_id)
+        if not district:
+            return None
+
+        # 구 고유 캐시 경로
+        cache_dir = os.path.join(os.path.dirname(__file__), "..", "..", "cache", "terrain_districts")
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_path = os.path.join(cache_dir, f"terrain_district_{district_id}.json")
+
+        if os.path.exists(cache_path):
+            with open(cache_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+
+        print(f"[TerrainService] '{district['name']}' 구 지형 데이터 OSM 추출 중...")
+        
+        # Shapely Polygon 생성 (OSMnx는 [lng, lat] 순서 또는 Polygon 객체 기대)
+        # district['coords'] 는 [[lat, lng], ...]
+        poly = Polygon([(lng, lat) for lat, lng in district["coords"]])
+        
+        # 기준점은 구의 중심점
+        ref_lat, ref_lng = district["center"]
+        
+        result = {
+            "name": district["name"],
+            "center": {"lat": ref_lat, "lng": ref_lng},
+            "layers": {
+                "water": [],
+                "forest": [],
+                "grass": [],
+                "roads": [],
+            }
+        }
+
+        # OSMnx extraction within polygon
+        try:
+            # 1. 물
+            water_tags = {"natural": ["water", "wetland"], "waterway": ["river", "stream", "canal"]}
+            water_gdf = ox.features_from_polygon(poly, tags=water_tags)
+            if not water_gdf.empty:
+                for _, row in water_gdf.iterrows():
+                    geom = row.geometry
+                    if geom.geom_type == "Polygon":
+                        coords = self._polygon_to_list(geom, ref_lat, ref_lng)
+                        result["layers"]["water"].append({"type": "polygon", "coords": coords})
+                    elif geom.geom_type == "MultiPolygon":
+                        for part in geom.geoms:
+                            coords = self._polygon_to_list(part, ref_lat, ref_lng)
+                            result["layers"]["water"].append({"type": "polygon", "coords": coords})
+                    elif geom.geom_type in ("LineString", "MultiLineString"):
+                        lines = [geom] if geom.geom_type == "LineString" else list(geom.geoms)
+                        for line in lines:
+                            coords = self._line_to_list(line, ref_lat, ref_lng)
+                            result["layers"]["water"].append({"type": "line", "width": 20, "coords": coords})
+        except Exception as e:
+            print(f"[TerrainService] District Water Error: {e}")
+
+        try:
+            # 2. 녹지
+            forest_tags = {"landuse": ["forest", "recreation_ground"], "leisure": ["park", "nature_reserve"], "natural": ["wood"]}
+            forest_gdf = ox.features_from_polygon(poly, tags=forest_tags)
+            if not forest_gdf.empty:
+                for _, row in forest_gdf.iterrows():
+                    geom = row.geometry
+                    if geom.geom_type == "Polygon":
+                        coords = self._polygon_to_list(geom, ref_lat, ref_lng)
+                        result["layers"]["forest"].append({"type": "polygon", "coords": coords})
+                    elif geom.geom_type == "MultiPolygon":
+                        for part in geom.geoms:
+                            coords = self._polygon_to_list(part, ref_lat, ref_lng)
+                            result["layers"]["forest"].append({"type": "polygon", "coords": coords})
+        except Exception as e:
+            print(f"[TerrainService] District Forest Error: {e}")
+
+        try:
+            # 3. 도로
+            # osmnx can fetch graph from polygon
+            G = ox.graph_from_polygon(poly, network_type="all")
+            edges = ox.graph_to_gdfs(G, nodes=False)
+            major_hw = ["motorway", "trunk", "primary", "secondary", "tertiary", "residential"]
+            
+            if not edges.empty:
+                for _, row in edges.iterrows():
+                    geom = row.geometry
+                    hw = row.get("highway", "residential")
+                    if isinstance(hw, list): hw = hw[0]
+                    if hw not in major_hw: continue
+
+                    bridge = row.get("bridge", "no")
+                    if isinstance(bridge, list): bridge = bridge[0]
+                    
+                    lines = [geom] if geom.geom_type == "LineString" else (list(geom.geoms) if geom.geom_type == "MultiLineString" else [])
+                    for line in lines:
+                        coords = self._line_to_list(line, ref_lat, ref_lng)
+                        result["layers"]["roads"].append({
+                            "type": "line",
+                            "highway": hw,
+                            "bridge": bridge,
+                            "coords": coords
+                        })
+        except Exception as e:
+            print(f"[TerrainService] District Road Error: {e}")
+
+        final_result = self._deep_sanitize(result)
+        
+        # 캐싱
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(final_result, f, ensure_ascii=False, indent=2)
+
+        return final_result
+
     def _polygon_to_list(self, polygon, ref_lat, ref_lng):
         if not polygon or not hasattr(polygon, 'exterior'): return []
         coords = list(polygon.exterior.coords)

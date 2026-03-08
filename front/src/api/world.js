@@ -10,9 +10,9 @@ const worldApi = {
   },
 
   // 특정 좌표 중심의 구역(Zone) 데이터 조회
-  getZones: async (lat, lng, dist = 2000, categories = '') => {
+  getZones: async (lat, lng, dist = 2000, categories = '', districtId = null) => {
     return await client.get('/api/world/zones', {
-      params: { lat, lng, dist, categories }
+      params: { lat, lng, dist, categories, district_id: districtId }
     });
   },
 
@@ -21,6 +21,11 @@ const worldApi = {
     return await client.get('/api/world/terrain', {
       params: { lat, lng, dist }
     });
+  },
+
+  // 특정 구(District) 고유 지형 데이터 조회
+  getDistrictTerrain: async (districtId) => {
+    return await client.get(`/api/world/terrain/district/${districtId}`);
   }
 };
 

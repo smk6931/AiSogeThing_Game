@@ -3,7 +3,7 @@ load_dotenv(override=True) # .env 파일 로드 (시스템 환경변수 덮어�
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# from user.routers.router import router as auth_router
+from user.routers.router import router as auth_router
 from player.routers.router import router as player_router
 from world.routers.router import router as world_router
 from common.routers.router import router as common_router
@@ -29,8 +29,8 @@ async def startup_event():
 
 # CORS 설정 (프론트엔드/클라우드 허용)
 origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "http://localhost:3100",
+    "http://127.0.0.1:3100",
 
     "*" # 개발 편의상 유지하되, 위 명시적 주소가 우선됨
 ]
@@ -44,7 +44,7 @@ app.add_middleware(
 )
 
 # 라우터 등록
-# app.include_router(auth_router)
+app.include_router(auth_router)
 app.include_router(player_router)
 app.include_router(world_router)
 app.include_router(common_router)

@@ -323,7 +323,7 @@ const ZoneOverlay = ({
           'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
           'road_major', 'road_minor', 'unexplored'
         ];
-        const response = await worldApi.getZones(bbox.lat, bbox.lng, bbox.dist, ALL_CATS.join(','));
+        const response = await worldApi.getZones(bbox.lat, bbox.lng, bbox.dist, ALL_CATS.join(','), currentDistrict.id);
         const data = response.data;
         data._timestamp = Date.now();
         updateState(data);

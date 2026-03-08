@@ -208,6 +208,20 @@ def get_current_district(lat: float, lng: float) -> dict | None:
     return None
 
 
+def get_district_by_id(district_id: int) -> dict | None:
+    """
+    ID로 특정 구의 데이터를 반환합니다.
+    """
+    try:
+        data = fetch_seoul_districts()
+        for district in data.get("districts", []):
+            if district["id"] == district_id:
+                return district
+    except Exception as e:
+        print(f"[DistrictService] 구 조회 오류: {e}")
+    return None
+
+
 def _point_in_polygon(lat: float, lng: float, polygon: list) -> bool:
     """Ray-casting 알고리즘: 점이 폴리곤 내부에 있으면 True"""
     n = len(polygon)

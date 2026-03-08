@@ -21,12 +21,12 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 3100,
     strictPort: true,
     allowedHosts: ['sogething.com', 'www.sogething.com', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': {
-        target: 'http://localhost:8400',
+        target: 'http://localhost:8100',
         changeOrigin: true,
       }
     },

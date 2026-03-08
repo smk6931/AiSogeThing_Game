@@ -192,15 +192,23 @@ ZONE_CATEGORIES = {
 }
 
 
-def _build_overpass_query(south, west, north, east, categories=None):
-    bbox = f"{south},{west},{north},{east}"
+def _build_overpass_query(south, west, north, east, categories=None, poly_coords=None):
+    # poly_coords: [[lat, lng], ...]
+    if poly_coords:
+        # Overpass poly filter expects: "lat lng lat lng ..."
+        poly_str = " ".join([f"{p[0]} {p[1]}" for p in poly_coords])
+        filter_str = f'poly:"{poly_str}"'
+    else:
+        filter_str = f"{south},{west},{north},{east}"
+
     cats = categories or list(ZONE_CATEGORIES.keys())
     parts = []
     for cat in cats:
         if cat not in ZONE_CATEGORIES:
             continue
         for tag in ZONE_CATEGORIES[cat]["tags"]:
-            parts.append(f"  {tag}({bbox});")
+            parts.append(f"  {tag}({filter_str});")
+    
     query = f"""
 [out:json][timeout:60];
 (
@@ -346,7 +354,7 @@ def _classify_way(tags, categories):
 # ============================================================
 # 미개척 지형 자동 계산 (Shapely 도로망 폴리곤화)
 # ============================================================
-def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: dict):
+def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: dict, poly_coords=None):
     """
     도로망으로 생성되는 격자 폴리곤 중, 기존 레이어로 채워지지 않은 영역을
     Shapely로 계산하여 '미개척 지형' 폴리곤 리스트를 반환합니다.
@@ -365,14 +373,26 @@ def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: 
         def xy_to_gps(x, y):
             return [lat + y / LAT_TO_M, lng + x / LNG_TO_M]
 
-        # 1. 바운딩박스 경계선 (도로와 합쳐 폴리곤화)
-        half = dist * 0.98
-        bbox_poly = box(-half, -half, half, half)
+        # 1. 베이스 영역 (Base Area) 설정
+        if poly_coords:
+            # 구(District) 경계가 있으면 그 안에서만 계산 (Artifact 방지 핵심)
+            base_pts = [gps_to_xy(p[0], p[1]) for p in poly_coords]
+            base_poly = Polygon(base_pts)
+            if not base_poly.is_valid:
+                base_poly = make_valid(base_poly)
+            # 렌더링 성능을 위해 박스로 한번 더 자름 (너무 넓은 구 방계 방지)
+            half = dist * 1.0
+            bbox_poly = box(-half, -half, half, half)
+            base_poly = base_poly.intersection(bbox_poly)
+        else:
+            # 기본: 반지름(dist) 기반 박스
+            half = dist * 0.98
+            base_poly = box(-half, -half, half, half)
 
         # 2. 기존 모든 레이어의 폴리곤을 Shapely로 변환 → 합집합
         existing_shapes = []
         for cat, features in existing_zones.items():
-            if cat in ("road_major", "road_minor"):
+            if cat in ("road_major", "road_minor", "unexplored"):
                 continue  # 도로는 선(line)이라 면적 없음, 제외
             for f in features:
                 if f.get("type") != "polygon" or len(f.get("coords", [])) < 3:
@@ -402,32 +422,36 @@ def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: 
                 except Exception:
                     pass
 
-        # 경계선도 라인으로 추가
-        bx, by = bbox_poly.exterior.xy
-        boundary_line = LineString(list(zip(bx, by)))
-        road_lines.append(boundary_line)
+        # 베이스 영역 경계선도 라인으로 추가 (격자 형성을 위해)
+        if hasattr(base_poly, 'exterior') and base_poly.exterior:
+            road_lines.append(LineString(base_poly.exterior.coords))
+        elif hasattr(base_poly, 'geoms'):
+            for g in base_poly.geoms:
+                if g.exterior:
+                    road_lines.append(LineString(g.exterior.coords))
 
         if not road_lines:
-            return []
-
-        # 4. 도로 라인망 폴리곤화
-        merged = linemerge(road_lines)
-        cells = list(polygonize(merged))
-
-        if not cells:
-            # 도로만으로 폴리곤화가 안 될 경우, bbox 전체에서 기존 레이어를 뺀 영역 반환
-            remainder = bbox_poly.difference(existing_union)
+            # 도로가 없어도 베이스 영역에서 기존 영역을 뺀 나머지가 '미개척지'
+            remainder = base_poly.difference(existing_union)
             cells = [remainder] if not remainder.is_empty else []
+        else:
+            # 4. 도로 라운드망 폴리곤화
+            merged = linemerge(road_lines)
+            cells = list(polygonize(merged))
+            if not cells:
+                remainder = base_poly.difference(existing_union)
+                cells = [remainder] if not remainder.is_empty else []
 
-        # 5. 각 도로 격자 폴리곤에서 기존 레이어 영역 제거
+        # 5. 각 격자 폴리곤에서 기존 레이어 영역 제거 및 베이스 영역으로 클리핑
         unexplored = []
-        min_area = 50 * 50  # 최소 50m x 50m = 2500m² 미만 무시 (너무 작은 잡음 제거)
+        min_area = 30 * 30  # 최소 면적 최적화
 
         for cell in cells:
             try:
-                if not bbox_poly.intersects(cell):
+                if not base_poly.intersects(cell):
                     continue
-                clipped = cell.intersection(bbox_poly)
+                # 베이스 영역(구 경계) 안으로 한정
+                clipped = cell.intersection(base_poly)
                 gap = clipped.difference(existing_union)
 
                 if gap.is_empty or gap.area < min_area:
@@ -438,6 +462,8 @@ def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: 
                 for g in geoms:
                     if g.is_empty or g.area < min_area:
                         continue
+                    if not hasattr(g, 'exterior') or not g.exterior:
+                        continue
                     ext_pts = list(g.exterior.coords)
                     coords_gps = [xy_to_gps(x, y) for x, y in ext_pts]
                     unexplored.append({
@@ -445,10 +471,11 @@ def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: 
                         "coords": coords_gps,
                         "tags": {}
                     })
-            except Exception:
+            except Exception as e:
+                # print(f"Cell Processing Error: {e}")
                 continue
 
-        print(f"[ZoneService] 미개척 지형 {len(unexplored)}개 폴리곤 계산 완료")
+        print(f"[ZoneService] {('구' if poly_coords else '반경')} 미개척 지형 {len(unexplored)}개 폴리곤 계산 완료")
         return unexplored
 
     except ImportError:
@@ -459,7 +486,7 @@ def compute_unexplored_zones(lat: float, lng: float, dist: int, existing_zones: 
         return []
 
 
-def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None):
+def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None, district_id: int = None):
     if isinstance(categories, str):
         cats = [c.strip() for c in categories.split(",") if c.strip()]
     else:
@@ -469,12 +496,18 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None):
     fetch_cats = [c for c in cats if c != "unexplored"]
 
     cat_str = "_".join(sorted(fetch_cats)) if fetch_cats else "all"
-    cache_key = f"v8_z{dist}_lat{lat:.3f}_lng{lng:.3f}_{cat_str}.json"
+    
+    # 구 ID가 있으면 캐시 키에 포함 (특정 구 전용 데이터임을 표시)
+    if district_id:
+        cache_key = f"v9_district{district_id}_{cat_str}.json"
+    else:
+        cache_key = f"v9_z{dist}_lat{lat:.3f}_lng{lng:.3f}_{cat_str}.json"
+        
     cache_path = os.path.join(CACHE_DIR, cache_key)
 
     if os.path.exists(cache_path):
         mtime = os.path.getmtime(cache_path)
-        if time.time() - mtime < 86400:
+        if time.time() - mtime < 86400 * 7: # 캐시 일주일 유지
             try:
                 with open(cache_path, "r", encoding="utf-8") as f:
                     cached_data = json.load(f)
@@ -483,6 +516,18 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None):
             except:
                 pass
 
+    # 구 정보 조회
+    poly_coords = None
+    if district_id:
+        from world.services.district_service import get_district_by_id
+        district = get_district_by_id(district_id)
+        if district:
+            poly_coords = district["coords"]
+            # 구 기반일 때는 center/dist를 구 정보로 덮어씀
+            lat, lng = district["center"]
+            # dist는 구를 포함하도록 넉넉히 (bbox fallback용)
+            dist = 5000 
+
     lat_offset = dist / 111000
     lng_offset = dist / (111000 * math.cos(math.radians(lat)))
     south = lat - lat_offset
@@ -490,8 +535,8 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None):
     west = lng - lng_offset
     east = lng + lng_offset
 
-    print(f"[ZoneService] 구역 데이터 추출: ({lat:.4f}, {lng:.4f}), 반경 {dist}m")
-    query = _build_overpass_query(south, west, north, east, fetch_cats)
+    print(f"[ZoneService] 구역 데이터 추출: {'구-' + str(district_id) if district_id else (str(lat) + ',' + str(lng))}")
+    query = _build_overpass_query(south, west, north, east, fetch_cats, poly_coords=poly_coords)
 
     try:
         encoded = urllib.parse.urlencode({"data": query}).encode("utf-8")
@@ -505,7 +550,7 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None):
                 req.add_header("Content-Type", "application/x-www-form-urlencoded")
                 req.add_header("User-Agent", "AiSogeThing/1.0")
                 start = time.time()
-                with urllib.request.urlopen(req, timeout=30) as resp:
+                with urllib.request.urlopen(req, timeout=45) as resp:
                     raw = json.loads(resp.read().decode("utf-8"))
                 print(f"[ZoneService] 성공! ({time.time()-start:.1f}초)")
                 break
@@ -532,7 +577,7 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None):
 
         # 미개척 지형 계산 (요청에 'unexplored' 포함된 경우)
         if "unexplored" in (categories or []):
-            unexplored_features = compute_unexplored_zones(lat, lng, dist, zones)
+            unexplored_features = compute_unexplored_zones(lat, lng, dist, zones, poly_coords=poly_coords)
             zones["unexplored"] = unexplored_features
             cat_meta["unexplored"] = {"color": "#4a3728", "label": "미개척 지형"}
 
