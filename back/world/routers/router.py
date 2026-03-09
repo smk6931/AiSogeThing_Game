@@ -1,8 +1,14 @@
 import asyncio
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from world.services.terrain_service import terrain_service
-from world.services.zone_service import fetch_zones
-from world.services.district_service import fetch_seoul_districts, get_current_district as _get_current_district
+from world.services.zone_service import fetch_zones, zone_service
+from world.services.district_service import (
+    fetch_seoul_districts,
+    fetch_seoul_sub_districts,
+    get_current_district as _get_current_district,
+    get_current_dong as _get_current_dong
+)
+from world.services.block_service import block_service
 
 router = APIRouter(prefix="/api/world", tags=["World"])
 
@@ -43,13 +49,65 @@ async def get_current_district(lat: float, lng: float):
     return result or {"name": None, "name_en": None, "id": None}
 
 
+@router.get("/dongs")
+async def get_dongs(refresh: bool = False):
+    """
+    서울시 동(admin_level=8) 행정 경계 데이터를 반환합니다.
+    """
+    loop = asyncio.get_event_loop()
+    data = await loop.run_in_executor(None, fetch_seoul_sub_districts, refresh)
+    return data
+
+
+@router.get("/dong/current")
+async def get_current_dong(lat: float, lng: float):
+    """
+    주어진 GPS 좌표가 어느 '동'에 속하는지 반환합니다.
+    """
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, _get_current_dong, lat, lng)
+    return result or {"name": None, "id": None}
+
+
 @router.get("/terrain/district/{district_id}")
 async def get_district_terrain(district_id: int):
     """
-    특정 구 고유의 지형 데이터를 반환합니다. (기존 거대한 seoul_terrain.json 대신 사용 가능)
+    특정 구 고유의 지형 데이터를 반환합니다.
     """
     loop = asyncio.get_event_loop()
     data = await loop.run_in_executor(None, terrain_service.extract_district_terrain, district_id)
     if not data:
         raise HTTPException(status_code=404, detail="District not found")
     return data
+
+
+@router.get("/terrain/dong/{dong_id}")
+async def get_dong_terrain(dong_id: int):
+    """
+    특정 동 고유의 지형 데이터를 반환합니다.
+    """
+    loop = asyncio.get_event_loop()
+    data = await loop.run_in_executor(None, terrain_service.extract_dong_terrain, dong_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Dong not found")
+    return data
+
+@router.get("/zones/district/{district_id}")
+async def get_district_zones(district_id: int):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, zone_service.extract_district_zones, district_id)
+
+@router.get("/zones/dong/{dong_id}")
+async def get_dong_zones(dong_id: int):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, zone_service.extract_dong_zones, dong_id)
+
+@router.get("/blocks/district/{district_id}")
+async def get_district_blocks(district_id: int):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, block_service.extract_district_blocks, district_id)
+
+@router.get("/blocks/dong/{dong_id}")
+async def get_dong_blocks(dong_id: int):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, block_service.extract_dong_blocks, dong_id)

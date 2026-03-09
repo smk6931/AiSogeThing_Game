@@ -22,6 +22,7 @@ import CityBlockOverlay from '@entity/world/CityBlockOverlay';
 import SeoulDistrictOverlay from '@entity/world/SeoulDistrictOverlay';
 import SeoulTerrain from '@entity/world/SeoulTerrain';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
+import { useSeoulDongs } from '@hooks/useSeoulDongs';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
 // 각도 보간 함수 (Shortest path lerp for angles)
@@ -200,27 +201,41 @@ const RpgWorld = ({
   // [Zone Painting] ZoneOverlay에서 로드된 데이터를 SeoulHeightMap과 공유
   const [sharedZoneData, setSharedZoneData] = useState(null);
 
-  // 서울 구 경계 데이터 + 현재 구 판별
+  // 서울 구/동 경계 데이터 + 현재 구/동 판별
   const { districts, getDistrictAt } = useSeoulDistricts();
-  const [currentDistrictId, setCurrentDistrictId] = useState(null);
-  const [currentDistrict, setCurrentDistrict] = useState(null); // 구 전체 객체 (coords, center 포함)
+  const { dongs, getDongAt } = useSeoulDongs();
 
-  // 플레이어 GPS 위치 기반 현재 구 판별 (1초마다 체크)
+  const [currentDistrictId, setCurrentDistrictId] = useState(null);
+  const [currentDistrict, setCurrentDistrict] = useState(null);
+  const [currentDongId, setCurrentDongId] = useState(null);
+  const [currentDong, setCurrentDong] = useState(null);
+
+  // 플레이어 GPS 위치 기반 현재 구/동 판별 (1초마다 체크)
   useEffect(() => {
     const interval = setInterval(() => {
       if (!playerRef.current) return;
       const { x, z } = playerRef.current.position;
       const lat = GIS_ORIGIN.lat - (z / LAT_TO_M);
       const lng = GIS_ORIGIN.lng + (x / LNG_TO_M);
-      const found = getDistrictAt(lat, lng);
-      if (found && found.id !== currentDistrictId) {
-        setCurrentDistrictId(found.id);
-        setCurrentDistrict(found); // coords 포함 전체 객체 저장
-        console.log(`[RpgWorld] 구 전환: ${found.name}`);
+
+      // 1. 구 판별
+      const foundDist = getDistrictAt(lat, lng);
+      if (foundDist && foundDist.id !== currentDistrictId) {
+        setCurrentDistrictId(foundDist.id);
+        setCurrentDistrict(foundDist);
+        console.log(`[RpgWorld] 구 전환: ${foundDist.name}`);
+      }
+
+      // 2. 동 판별 (LOD 0 스트리밍용)
+      const foundDong = getDongAt(lat, lng);
+      if (foundDong && foundDong.id !== currentDongId) {
+        setCurrentDongId(foundDong.id);
+        setCurrentDong(foundDong);
+        console.log(`[RpgWorld] 동 전환 (High-Detail): ${foundDong.name}`);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [getDistrictAt, currentDistrictId]);
+  }, [getDistrictAt, getDongAt, currentDistrictId, currentDongId]);
 
   const playerRef = useRef();
   // [삭제] 인위적인 스케일(15) 대신 현실 미터(0.55) 기반 스케일을 직접 사용합니다.
@@ -352,13 +367,15 @@ const RpgWorld = ({
         districts={districts} // 전체 서울 마스크를 위해 전달
       />
 
-      {/* 2. 서울 지형 레이어 (수동 추출 데이터) - 구 기반 필터 지원 */}
+      {/* 2. [LOD 0] 동 단위 정밀 지형 레이어 (지하철 노선과 조화) */}
       <SeoulTerrain
         visible={showSeoulNature || showSeoulRoads}
         showRoads={showSeoulRoads}
         showNature={showSeoulNature}
-        districtId={currentDistrictId}
-        currentDistrict={currentDistrict}
+        dongId={currentDongId}
+        currentDong={currentDong}
+        elevation={0.05} // 지면보다 살짝 위
+        shiftZ={0}
       />
 
       {/* 3. 지하철 노선도 */}
@@ -414,6 +431,7 @@ const RpgWorld = ({
           heightScale={debugConfig.terrainHeightScale}
           zoneData={sharedZoneData}
           currentDistrict={currentDistrict}
+          currentDong={currentDong}
         />
       </group>
 
@@ -421,6 +439,8 @@ const RpgWorld = ({
       <SeoulDistrictOverlay
         districts={districts}
         currentDistrictId={currentDistrictId}
+        currentDongId={currentDongId}
+        currentDong={currentDong}
         visible={showDistrictBoundaries}
         elevation={debugConfig.mapElevation + 0.3}
       />

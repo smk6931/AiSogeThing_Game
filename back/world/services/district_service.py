@@ -14,6 +14,7 @@ import time
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache", "districts")
 DISTRICT_CACHE_FILE = os.path.join(CACHE_DIR, "seoul_districts.json")
+DONG_CACHE_FILE = os.path.join(CACHE_DIR, "seoul_dongs.json")
 OVERPASS_MIRRORS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
@@ -22,11 +23,23 @@ OVERPASS_MIRRORS = [
 
 # Overpass에서 서울 25구 관계 경계를 가져오는 쿼리
 # admin_level=6 in South Korea = 구(gu) 단위
-OVERPASS_QUERY = """
+OVERPASS_DISTRICT_QUERY = """
 [out:json][timeout:90];
 area["name"="서울특별시"]["admin_level"="4"]->.seoul;
 (
   relation["admin_level"="6"](area.seoul);
+);
+out body;
+>;
+out skel qt;
+"""
+
+# admin_level=8 in South Korea = 동(dong/eup/myeon) 단위
+OVERPASS_DONG_QUERY = """
+[out:json][timeout:180];
+area["name"="서울특별시"]["admin_level"="4"]->.seoul;
+(
+  relation["admin_level"="8"](area.seoul);
 );
 out body;
 >;
@@ -57,7 +70,7 @@ def fetch_seoul_districts(force_refresh: bool = False) -> dict:
     raw = None
     for mirror in OVERPASS_MIRRORS:
         try:
-            data_encoded = urllib.parse.urlencode({"data": OVERPASS_QUERY}).encode("utf-8")
+            data_encoded = urllib.parse.urlencode({"data": OVERPASS_DISTRICT_QUERY}).encode("utf-8")
             req = urllib.request.Request(mirror, data=data_encoded)
             req.add_header("User-Agent", "SeoulDistrictService/1.0 (game-project)")
             with urllib.request.urlopen(req, timeout=90) as resp:
@@ -113,8 +126,8 @@ def _parse_district_response(data: dict) -> list:
         name_en = tags.get("name:en", "")
         admin_level = tags.get("admin_level", "")
 
-        # 구 단위(admin_level=6)만 처리
-        if admin_level != "6":
+        # 구 단위(admin_level=6) 또는 동 단위(admin_level=8) 처리
+        if admin_level not in ["6", "8"]:
             continue
 
         # outer 멤버 way들의 node ID 리스트 수집
@@ -180,7 +193,8 @@ def _parse_district_response(data: dict) -> list:
             "name_en": name_en,
             "admin_level": admin_level,
             "center": [round(lat_avg, 6), round(lng_avg, 6)],
-            "coords": outer_coords   # [[lat, lng], ...]
+            "coords": outer_coords,   # [[lat, lng], ...]
+            "tags": tags # 추가 메타데이터
         })
 
     # 이름 기준 정렬
@@ -188,10 +202,55 @@ def _parse_district_response(data: dict) -> list:
     return districts
 
 
+def fetch_seoul_sub_districts(force_refresh: bool = False) -> dict:
+    """
+    서울시 동(Dong) 단위 행정 경계를 Overpass API에서 가져와 영구 캐시합니다.
+    """
+    os.makedirs(CACHE_DIR, exist_ok=True)
+
+    if not force_refresh and os.path.exists(DONG_CACHE_FILE):
+        try:
+            with open(DONG_CACHE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get("dongs"):
+                print(f"[DistrictService] 동 캐시 로드: {len(data['dongs'])}개 동")
+                return data
+        except Exception as e:
+            print(f"[DistrictService] 동 캐시 읽기 오류: {e}")
+
+    print("[DistrictService] Overpass API에서 서울 동 경계 패치 중...")
+    raw = None
+    for mirror in OVERPASS_MIRRORS:
+        try:
+            data_encoded = urllib.parse.urlencode({"data": OVERPASS_DONG_QUERY}).encode("utf-8")
+            req = urllib.request.Request(mirror, data=data_encoded)
+            req.add_header("User-Agent", "SeoulDongService/1.0")
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                raw = json.loads(resp.read().decode("utf-8"))
+            print(f"[DistrictService] 동 미러 성공: {mirror}")
+            break
+        except Exception as e:
+            print(f"[DistrictService] 동 미러 실패: {e}")
+            time.sleep(1)
+
+    if raw is None:
+        return {"dongs": [], "error": "All mirrors failed"}
+
+    dongs = _parse_district_response(raw)
+    result = {"dongs": dongs, "fetched_at": time.time(), "count": len(dongs)}
+
+    try:
+        with open(DONG_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[DistrictService] 동 캐시 저장 오류: {e}")
+
+    return result
+
+
 def get_current_district(lat: float, lng: float) -> dict | None:
     """
     현재 GPS 좌표가 어느 구에 속하는지 반환합니다.
-    Ray-casting 알고리즘으로 point-in-polygon 판별.
     """
     try:
         data = fetch_seoul_districts()
@@ -219,6 +278,38 @@ def get_district_by_id(district_id: int) -> dict | None:
                 return district
     except Exception as e:
         print(f"[DistrictService] 구 조회 오류: {e}")
+    return None
+
+
+def get_current_dong(lat: float, lng: float) -> dict | None:
+    """
+    현재 GPS 좌표가 어느 '동'에 속하는지 반환합니다.
+    """
+    try:
+        data = fetch_seoul_sub_districts()
+        for dong in data.get("dongs", []):
+            if _point_in_polygon(lat, lng, dong["coords"]):
+                return {
+                    "name": dong["name"],
+                    "id": dong["id"],
+                    "center": dong["center"]
+                }
+    except Exception as e:
+        print(f"[DistrictService] 동 판별 오류: {e}")
+    return None
+
+
+def get_dong_by_id(dong_id: int) -> dict | None:
+    """
+    ID로 특정 동의 데이터를 반환합니다.
+    """
+    try:
+        data = fetch_seoul_sub_districts()
+        for dong in data.get("dongs", []):
+            if dong["id"] == dong_id:
+                return dong
+    except Exception as e:
+        print(f"[DistrictService] 동 조회 오류: {e}")
     return None
 
 

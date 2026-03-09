@@ -26,6 +26,39 @@ const worldApi = {
   // 특정 구(District) 고유 지형 데이터 조회
   getDistrictTerrain: async (districtId) => {
     return await client.get(`/api/world/terrain/district/${districtId}`);
+  },
+
+  // 서울시 동(Dong) 행정 경계 데이터 조회
+  getDongs: async (refresh = false) => {
+    return await client.get(`/api/world/dongs?refresh=${refresh}`);
+  },
+
+  // 현재 좌표 기준 동 정보 조회
+  getCurrentDong: async (lat, lng) => {
+    return await client.get('/api/world/dong/current', {
+      params: { lat, lng }
+    });
+  },
+
+  // 특정 동(Dong) 고유 지형 데이터 조회
+  getDongTerrain: async (dongId) => {
+    return await client.get(`/api/world/terrain/dong/${dongId}`);
+  },
+
+  // 구역(Zone) 데이터 조회 (구/동 단위 선택적 지원)
+  getDistrictZones: async (districtId) => {
+    return await client.get(`/api/world/zones/district/${districtId}`);
+  },
+  getDongZones: async (dongId) => {
+    return await client.get(`/api/world/zones/dong/${dongId}`);
+  },
+
+  // 블록(Block) 데이터 조회
+  getDistrictBlocks: async (districtId) => {
+    return await client.get(`/api/world/blocks/district/${districtId}`);
+  },
+  getDongBlocks: async (dongId) => {
+    return await client.get(`/api/world/blocks/dong/${dongId}`);
   }
 };
 

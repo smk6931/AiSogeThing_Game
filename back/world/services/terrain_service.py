@@ -6,6 +6,7 @@ import urllib.request
 import urllib.parse
 from shapely.geometry import Polygon, LineString, MultiPolygon, MultiLineString
 import os
+import concurrent.futures
 
 # osmnx 캐시 설정 (라이브러리 원본 데이터는 raw 폴더로 격리)
 ox.settings.use_cache = True
@@ -49,12 +50,10 @@ class TerrainService:
             "heightmap": None
         }
 
-        # 1. 고도 데이터 추출 (Heightmap) - 비활성화 (전역 HeightMap 사용으로 성능 최적화)
-        # result["heightmap"] = self._fetch_area_elevations(lat, lng, dist, grid_size)
+        # 고도 데이터 추출은 현재 전역 HeightMap을 사용하므로 생략
         result["heightmap"] = None
 
-
-        # 2. OSM 특징 데이터 추출 (Water, Forest, Grass)
+        # [병렬화 적용 가능하지만 실시간 area 추출은 거리(dist)가 작으므로 순차 처리 유지하거나 추후 병렬화]
         try:
             water_tags = {"natural": ["water", "wetland"], "waterway": ["river", "stream", "canal"]}
             water_gdf = ox.features_from_point(center, tags=water_tags, dist=dist)
@@ -77,7 +76,6 @@ class TerrainService:
             print(f"[TerrainService] Water Layer Error: {e}")
 
         try:
-            # 2. 숲/녹지
             forest_tags = {"landuse": ["forest", "recreation_ground"], "leisure": ["park", "nature_reserve"], "natural": ["wood"]}
             forest_gdf = ox.features_from_point(center, tags=forest_tags, dist=dist)
             if not forest_gdf.empty:
@@ -94,22 +92,17 @@ class TerrainService:
             print(f"[TerrainService] Forest Layer Error: {e}")
 
         try:
-            # 3. 도로 (핵심 간선도로 위주 필터링)
             G = ox.graph_from_point(center, dist=dist, network_type="all")
             edges = ox.graph_to_gdfs(G, nodes=False)
-            
             major_hw = ["motorway", "trunk", "primary", "secondary", "tertiary", "residential"]
-            
             if not edges.empty:
                 for _, row in edges.iterrows():
                     geom = row.geometry
                     hw = row.get("highway", "residential")
                     if isinstance(hw, list): hw = hw[0]
                     if hw not in major_hw: continue
-
                     bridge = row.get("bridge", "no")
                     if isinstance(bridge, list): bridge = bridge[0]
-                    
                     lines = [geom] if geom.geom_type == "LineString" else (list(geom.geoms) if geom.geom_type == "MultiLineString" else [])
                     for line in lines:
                         coords = self._line_to_list(line, lat, lng)
@@ -125,7 +118,6 @@ class TerrainService:
         return self._deep_sanitize(result)
 
     def _deep_sanitize(self, obj):
-        """JSON 데이터 전송 직전에 NaN/Inf 값을 안전한 값으로 필터링"""
         if isinstance(obj, dict):
             return {k: self._deep_sanitize(v) for k, v in obj.items()}
         elif isinstance(obj, list):
@@ -136,182 +128,125 @@ class TerrainService:
             return obj
         return obj
 
-
     def extract_district_terrain(self, district_id: int):
-        """
-        특정 구(district_id)의 경계 polygon을 기준으로 OSM 데이터를 추출합니다.
-        """
         from world.services.district_service import get_district_by_id
         district = get_district_by_id(district_id)
-        if not district:
-            return None
+        if not district: return None
+        return self._extract_boundary_terrain(district, "district")
 
-        # 구 고유 캐시 경로
-        cache_dir = os.path.join(os.path.dirname(__file__), "..", "..", "cache", "terrain_districts")
+    def extract_dong_terrain(self, dong_id: int):
+        from world.services.district_service import get_dong_by_id
+        dong = get_dong_by_id(dong_id)
+        if not dong: return None
+        return self._extract_boundary_terrain(dong, "dong")
+
+    def _extract_boundary_terrain(self, area_data, area_type):
+        area_id = area_data["id"]
+        area_name = area_data["name"]
+        cache_dir = os.path.join(os.path.dirname(__file__), "..", "..", "cache", f"terrain_{area_type}s")
         os.makedirs(cache_dir, exist_ok=True)
-        cache_path = os.path.join(cache_dir, f"terrain_district_{district_id}.json")
+        cache_path = os.path.join(cache_dir, f"terrain_{area_type}_{area_id}.json")
 
         if os.path.exists(cache_path):
             with open(cache_path, "r", encoding="utf-8") as f:
                 return json.load(f)
 
-        print(f"[TerrainService] '{district['name']}' 구 지형 데이터 OSM 추출 중...")
-        
-        # Shapely Polygon 생성 (OSMnx는 [lng, lat] 순서 또는 Polygon 객체 기대)
-        # district['coords'] 는 [[lat, lng], ...]
-        poly = Polygon([(lng, lat) for lat, lng in district["coords"]])
-        
-        # 기준점은 구의 중심점
-        ref_lat, ref_lng = district["center"]
+        print(f"[TerrainService] '{area_name}' {area_type} 지형 데이터 병렬 추출 시작...")
+        poly = Polygon([(lng, lat) for lat, lng in area_data["coords"]])
+        ref_lat, ref_lng = area_data["center"]
         
         result = {
-            "name": district["name"],
+            "name": area_name,
+            "type": area_type,
+            "id": area_id,
             "center": {"lat": ref_lat, "lng": ref_lng},
-            "layers": {
-                "water": [],
-                "forest": [],
-                "grass": [],
-                "roads": [],
-            }
+            "layers": {"water": [], "forest": [], "grass": [], "roads": []}
         }
 
-        # OSMnx extraction within polygon
-        try:
-            # 1. 물
-            water_tags = {"natural": ["water", "wetland"], "waterway": ["river", "stream", "canal"]}
-            water_gdf = ox.features_from_polygon(poly, tags=water_tags)
-            if not water_gdf.empty:
-                for _, row in water_gdf.iterrows():
-                    geom = row.geometry
-                    if geom.geom_type == "Polygon":
-                        coords = self._polygon_to_list(geom, ref_lat, ref_lng)
-                        result["layers"]["water"].append({"type": "polygon", "coords": coords})
-                    elif geom.geom_type == "MultiPolygon":
-                        for part in geom.geoms:
-                            coords = self._polygon_to_list(part, ref_lat, ref_lng)
-                            result["layers"]["water"].append({"type": "polygon", "coords": coords})
-                    elif geom.geom_type in ("LineString", "MultiLineString"):
-                        lines = [geom] if geom.geom_type == "LineString" else list(geom.geoms)
+        def fetch_water():
+            items = []
+            try:
+                water_tags = {"natural": ["water", "wetland"], "waterway": ["river", "stream", "canal"]}
+                gdf = ox.features_from_polygon(poly, tags=water_tags)
+                if not gdf.empty:
+                    for _, row in gdf.iterrows():
+                        geom = row.geometry
+                        if geom.geom_type == "Polygon":
+                            items.append({"type": "polygon", "coords": self._polygon_to_list(geom, ref_lat, ref_lng)})
+                        elif geom.geom_type == "MultiPolygon":
+                            for part in geom.geoms:
+                                items.append({"type": "polygon", "coords": self._polygon_to_list(part, ref_lat, ref_lng)})
+                        elif geom.geom_type in ("LineString", "MultiLineString"):
+                            lines = [geom] if geom.geom_type == "LineString" else list(geom.geoms)
+                            for line in lines:
+                                items.append({"type": "line", "width": 20, "coords": self._line_to_list(line, ref_lat, ref_lng)})
+            except Exception as e: print(f"[TerrainService] Water Error: {e}")
+            return items
+
+        def fetch_forest():
+            items = []
+            try:
+                forest_tags = {"landuse": ["forest", "recreation_ground"], "leisure": ["park", "nature_reserve"], "natural": ["wood"]}
+                gdf = ox.features_from_polygon(poly, tags=forest_tags)
+                if not gdf.empty:
+                    for _, row in gdf.iterrows():
+                        geom = row.geometry
+                        if geom.geom_type == "Polygon":
+                            items.append({"type": "polygon", "coords": self._polygon_to_list(geom, ref_lat, ref_lng)})
+                        elif geom.geom_type == "MultiPolygon":
+                            for part in geom.geoms:
+                                items.append({"type": "polygon", "coords": self._polygon_to_list(part, ref_lat, ref_lng)})
+            except Exception as e: print(f"[TerrainService] Forest Error: {e}")
+            return items
+
+        def fetch_roads():
+            items = []
+            try:
+                G = ox.graph_from_polygon(poly, network_type="all")
+                edges = ox.graph_to_gdfs(G, nodes=False)
+                major_hw = ["motorway", "trunk", "primary", "secondary", "tertiary", "residential", "unclassified", "service"]
+                if not edges.empty:
+                    for _, row in edges.iterrows():
+                        geom = row.geometry
+                        hw = row.get("highway", "residential")
+                        if isinstance(hw, list): hw = hw[0]
+                        if hw not in major_hw: continue
+                        bridge = row.get("bridge", "no")
+                        if isinstance(bridge, list): bridge = bridge[0]
+                        lines = [geom] if geom.geom_type == "LineString" else (list(geom.geoms) if geom.geom_type == "MultiLineString" else [])
                         for line in lines:
-                            coords = self._line_to_list(line, ref_lat, ref_lng)
-                            result["layers"]["water"].append({"type": "line", "width": 20, "coords": coords})
-        except Exception as e:
-            print(f"[TerrainService] District Water Error: {e}")
+                            items.append({
+                                "type": "line",
+                                "highway": hw,
+                                "bridge": bridge,
+                                "coords": self._line_to_list(line, ref_lat, ref_lng)
+                            })
+            except Exception as e: print(f"[TerrainService] Road Error: {e}")
+            return items
 
-        try:
-            # 2. 녹지
-            forest_tags = {"landuse": ["forest", "recreation_ground"], "leisure": ["park", "nature_reserve"], "natural": ["wood"]}
-            forest_gdf = ox.features_from_polygon(poly, tags=forest_tags)
-            if not forest_gdf.empty:
-                for _, row in forest_gdf.iterrows():
-                    geom = row.geometry
-                    if geom.geom_type == "Polygon":
-                        coords = self._polygon_to_list(geom, ref_lat, ref_lng)
-                        result["layers"]["forest"].append({"type": "polygon", "coords": coords})
-                    elif geom.geom_type == "MultiPolygon":
-                        for part in geom.geoms:
-                            coords = self._polygon_to_list(part, ref_lat, ref_lng)
-                            result["layers"]["forest"].append({"type": "polygon", "coords": coords})
-        except Exception as e:
-            print(f"[TerrainService] District Forest Error: {e}")
-
-        try:
-            # 3. 도로
-            # osmnx can fetch graph from polygon
-            G = ox.graph_from_polygon(poly, network_type="all")
-            edges = ox.graph_to_gdfs(G, nodes=False)
-            major_hw = ["motorway", "trunk", "primary", "secondary", "tertiary", "residential"]
-            
-            if not edges.empty:
-                for _, row in edges.iterrows():
-                    geom = row.geometry
-                    hw = row.get("highway", "residential")
-                    if isinstance(hw, list): hw = hw[0]
-                    if hw not in major_hw: continue
-
-                    bridge = row.get("bridge", "no")
-                    if isinstance(bridge, list): bridge = bridge[0]
-                    
-                    lines = [geom] if geom.geom_type == "LineString" else (list(geom.geoms) if geom.geom_type == "MultiLineString" else [])
-                    for line in lines:
-                        coords = self._line_to_list(line, ref_lat, ref_lng)
-                        result["layers"]["roads"].append({
-                            "type": "line",
-                            "highway": hw,
-                            "bridge": bridge,
-                            "coords": coords
-                        })
-        except Exception as e:
-            print(f"[TerrainService] District Road Error: {e}")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            f_water = executor.submit(fetch_water)
+            f_forest = executor.submit(fetch_forest)
+            f_roads = executor.submit(fetch_roads)
+            result["layers"]["water"] = f_water.result()
+            result["layers"]["forest"] = f_forest.result()
+            result["layers"]["roads"] = f_roads.result()
 
         final_result = self._deep_sanitize(result)
-        
-        # 캐싱
         with open(cache_path, "w", encoding="utf-8") as f:
             json.dump(final_result, f, ensure_ascii=False, indent=2)
-
         return final_result
 
     def _polygon_to_list(self, polygon, ref_lat, ref_lng):
         if not polygon or not hasattr(polygon, 'exterior'): return []
-        coords = list(polygon.exterior.coords)
-        return [self.gps_to_game(lat, lng, ref_lat, ref_lng) for lng, lat in coords]
+        return [self.gps_to_game(lat, lng, ref_lat, ref_lng) for lng, lat in list(polygon.exterior.coords)]
 
     def _line_to_list(self, line, ref_lat, ref_lng):
         if not line or not hasattr(line, 'coords'): return []
-        coords = list(line.coords)
-        return [self.gps_to_game(lat, lng, ref_lat, ref_lng) for lng, lat in coords]
+        return [self.gps_to_game(lat, lng, ref_lat, ref_lng) for lng, lat in list(line.coords)]
 
     def _fetch_area_elevations(self, lat, lng, dist, grid_size):
-        """opentopodata를 이용해 격자 고도 데이터 추출"""
-        lat_range = dist / self.LAT_TO_M
-        lng_range = dist / self.LNG_TO_M
-        
-        lat_min, lat_max = lat - lat_range, lat + lat_range
-        lng_min, lng_max = lng - lng_range, lng + lng_range
-        
-        grid_points = []
-        for row in range(grid_size):
-            for col in range(grid_size):
-                p_lat = lat_max - (row / (grid_size - 1)) * (lat_max - lat_min)
-                p_lng = lng_min + (col / (grid_size - 1)) * (lng_max - lng_min)
-                grid_points.append((p_lat, p_lng))
-        
-        elevations = []
-        for i in range(0, len(grid_points), 100):
-            batch = grid_points[i:i+100]
-            locations = "|".join(f"{lt:.6f},{lg:.6f}" for lt, lg in batch)
-            url = f"https://api.opentopodata.org/v1/srtm30m?locations={urllib.parse.quote(locations)}"
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": "AiSogeThing/1.0"})
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    data = json.loads(resp.read().decode())
-                    if data.get("status") == "OK":
-                        for r in data["results"]:
-                            e = r.get("elevation")
-                            elevations.append(self._sanitize_float(e))
-                    else:
-                        elevations.extend([0.0] * len(batch))
-            except Exception as e:
-                print(f"[TerrainService] Elevation API error: {e}")
-                elevations.extend([0.0] * len(batch))
-            time.sleep(1.0)
-
-        # 안전한 min/max 계산 (비어있거나 모든 값이 0일 때 대비)
-        valid = [e for e in elevations if e is not None and not math.isnan(e)]
-        if not valid: valid = [0.0]
-        
-        return {
-            "grid_size": grid_size,
-            "elevations": elevations,
-            "min": round(min(valid), 1),
-            "max": round(max(valid), 1)
-        }
-
-    def _sanitize_float(self, val):
-        """NaN 또는 무한대 값을 JSON 안전한 값(0)으로 변환"""
-        if val is None or math.isnan(val) or math.isinf(val):
-            return 0.0
-        return float(val)
+        # OpenTopoData API 호출 (현재 비활성 상태 유지)
+        return {"grid_size": grid_size, "elevations": [], "min": 0, "max": 0}
 
 terrain_service = TerrainService()

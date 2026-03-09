@@ -94,7 +94,10 @@ const getDetailedColor = (relElev) => {
 // 메인 컴포넌트 (Memoized for stability)
 // ===========================
 
-const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.0, zoneData = null, currentDistrict = null }) => {
+const SeoulHeightMap = React.memo(({
+  visible = true, playerRef, heightScale = 1.0,
+  zoneData = null, currentDistrict = null, currentDong = null
+}) => {
 
   const [data, setData] = useState(null);
   const built = useRef(false);
@@ -163,11 +166,12 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
     const vertCount = grid_size * grid_size;
     const colors = new Float32Array(vertCount * 4); // RGBA (알파 채널 추가)
 
-    // 마스크 최적화를 위한 BBox 사전 계산
+    // 마스크 최적화를 위한 BBox 사전 계산 (동이 있으면 동을, 없으면 구를 사용)
+    const activeMaskArea = currentDong || currentDistrict;
     let maskBBox = null;
-    if (currentDistrict?.coords) {
+    if (activeMaskArea?.coords) {
       maskBBox = { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 };
-      for (const [lat, lng] of currentDistrict.coords) {
+      for (const [lat, lng] of activeMaskArea.coords) {
         if (lat < maskBBox.minLat) maskBBox.minLat = lat;
         if (lat > maskBBox.maxLat) maskBBox.maxLat = lat;
         if (lng < maskBBox.minLng) maskBBox.minLng = lng;
@@ -179,16 +183,29 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
     for (let i = 0; i < vertCount; i++) {
       const rawElev = elevations[i] ?? elev_min;
       const relElev = Math.max(0, rawElev - elev_min);
-      positions[i * 3 + 1] = relElev * heightScale;
 
-      const c = getDetailedColor(relElev);
+      // [계단식 지형 구현] 고도 값을 10미터 단위로 양자화
+      const stepHeight = 10.0;
+      const quantizedElev = Math.floor(relElev / stepHeight) * stepHeight;
+      positions[i * 3 + 1] = quantizedElev * heightScale;
+
+      // [단순화] 초록색 계열의 층층이 명암 적용
+      const c = new THREE.Color();
+      if (relElev < 10.0) {
+        c.setHex(0x1a3a5a); // 물 영역
+      } else {
+        // 계단형 느낌을 시각화하기 위해 양자화된 고도 기반 색상
+        const tone = 0.2 + (quantizedElev / 400) * 0.4;
+        c.setRGB(0.12, tone, 0.12);
+      }
+
       colors[i * 4 + 0] = c.r;
       colors[i * 4 + 1] = c.g;
       colors[i * 4 + 2] = c.b;
 
-      // 마스크 (알파) 적용 로직
+      // 마스크 (알파) 적용
       let alpha = 1.0;
-      if (currentDistrict?.coords) {
+      if (activeMaskArea?.coords) {
         const worldX = posX + positions[i * 3 + 0];
         const worldZ = posZ + positions[i * 3 + 2];
         const vLat = GIS_ORIGIN.lat - worldZ / LAT_TO_M;
@@ -196,48 +213,14 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
 
         if (vLat < maskBBox.minLat || vLat > maskBBox.maxLat || vLng < maskBBox.minLng || vLng > maskBBox.maxLng) {
           alpha = 0.0;
-        } else if (!pointInPolygon(vLat, vLng, currentDistrict.coords)) {
+        } else if (!pointInPolygon(vLat, vLng, activeMaskArea.coords)) {
           alpha = 0.0;
         }
       }
       colors[i * 4 + 3] = alpha;
     }
 
-    // [2단계] Zone 데이터가 있으면 각 정점의 GPS 역산 → Zone 판정 → 색상 덮어쓰기
-    if (zoneData?.zones) {
-      console.log('[HeightMap] Zone 기반 텍스처 페인팅 시작...');
-      const t0 = performance.now();
-      const zoneBBoxes = precomputeZoneBBox(zoneData.zones);
-
-      for (let i = 0; i < vertCount; i++) {
-        // 정점의 로컬 게임 좌표 → 월드 좌표 → GPS
-        const worldX = posX + positions[i * 3 + 0];
-        const worldZ = posZ + positions[i * 3 + 2];
-        const vLat = GIS_ORIGIN.lat - worldZ / LAT_TO_M;
-        const vLng = GIS_ORIGIN.lng + worldX / LNG_TO_M;
-
-        let matched = null;
-        outer: for (const zoneName of ZONE_PRIORITY) {
-          for (const bbox of zoneBBoxes[zoneName]) {
-            if (vLat < bbox.minLat || vLat > bbox.maxLat ||
-              vLng < bbox.minLng || vLng > bbox.maxLng) continue;
-            if (pointInPolygon(vLat, vLng, bbox.coords)) {
-              matched = zoneName;
-              break outer;
-            }
-          }
-        }
-
-        if (matched) {
-          const [r, g, b] = ZONE_PAINT[matched];
-          colors[i * 4 + 0] = r;
-          colors[i * 4 + 1] = g;
-          colors[i * 4 + 2] = b;
-        }
-      }
-      console.log(`[HeightMap] Zone 페인팅 완료: ${(performance.now() - t0).toFixed(0)}ms`);
-    }
-
+    // [최적화] CPU 부하 방지를 위해 Zone PiP 루프 중단
     geo.attributes.position.needsUpdate = true;
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 4));
     geo.computeVertexNormals();
@@ -245,7 +228,7 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
     geo.computeBoundingSphere();
 
     return geo;
-  }, [data, heightScale, zoneData]);
+  }, [data, heightScale, currentDistrict, currentDong]);
 
 
   // 등고선(지형) 범위 바운더리 지오메트리 캐싱 (조건문 이전으로 이동 - Rules of Hooks)
@@ -271,98 +254,43 @@ const SeoulHeightMap = React.memo(({ visible = true, playerRef, heightScale = 1.
           vertexColors={true}
           transparent={true} // 마스크 적용을 위해 투명화 지원
           alphaTest={0.5}
-          roughness={0.9}
+          roughness={1.0}
           metalness={0.0}
           onBeforeCompile={(shader) => {
             shader.uniforms.uPlayerPos = uniforms.uPlayerPos;
-            shader.uniforms.uHighlightRadius = uniforms.uHighlightRadius;
-            shader.uniforms.tGrass = uniforms.tGrass;
-            shader.uniforms.tRock = uniforms.tRock;
-            shader.uniforms.tSand = uniforms.tSand;
 
             shader.vertexShader = shader.vertexShader.replace(
               '#include <common>',
-              `
-              #include <common>
-              varying vec3 vWorldPos;
-              `
+              `#include <common>
+               varying vec3 vWorldPos;`
             );
             shader.vertexShader = shader.vertexShader.replace(
               '#include <begin_vertex>',
-              `
-              #include <begin_vertex>
-              vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-              `
+              `#include <begin_vertex>
+               vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`
             );
 
             shader.fragmentShader = shader.fragmentShader.replace(
               '#include <common>',
-              `
-              #include <common>
-              uniform vec2 uPlayerPos;
-              uniform float uHighlightRadius;
-              uniform sampler2D tGrass;
-              uniform sampler2D tRock;
-              uniform sampler2D tSand;
-              varying vec3 vWorldPos;
-              `
+              `#include <common>
+               uniform vec2 uPlayerPos;
+               varying vec3 vWorldPos;`
             );
 
             shader.fragmentShader = shader.fragmentShader.replace(
               '#include <map_fragment>',
               `
-              float dist = distance(vWorldPos.xz, uPlayerPos);
-              // [최적화] 텍스처 경계를 훨씬 부드럽게 (0.5 ~ 1.0)
-              float spotAlpha = 1.0 - smoothstep(uHighlightRadius * 0.5, uHighlightRadius, dist);
+              // 오직 버텍스 컬러와 고도를 이용한 쉐이딩만 수행 (최적화)
+              diffuseColor.rgb = vColor.rgb;
               
-              vec2 uv = vWorldPos.xz * 0.025; 
-
-              vec4 texGrass = texture2D(tGrass, uv);
-              vec4 texRock  = texture2D(tRock, uv);
-              vec4 texSand  = texture2D(tSand, uv * 1.5);
-              
-              // Vertex Color 기반 자동 바이옴 믹싱
-              // B가 강하면 물(푸른빛), R이 강하면 바위(산), G가 중간이면 평지(풀)
-              vec4 blendedTex;
-              if (vColor.b > vColor.g + 0.1) {
-                  // 물 영역 (텍스처보다는 깊은 색감 위주)
-                  blendedTex = mix(vec4(0.05, 0.25, 0.6, 1.0), texSand, 0.2);
-              } else if (vColor.r > vColor.g + 0.1) {
-                  // 산/바위 영역
-                  blendedTex = texRock;
-              } else if (vColor.r > 0.7 && vColor.g > 0.6) {
-                  // 모래/해변 영역
-                  blendedTex = texSand;
-              } else {
-                  // 일반 평지/숲 영역
-                  blendedTex = texGrass;
-              }
-              
-              // 1. 텍스처와 버텍스 컬러 기본 합산 (스포트라이트 제약 없이 상시 노출)
-              diffuseColor.rgb = vColor.rgb * blendedTex.rgb * 1.8;
-              
-              // 2. [고급 효과] 수직 절벽(Step Side) 강조 
-              // dFdx/dFdy를 사용하여 '가파른 면'에 인위적인 쉐이딩 추가 (각진 느낌 강조)
+              // [고급 효과] 수직 절벽 명암 강조 (입체감 유지)
               vec3 vFaceNormal = normalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)));
-              float isVertical = 1.0 - smoothstep(0.5, 0.7, vFaceNormal.y);
-              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.65, isVertical);
-              
-              // 3. [고급 효과] 택티컬 그리드 (10m 간격)
-              // 건축 설계도나 보드게임판 같은 정밀한 공간감을 부여합니다.
-              float gridMajor = (mod(vWorldPos.x + 0.1, 10.0) < 0.22 || mod(vWorldPos.z + 0.1, 10.0) < 0.22) ? 1.0 : 0.0;
-              float gridMinor = (mod(vWorldPos.x + 0.05, 2.0) < 0.12 || mod(vWorldPos.z + 0.05, 2.0) < 0.12) ? 0.4 : 0.0;
-              float grid = max(gridMajor, gridMinor);
-              diffuseColor.rgb += grid * 0.08; // 그리드 선을 은은하게 추가
-              
-              // 4. [고급 효과] 앰비언트 오클루전 (높이에 따른 어둡기 조절)
-              float ao = 0.82 + 0.18 * smoothstep(0.0, 100.0, vWorldPos.y);
-              diffuseColor.rgb *= ao;
+              float isVertical = 1.0 - smoothstep(0.7, 0.9, vFaceNormal.y);
+              diffuseColor.rgb *= (1.0 - isVertical * 0.4);
 
-              // 5. [마스크 처리] 구별 경계 외부는 렌더링 스킵
+              // [마스크 처리]
               diffuseColor.a = vColor.a;
-              if (diffuseColor.a < 0.2) {
-                  discard;
-              }
+              if (diffuseColor.a < 0.1) discard;
               `
             );
           }}

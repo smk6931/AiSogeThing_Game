@@ -246,7 +246,8 @@ const calcDistrictBbox = (coords) => {
  * - elevation: Y축 높이 (지도 위에 올려야 함)
  */
 const ZoneOverlay = ({
-  playerPos, currentDistrict = null, elevation = 0.05, heightScale = 1.0, onZoneLoaded, visible = true, enabledZones = {},
+  playerPos, currentDistrict = null, dongId = null, currentDong = null,
+  elevation = 0.05, heightScale = 1.0, onZoneLoaded, visible = true, enabledZones = {},
   zoneRadius = 2500
 }) => {
   const [zoneData, setZoneData] = useState({ zones: {}, categories: {} });
@@ -283,27 +284,30 @@ const ZoneOverlay = ({
     }));
   };
 
-  // [핵심] 구(District) 기반 Zone 로드 — 구가 바뀔 때만 fetch
+  // [핵심] 구(District) 또는 동(Dong) 기반 Zone 로드 — 영역이 바뀔 때만 fetch
   useEffect(() => {
-    if (!visible || !currentDistrict) return;
+    if (!visible) return;
+    if (!currentDistrict && !dongId) return;
 
-    const cacheKey = `world_zones_district_v2_${currentDistrict.id}`;
+    const targetId = dongId || currentDistrict?.id;
+    const targetName = dongId ? (currentDong?.name || dongId) : currentDistrict?.name;
+    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v3_${targetId}`;
 
-    const fetchForDistrict = async () => {
+    const fetchAreaData = async () => {
       // 1. 메모리 캐시
       if (zoneCache.current.has(cacheKey)) {
-        console.log(`[ZoneOverlay] 구 메모리 캐시: ${currentDistrict.name}`);
+        console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 메모리 캐시: ${targetName}`);
         setZoneDataStrict(zoneCache.current.get(cacheKey));
         return;
       }
       // 2. 브라우저 영구 캐시
       try {
-        const browserCache = await caches.open('zone-data-v9');
+        const browserCache = await caches.open('zone-data-v10');
         const cachedRes = await browserCache.match(cacheKey);
         if (cachedRes) {
           const data = await cachedRes.json();
           if (Date.now() - (data._timestamp || 0) < 86400000 * 7) {
-            console.log(`[ZoneOverlay] 구 로컬 캐시: ${currentDistrict.name}`);
+            console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 로컬 캐시: ${targetName}`);
             setZoneDataStrict(data);
             zoneCache.current.set(cacheKey, data);
             return;
@@ -311,37 +315,37 @@ const ZoneOverlay = ({
         }
       } catch (e) { }
 
-      // 3. 구 bbox 계산 후 서버 패치
-      const bbox = calcDistrictBbox(currentDistrict.coords);
-      if (!bbox) return;
-      console.log(`[ZoneOverlay] 구 서버 패치: ${currentDistrict.name} (dist=${bbox.dist}m)`);
+      // 3. 서버 패치
+      console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 서버 패치: ${targetName}`);
       setLoadingGroups({ world_zones: true });
-      setZoneData({ zones: {}, categories: {} }); // 이전 구 데이터 즉각 클리어
+
+      // 동 전환 시에는 이전 동 데이터를 클리어할지, 누적할지 선택 가능 (일단 클리어)
+      if (dongId) {
+        setZoneData({ zones: {}, categories: {} });
+      }
 
       try {
-        const ALL_CATS = [
-          'water', 'park', 'forest', 'natural_site',
-          'residential', 'commercial', 'industrial', 'institutional', 'educational', 'medical', 'parking',
-          'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
-          'road_major', 'road_minor', 'unexplored'
-        ];
-        const response = await worldApi.getZones(bbox.lat, bbox.lng, bbox.dist, ALL_CATS.join(','), currentDistrict.id);
+        const response = dongId
+          ? await worldApi.getDongZones(dongId)
+          : await worldApi.getDistrictZones(currentDistrict.id);
+
         const data = response.data;
         data._timestamp = Date.now();
-        setZoneDataStrict(data); // MERGE 하지 않고 REPLACED
+        setZoneDataStrict(data);
         zoneCache.current.set(cacheKey, data);
-        const browserCache = await caches.open('zone-data-v9');
+
+        const browserCache = await caches.open('zone-data-v10');
         browserCache.put(cacheKey, new Response(JSON.stringify(data)));
-        console.log(`[ZoneOverlay] 구 로드 완료: ${currentDistrict.name}`);
+        console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 로드 완료: ${targetName}`);
       } catch (err) {
-        console.error('[ZoneOverlay] 구 패치 실패:', err);
+        console.error(`[ZoneOverlay] ${dongId ? '동' : '구'} 패치 실패:`, err);
       } finally {
         setLoadingGroups({});
       }
     };
 
-    fetchForDistrict();
-  }, [visible, currentDistrict?.id]); // 구 ID가 바뀔 때만
+    fetchAreaData();
+  }, [visible, currentDistrict?.id, dongId]); // 구 ID 또는 동 ID가 바뀔 때만
 
   // [Fallback] currentDistrict 없을 때 기존 이동거리 방식 유지
   useEffect(() => {

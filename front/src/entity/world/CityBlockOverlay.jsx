@@ -233,7 +233,10 @@ const pointInPolygon = (lat, lng, coords) => {
 // ==============================================
 // 메인 컴포넌트
 // ==============================================
-const CityBlockOverlay = ({ zoneData, visible = true, heightScale = 1.0, currentDistrict = null }) => {
+const CityBlockOverlay = ({
+  zoneData, visible = true, heightScale = 1.0,
+  currentDistrict = null, dongId = null, currentDong = null
+}) => {
   const [hm, setHm] = useState(null);
   const textures = useTexture(BLOCK_IMAGES);
   const [selectedBlock, setSelectedBlock] = useState(null);
@@ -249,6 +252,8 @@ const CityBlockOverlay = ({ zoneData, visible = true, heightScale = 1.0, current
     if (!zoneData?.zones || !hm) return [];
 
     const districtCoords = currentDistrict?.coords;
+    const dongCoords = currentDong?.coords;
+    const maskCoords = dongCoords || districtCoords; // 동 경계가 있으면 동으로, 없으면 구로 마스킹
 
     // 여러 카테고리의 폴리곤들을 하나의 배열로 통합
     let allPolygons = [];
@@ -256,12 +261,12 @@ const CityBlockOverlay = ({ zoneData, visible = true, heightScale = 1.0, current
       'natural_site', 'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
       'park', 'forest'].forEach(cat => {
         if (zoneData.zones[cat]) {
-          const filtered = districtCoords
+          const filtered = maskCoords
             ? zoneData.zones[cat].filter(f => {
               if (f.type !== 'polygon' || !f.coords?.length) return false;
-              // [성능 최적화] 첫 번째 좌표만 검사하여 구 역내 데이터인지 판별 (엄격한 마스킹)
+              // [성능 최적화] 첫 번째 좌표만 검사하여 마스크 역내 데이터인지 판별
               const [lat, lng] = f.coords[0];
-              return pointInPolygon(lat, lng, districtCoords);
+              return pointInPolygon(lat, lng, maskCoords);
             })
             : zoneData.zones[cat].filter(f => f.type === 'polygon' && f.coords?.length >= 3);
 
@@ -276,7 +281,7 @@ const CityBlockOverlay = ({ zoneData, visible = true, heightScale = 1.0, current
       const defaultTexIdx = idx % BLOCK_IMAGES.length;
       return { idx, geoData, defaultTexIdx };
     }).filter(b => b.geoData !== null);
-  }, [zoneData, hm, heightScale, currentDistrict]);
+  }, [zoneData, hm, heightScale, currentDistrict, currentDong]);
 
   const handleBlockClick = useCallback((e, blockIdx) => {
     e.stopPropagation();
