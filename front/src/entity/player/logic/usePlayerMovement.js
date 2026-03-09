@@ -17,8 +17,6 @@ export const usePlayerMovement = (ref, input, onMove, zoomLevel = 16) => {
       // 에디터에서 설정한 속도를 사용
       const moveSpeed = input.source === 'keyboard' ? configSpeed : configSpeed * 1.6;
 
-
-
       // 1. 카메라 정면 방향 계산 (XZ 평면 투영)
       state.camera.getWorldDirection(forward.current);
       forward.current.y = 0;

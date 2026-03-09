@@ -52,15 +52,6 @@ const GameCanvas = ({
 
       <ZoomSystem zoomLevel={zoomLevel} />
 
-      <OrbitControls
-        ref={orbitRef}
-        enablePan={false}
-        enableRotate={cameraMode === '360'}
-        enableDamping={cameraMode === '360'} // 쿼터뷰(아이소메트릭)에서는 카메라 지연 제거를 위해 damping 끔
-        enableZoom={false}
-        makeDefault
-      />
-
       <Suspense fallback={null}>
         <RpgWorld
           input={input}
@@ -91,6 +82,15 @@ const GameCanvas = ({
           orbitRef={orbitRef}
         />
       </Suspense>
+
+      <OrbitControls
+        ref={orbitRef}
+        enablePan={false}
+        enableRotate={cameraMode === '360'}
+        enableDamping={false} // 캐릭터가 화면 중앙에서 벗어나지 않도록 모든 시점 모드에서 지연 효과 비활성화
+        enableZoom={false}
+        makeDefault
+      />
     </Canvas>
   );
 };

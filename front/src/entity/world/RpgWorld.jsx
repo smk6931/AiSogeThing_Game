@@ -37,86 +37,82 @@ const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => 
   const modeRef = useRef(cameraMode);
 
   useFrame((state, delta) => {
-    if (target.current && orbitRef.current) {
-      const targetPos = new THREE.Vector3();
-      targetPos.copy(target.current.position); // getWorldPosition은 한 프레임 지연을 유발할 수 있으므로 직접 position 사용
-
-      // 모드 변경 감지 및 카메라 초기화
-      if (modeRef.current !== cameraMode) {
-        modeRef.current = cameraMode;
-        lastTargetPos.current = null; // 다음 프레임에 재초기화 유도
-      }
-
-      // 1. 첫 프레임 또는 모드 변경 시 초기화
-      if (!lastTargetPos.current) {
-        lastTargetPos.current = targetPos.clone();
-
-        let cx, cz, baseHeight;
-
-        // 카메라 FOV 실시간 동기화 (PerspectiveCamera에서만)
-        if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
-          state.camera.fov = debugConfig.cameraFov;
-          state.camera.updateProjectionMatrix();
-        }
-
-        if (cameraMode === 'isometric') {
-          // Orthographic은 원근감이 없으므로 거리가 멀어도 크기가 작아지지 않습니다.
-          // 지형(산 등)이 near 클리핑 평면에 잘리지 않도록 아주 먼 거리를 기본으로 설정합니다.
-          const dist = state.camera.isOrthographicCamera
-            ? 10000
-            : (debugConfig?.camIsoDistMult || 50) * Math.pow(2, 16.5 - zoomLevel);
-          const pitch = ((debugConfig?.camIsoPitch || 15) * Math.PI) / 180;
-
-          cx = targetPos.x;
-          cz = targetPos.z + dist * Math.sin(pitch);
-          baseHeight = dist * Math.cos(pitch);
-        }
-        else {
-          // 360뷰: 캐릭터 스케일에 맞게 거리 조정
-          const dist = state.camera.isOrthographicCamera
-            ? 10000
-            : 30 * Math.pow(2, 16.5 - zoomLevel);
-          const radius = dist * 0.45;
-          cx = targetPos.x;
-          cz = targetPos.z + radius;
-          baseHeight = dist * 0.8;
-        }
-
-        state.camera.position.set(cx, targetPos.y + baseHeight, cz);
-
-        orbitRef.current.target.copy(targetPos);
-        orbitRef.current.update();
-        return;
-      }
-
-      // 2. 캐릭터 이동량 만큼 카메라도 이동 (보간/지연 없는 즉시 추적)
-      // 이전 타겟 위치와 현재 타겟 위치의 차이를 직접 카메라에 반영
-      const currentOffset = new THREE.Vector3().subVectors(state.camera.position, lastTargetPos.current);
-      state.camera.position.copy(targetPos).add(currentOffset);
-
-      // 3. OrbitControls의 바라보는 타겟 갱신
-      if (orbitRef.current) {
-        orbitRef.current.target.copy(targetPos);
-
-        // 카메라 FOV 매 프레임 체크 및 업데이트 (PerspectiveCamera에서만)
-        if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
-          state.camera.fov = debugConfig.cameraFov;
-          state.camera.updateProjectionMatrix();
-        }
-
-        // 쿼터뷰일 때, 강제로 회전각 고정 (사용자가 드래그해도 돌아감 방지 + 모드 전환 시 즉시 고정)
-        if (cameraMode === 'isometric') {
-          const az = (debugConfig?.camIsoAzimuth || 0) * (Math.PI / 180);
-          const pitch = ((debugConfig?.camIsoPitch || 15) * Math.PI) / 180;
-          orbitRef.current.setAzimuthalAngle(az);
-          orbitRef.current.setPolarAngle(pitch);
-        }
-
-        orbitRef.current.update();
-      }
-
-      lastTargetPos.current.copy(targetPos);
+    // target.current가 없거나 THREE.Object3D가 아니면 실행 중단
+    if (!target?.current || !target.current.position) {
+      return;
     }
+
+    if (!orbitRef?.current) {
+      return;
+    }
+
+    const targetPos = new THREE.Vector3();
+    targetPos.copy(target.current.position);
+
+    // 모드 변경 감지 및 카메라 초기화
+    if (modeRef.current !== cameraMode) {
+      modeRef.current = cameraMode;
+      lastTargetPos.current = null; // 재초기화 유도
+    }
+
+    // 1. 첫 프레임 또는 모드 변경 시 초기화
+    if (!lastTargetPos.current) {
+      lastTargetPos.current = targetPos.clone();
+
+      let cx, cz, baseHeight;
+
+      // 카메라 FOV 초기 동기화
+      if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
+        state.camera.fov = debugConfig.cameraFov;
+        state.camera.updateProjectionMatrix();
+      }
+
+      if (cameraMode === 'isometric') {
+        const dist = state.camera.isOrthographicCamera
+          ? 10000
+          : (debugConfig?.camIsoDistMult || 50) * Math.pow(2, 16.5 - zoomLevel);
+        const pitch = ((debugConfig?.camIsoPitch || 15) * Math.PI) / 180;
+
+        cx = targetPos.x;
+        cz = targetPos.z + dist * Math.sin(pitch);
+        baseHeight = dist * Math.cos(pitch);
+      } else {
+        const dist = state.camera.isOrthographicCamera
+          ? 10000
+          : 30 * Math.pow(2, 16.5 - zoomLevel);
+        const radius = dist * 0.45;
+        cx = targetPos.x;
+        cz = targetPos.z + radius;
+        baseHeight = dist * 0.8;
+      }
+
+      state.camera.position.set(cx, targetPos.y + baseHeight, cz);
+      orbitRef.current.target.copy(targetPos);
+      orbitRef.current.update();
+      return;
+    }
+
+    // 2. 캐릭터 이동량 만큼 카메라도 이동
+    const currentOffset = new THREE.Vector3().subVectors(state.camera.position, lastTargetPos.current);
+    state.camera.position.copy(targetPos).add(currentOffset);
+
+    // 3. OrbitControls 갱신
+    orbitRef.current.target.copy(targetPos);
+
+    if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
+      state.camera.fov = debugConfig.cameraFov;
+      state.camera.updateProjectionMatrix();
+    }
+
+    if (cameraMode === 'isometric') {
+      const az = (debugConfig?.camIsoAzimuth || 0) * (Math.PI / 180);
+      const pitch = ((debugConfig?.camIsoPitch || 15) * Math.PI) / 180;
+      orbitRef.current.setAzimuthalAngle(az);
+      orbitRef.current.setPolarAngle(pitch);
+    }
+
+    orbitRef.current.update();
+    lastTargetPos.current.copy(targetPos);
   });
 
   return null;
@@ -324,13 +320,6 @@ const RpgWorld = ({
         <Environment files={debugConfig.hdriUrl} background />
       )}
 
-      <CameraRig
-        target={playerRef}
-        zoomLevel={zoomLevel}
-        orbitRef={orbitRef}
-        cameraMode={cameraMode}
-        debugConfig={debugConfig}
-      />
 
       {/* 0. 베이스 지면 (어떠한 맵타일도 없는 곳의 기본 바닥) */}
       {debugConfig.showBaseFloor && (
@@ -546,6 +535,15 @@ const RpgWorld = ({
           {...p}
         />
       ))}
+
+      {/* [CRITICAL] CameraRig는 항상 Player 뒤에 위치해야 1프레임 지연 없이 최신 위치를 즉시 추적합니다. */}
+      <CameraRig
+        target={playerRef}
+        zoomLevel={zoomLevel}
+        orbitRef={orbitRef}
+        cameraMode={cameraMode}
+        debugConfig={debugConfig}
+      />
     </group>
   );
 };
