@@ -231,12 +231,9 @@ const SeoulHeightMap = React.memo(({
   }, [data, heightScale, currentDistrict, currentDong]);
 
 
-  // 등고선(지형) 범위 바운더리 지오메트리 캐싱 (조건문 이전으로 이동 - Rules of Hooks)
-  const boundaryGeo = useMemo(() => {
-    return data ? new THREE.PlaneGeometry(data.world_width, data.world_height) : null;
-  }, [data]);
 
-  if (!visible || !geometry || !data || !boundaryGeo) return null;
+
+  if (!visible || !geometry || !data) return null;
 
   const posX = data.offset_x + data.world_width / 2;
   const posZ = data.offset_z + data.world_height / 2;
@@ -297,17 +294,7 @@ const SeoulHeightMap = React.memo(({
         />
       </mesh>
 
-      {/* 2. 지형 범위 인디케이터 (경계 상자) - 전체모드에서 한눈에 범위를 알 수 있음 */}
-      <lineSegments position={[0, 50, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <edgesGeometry attach="geometry" args={[boundaryGeo]} />
-        <lineBasicMaterial attach="material" color="#ff3333" linewidth={4} transparent opacity={0.8} />
-      </lineSegments>
 
-      {/* 지형 범위 이름표 (바닥 텍스트 대신 중앙에 거대한 십자선 표기) */}
-      <lineSegments position={[0, 48, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry attach="geometry" args={[data.world_width, data.world_height, 2, 2]} />
-        <meshBasicMaterial attach="material" color="#ff3333" wireframe transparent opacity={0.1} />
-      </lineSegments>
     </group>
 
   );
