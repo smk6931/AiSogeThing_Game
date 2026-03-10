@@ -40,7 +40,7 @@ C. 시청 로그 저장 (Logging)
 - 최적화 전략:
   1) max_results를 50으로 설정하여 호출 횟수 최소화.
   2) 단순 메타데이터(URL, 제목) 저장 및 Iframe 재생으로 추가 비용 0 유지.
-  (상세 전략 문서는 Project_Docs/Problem_Solving/Youtube_Token_Optimization.md 참조)
+  (상세 전략 문서는 docs/Problem_Solving/Youtube_Token_Optimization.md 참조)
 
 5. JSONL 로그 예시
 {"id": "video_id_123", "title": "재미있는 영상", "user_id": "guest", "action": "click", "timestamp": "2026-01-16 14:55:00"}

@@ -135,10 +135,10 @@ const SeoulDistrictOverlay = ({
 
   return (
     <group name="seoul-boundaries" position={[0, elevation, 0]}>
-      {/* 0. 서울 전체 지도 면적 윤곽선 (항상 렌더링) */}
+      {/* 0. 서울 전체 지도 면적 윤곽선 (구 경계 레이어 켰을 때만 표시) */}
       {allDistrictsLinesGeo && (
         <lineSegments geometry={allDistrictsLinesGeo} position={[0, 0.1, 0]}>
-          <lineBasicMaterial color="#ff0000" linewidth={5} transparent opacity={0.8} />
+          <lineBasicMaterial color="#1a73e8" linewidth={5} transparent opacity={0.6} />
         </lineSegments>
       )}
 

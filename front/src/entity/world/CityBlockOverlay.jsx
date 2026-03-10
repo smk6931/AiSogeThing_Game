@@ -148,13 +148,13 @@ const buildTerrainBlock = (coords, hm, heightScale) => {
 // ==============================================
 // 단일 블록 메쉬 (회전 없이 XZ 평면에 직접 배치)
 // ==============================================
-const BlockMesh = React.memo(({ geoData, texture, isSelected, onClick }) => {
+const BlockMesh = React.memo(({ geoData, texture, isSelected, onClick, useStencil }) => {
   if (!geoData?.geo) return null;
   return (
     <mesh
       geometry={geoData.geo}
       onClick={onClick}
-      renderOrder={3}
+      renderOrder={4}
     >
       <meshBasicMaterial
         map={texture}
@@ -166,10 +166,46 @@ const BlockMesh = React.memo(({ geoData, texture, isSelected, onClick }) => {
         polygonOffsetFactor={-2}
         polygonOffsetUnits={-2}
         color={isSelected ? '#ffffff' : '#dddddd'}
+        stencilWrite={useStencil}
+        stencilRef={4}
+        stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
       />
     </mesh>
   );
 });
+
+// [NEW] 구/동 경계 모양대로 스텐실 도장을 찍어주는 컴포넌트
+const BlockMask = ({ maskArea, elevation }) => {
+  const geo = useMemo(() => {
+    if (!maskArea || !maskArea.coords || maskArea.coords.length === 0) return null;
+    try {
+      const shape = new THREE.Shape();
+      const first = gpsToGame(maskArea.coords[0][0], maskArea.coords[0][1]);
+      shape.moveTo(first.x, first.z);
+      for (let i = 1; i < maskArea.coords.length; i++) {
+        const p = gpsToGame(maskArea.coords[i][0], maskArea.coords[i][1]);
+        shape.lineTo(p.x, p.z);
+      }
+      return new THREE.ShapeGeometry(shape);
+    } catch (e) { return null; }
+  }, [maskArea]);
+
+  if (!geo) return null;
+
+  return (
+    <mesh geometry={geo} rotation={[-Math.PI / 2, 0, 0]} position={[0, elevation, 0]} renderOrder={3}>
+      <meshBasicMaterial
+        colorWrite={false}
+        depthWrite={false}
+        stencilWrite={true}
+        stencilRef={4}
+        stencilFunc={THREE.AlwaysStencilFunc}
+        stencilZPass={THREE.ReplaceStencilOp}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+};
 
 // ==============================================
 // 이미지 팔레트 UI
@@ -298,8 +334,13 @@ const CityBlockOverlay = ({
 
   if (!visible || blocks.length === 0) return null;
 
+  const activeMask = currentDong || currentDistrict;
+
   return (
-    <>
+    <group name="city-block-overlay">
+      {/* 0. 스텐실 마스크 렌더링 (구/동 모양 도장 찍기) */}
+      {activeMask && <BlockMask maskArea={activeMask} elevation={0.015} />}
+
       {blocks.map(({ idx, geoData, defaultTexIdx }) => {
         const texIdx = blockTextureMap[idx] ?? defaultTexIdx;
         const texture = Array.isArray(textures) ? textures[texIdx] : textures;
@@ -310,6 +351,7 @@ const CityBlockOverlay = ({
             texture={texture}
             isSelected={selectedBlock === idx}
             onClick={(e) => handleBlockClick(e, idx)}
+            useStencil={!!activeMask}
           />
         );
       })}
@@ -324,7 +366,7 @@ const CityBlockOverlay = ({
           />
         </Html>
       )}
-    </>
+    </group>
   );
 };
 

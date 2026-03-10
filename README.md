@@ -10,7 +10,7 @@
 > (This project is currently under active development.)
 >
 > *   실시간으로 코드가 업데이트되므로, 간헐적인 서비스 불안정이 발생할 수 있습니다.
-> *   매일 새로운 기능이 추가되고 있으며, 상세한 개발 과정은 [Daily Log](./Project_Docs/Daily_Log)에서 확인하실 수 있습니다.
+> *   매일 새로운 기능이 추가되고 있으며, 상세한 개발 과정은 [Daily Log](./docs/Daily_Log)에서 확인하실 수 있습니다.
 
 ---
 
@@ -24,8 +24,8 @@
 **"완성된 결과물보다 성장하는 과정에 집중합니다."**  
 개발자의 매일매일의 고민과 트러블 슈팅 과정이 궁금하다면 아래 문서를 참고해주세요.
 
-*   📂 **[Project_Docs/Daily_Log](./Project_Docs/Daily_Log)**: 일별 상세 개발 로그 (Error Log, Idea)
-*   📂 **[Project_Docs/Process](./Project_Docs/Process)**: 인프라 구축, 도메인 연결, 아키텍처 설계 문서
+*   📂 **[docs/Daily_Log](./docs/Daily_Log)**: 일별 상세 개발 로그 (Error Log, Idea)
+*   📂 **[docs/Process](./docs/Process)**: 인프라 구축, 도메인 연결, 아키텍처 설계 문서
 
 **[Recent Milestones]**
 *   ✅ **Infrastructure**: Oracle Cloud 서버 구축 & 도메인(`sogething.com`) 연결 완료

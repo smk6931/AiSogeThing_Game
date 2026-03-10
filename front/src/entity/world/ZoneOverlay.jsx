@@ -185,7 +185,7 @@ const buildZoneLineGeometry = (features, width = 15, heightmap = null, heightSca
 };
 
 // 단일 Zone 레이어 메쉬
-const ZoneMesh = React.memo(({ geometry, color, opacity, elevation }) => {
+const ZoneMesh = React.memo(({ geometry, color, opacity, elevation, useStencil }) => {
   if (!geometry) return null;
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, elevation, 0]} renderOrder={1}>
@@ -196,13 +196,16 @@ const ZoneMesh = React.memo(({ geometry, color, opacity, elevation }) => {
         opacity={opacity}
         side={THREE.DoubleSide}
         depthWrite={false}
+        stencilWrite={useStencil}
+        stencilRef={3} // ZoneOverlay 전용 Ref
+        stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
       />
     </mesh>
   );
 });
 
 // 라인 기반 Zone 메쉬 (도로 등)
-const ZoneLineMesh = React.memo(({ geometry, color, opacity, elevation }) => {
+const ZoneLineMesh = React.memo(({ geometry, color, opacity, elevation, useStencil }) => {
   if (!geometry) return null;
   return (
     <mesh position={[0, elevation, 0]} renderOrder={1}>
@@ -213,10 +216,46 @@ const ZoneLineMesh = React.memo(({ geometry, color, opacity, elevation }) => {
         opacity={opacity}
         side={THREE.DoubleSide}
         depthWrite={false}
+        stencilWrite={useStencil}
+        stencilRef={3}
+        stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
       />
     </mesh>
   );
 });
+
+// [NEW] 구/동 경계 모양대로 스텐실 도장을 찍어주는 컴포넌트
+const ZoneMask = ({ maskArea, elevation }) => {
+  const geo = useMemo(() => {
+    if (!maskArea || !maskArea.coords || maskArea.coords.length === 0) return null;
+    try {
+      const shape = new THREE.Shape();
+      const first = gpsToGame(maskArea.coords[0][0], maskArea.coords[0][1]);
+      shape.moveTo(first.x, first.z);
+      for (let i = 1; i < maskArea.coords.length; i++) {
+        const p = gpsToGame(maskArea.coords[i][0], maskArea.coords[i][1]);
+        shape.lineTo(p.x, p.z);
+      }
+      return new THREE.ShapeGeometry(shape);
+    } catch (e) { return null; }
+  }, [maskArea]);
+
+  if (!geo) return null;
+
+  return (
+    <mesh geometry={geo} rotation={[-Math.PI / 2, 0, 0]} position={[0, elevation, 0]} renderOrder={0}>
+      <meshBasicMaterial
+        colorWrite={false}
+        depthWrite={false}
+        stencilWrite={true}
+        stencilRef={3}
+        stencilFunc={THREE.AlwaysStencilFunc}
+        stencilZPass={THREE.ReplaceStencilOp}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+};
 
 /**
  * 구(District) coords 배열에서 bbox 중심 lat/lng와 dist(m)을 계산
@@ -459,74 +498,79 @@ const ZoneOverlay = ({
   };
   const enabled = { ...defaults, ...enabledZones };
 
+  const activeMask = currentDong || currentDistrict;
+
   return (
     <group name="zone-overlay-group">
+      {/* 0. 스텐실 마스크 렌더링 (구/동 모양 도장 찍기) */}
+      {activeMask && <ZoneMask maskArea={activeMask} elevation={elevation - 0.005} />}
+
       {/* 폴리곤 기반 Zone */}
       {enabled.water && geometries.water && (
-        <ZoneMesh geometry={geometries.water.geometry} color={ZONE_COLORS.water} opacity={ZONE_OPACITY.water} elevation={elevation} />
+        <ZoneMesh geometry={geometries.water.geometry} color={ZONE_COLORS.water} opacity={ZONE_OPACITY.water} elevation={elevation} useStencil={!!activeMask} />
       )}
       {enabled.water && geometries.water_line && (
-        <ZoneLineMesh geometry={geometries.water_line.geometry} color={ZONE_COLORS.water} opacity={ZONE_OPACITY.water} elevation={elevation} />
+        <ZoneLineMesh geometry={geometries.water_line.geometry} color={ZONE_COLORS.water} opacity={ZONE_OPACITY.water} elevation={elevation} useStencil={!!activeMask} />
       )}
       {enabled.park && geometries.park && (
-        <ZoneMesh geometry={geometries.park.geometry} color={ZONE_COLORS.park} opacity={ZONE_OPACITY.park} elevation={elevation + 0.01} />
+        <ZoneMesh geometry={geometries.park.geometry} color={ZONE_COLORS.park} opacity={ZONE_OPACITY.park} elevation={elevation + 0.01} useStencil={!!activeMask} />
       )}
       {enabled.forest && geometries.forest && (
-        <ZoneMesh geometry={geometries.forest.geometry} color={ZONE_COLORS.forest} opacity={ZONE_OPACITY.forest} elevation={elevation + 0.02} />
+        <ZoneMesh geometry={geometries.forest.geometry} color={ZONE_COLORS.forest} opacity={ZONE_OPACITY.forest} elevation={elevation + 0.02} useStencil={!!activeMask} />
       )}
       {enabled.natural_site && geometries.natural_site && (
-        <ZoneMesh geometry={geometries.natural_site.geometry} color={ZONE_COLORS.natural_site} opacity={ZONE_OPACITY.natural_site} elevation={elevation + 0.015} />
+        <ZoneMesh geometry={geometries.natural_site.geometry} color={ZONE_COLORS.natural_site} opacity={ZONE_OPACITY.natural_site} elevation={elevation + 0.015} useStencil={!!activeMask} />
       )}
       {enabled.residential && geometries.residential && (
-        <ZoneMesh geometry={geometries.residential.geometry} color={ZONE_COLORS.residential} opacity={ZONE_OPACITY.residential} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.residential.geometry} color={ZONE_COLORS.residential} opacity={ZONE_OPACITY.residential} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.commercial && geometries.commercial && (
-        <ZoneMesh geometry={geometries.commercial.geometry} color={ZONE_COLORS.commercial} opacity={ZONE_OPACITY.commercial} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.commercial.geometry} color={ZONE_COLORS.commercial} opacity={ZONE_OPACITY.commercial} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.industrial && geometries.industrial && (
-        <ZoneMesh geometry={geometries.industrial.geometry} color={ZONE_COLORS.industrial} opacity={ZONE_OPACITY.industrial} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.industrial.geometry} color={ZONE_COLORS.industrial} opacity={ZONE_OPACITY.industrial} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.institutional && geometries.institutional && (
-        <ZoneMesh geometry={geometries.institutional.geometry} color={ZONE_COLORS.institutional} opacity={ZONE_OPACITY.institutional} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.institutional.geometry} color={ZONE_COLORS.institutional} opacity={ZONE_OPACITY.institutional} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.educational && geometries.educational && (
-        <ZoneMesh geometry={geometries.educational.geometry} color={ZONE_COLORS.educational} opacity={ZONE_OPACITY.educational} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.educational.geometry} color={ZONE_COLORS.educational} opacity={ZONE_OPACITY.educational} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.medical && geometries.medical && (
-        <ZoneMesh geometry={geometries.medical.geometry} color={ZONE_COLORS.medical} opacity={ZONE_OPACITY.medical} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.medical.geometry} color={ZONE_COLORS.medical} opacity={ZONE_OPACITY.medical} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.parking && geometries.parking && (
-        <ZoneMesh geometry={geometries.parking.geometry} color={ZONE_COLORS.parking} opacity={ZONE_OPACITY.parking} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.parking.geometry} color={ZONE_COLORS.parking} opacity={ZONE_OPACITY.parking} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.military && geometries.military && (
-        <ZoneMesh geometry={geometries.military.geometry} color={ZONE_COLORS.military} opacity={ZONE_OPACITY.military} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.military.geometry} color={ZONE_COLORS.military} opacity={ZONE_OPACITY.military} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.religious && geometries.religious && (
-        <ZoneMesh geometry={geometries.religious.geometry} color={ZONE_COLORS.religious} opacity={ZONE_OPACITY.religious} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.religious.geometry} color={ZONE_COLORS.religious} opacity={ZONE_OPACITY.religious} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.sports && geometries.sports && (
-        <ZoneMesh geometry={geometries.sports.geometry} color={ZONE_COLORS.sports} opacity={ZONE_OPACITY.sports} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.sports.geometry} color={ZONE_COLORS.sports} opacity={ZONE_OPACITY.sports} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.cemetery && geometries.cemetery && (
-        <ZoneMesh geometry={geometries.cemetery.geometry} color={ZONE_COLORS.cemetery} opacity={ZONE_OPACITY.cemetery} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.cemetery.geometry} color={ZONE_COLORS.cemetery} opacity={ZONE_OPACITY.cemetery} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.transport && geometries.transport && (
-        <ZoneMesh geometry={geometries.transport.geometry} color={ZONE_COLORS.transport} opacity={ZONE_OPACITY.transport} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.transport.geometry} color={ZONE_COLORS.transport} opacity={ZONE_OPACITY.transport} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {enabled.port && geometries.port && (
-        <ZoneMesh geometry={geometries.port.geometry} color={ZONE_COLORS.port} opacity={ZONE_OPACITY.port} elevation={elevation + 0.005} />
+        <ZoneMesh geometry={geometries.port.geometry} color={ZONE_COLORS.port} opacity={ZONE_OPACITY.port} elevation={elevation + 0.005} useStencil={!!activeMask} />
       )}
       {/* 미개척 지형 — 가장 밑에 렌더 (다른 레이어가 없는 빈 공간 채우기) */}
       {enabled.unexplored && geometries.unexplored && (
-        <ZoneMesh geometry={geometries.unexplored.geometry} color={ZONE_COLORS.unexplored} opacity={ZONE_OPACITY.unexplored} elevation={elevation + 0.001} />
+        <ZoneMesh geometry={geometries.unexplored.geometry} color={ZONE_COLORS.unexplored} opacity={ZONE_OPACITY.unexplored} elevation={elevation + 0.001} useStencil={!!activeMask} />
       )}
 
       {/* 라인 기반 Zone (도로) */}
       {enabled.road_major && geometries.road_major && (
-        <ZoneLineMesh geometry={geometries.road_major.geometry} color={ZONE_COLORS.road_major} opacity={ZONE_OPACITY.road_major} elevation={elevation + 0.03} />
+        <ZoneLineMesh geometry={geometries.road_major.geometry} color={ZONE_COLORS.road_major} opacity={ZONE_OPACITY.road_major} elevation={elevation + 0.03} useStencil={!!activeMask} />
       )}
       {enabled.road_minor && geometries.road_minor && (
-        <ZoneLineMesh geometry={geometries.road_minor.geometry} color={ZONE_COLORS.road_minor} opacity={ZONE_OPACITY.road_minor} elevation={elevation + 0.025} />
+        <ZoneLineMesh geometry={geometries.road_minor.geometry} color={ZONE_COLORS.road_minor} opacity={ZONE_OPACITY.road_minor} elevation={elevation + 0.025} useStencil={!!activeMask} />
       )}
     </group>
   );

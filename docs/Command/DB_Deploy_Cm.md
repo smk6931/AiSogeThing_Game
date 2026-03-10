@@ -2,7 +2,7 @@
 
 [현재 설정: SSH 터널링으로 서버 DB 사용]
 - 빠른 개발을 위해 로컬에서 서버 DB에 직접 연결 중
-- 상세 가이드: Project_Docs/Command/DB_Tunnel_Setup.md 참고
+- 상세 가이드: docs/Command/DB_Tunnel_Setup.md 참고
 
 0. [SSH 터널링] 로컬에서 서버 DB 접속 (현재 사용 중)
    -----------------------------------------------------

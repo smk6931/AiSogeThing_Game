@@ -378,8 +378,8 @@ const RpgWorld = ({
         shiftZ={0}
       />
 
-      {/* 3. 지하철 노선도 */}
-      <SeoulSubwayLines />
+      {/* 3. 지하철 노선도 (레이어 설정에 따라 표시/숨김) */}
+      <SeoulSubwayLines visible={showDistrictBoundaries || showSeoulRoads} />
 
       {/* 4. OSM 구역 오버레이 (용도구역 등 실시간 데이터) */}
       <ZoneOverlay
