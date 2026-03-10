@@ -381,12 +381,14 @@ const RpgWorld = ({
       {/* 3. 지하철 노선도 */}
       <SeoulSubwayLines />
 
-      {/* 4. OSM 구역 오버레이 (영도구역 등 실시간 데이터) */}
+      {/* 4. OSM 구역 오버레이 (용도구역 등 실시간 데이터) */}
       <ZoneOverlay
         visible={(showSeoulRoads || showSeoulNature || showCityBlocks || showLanduseZones)}
         categories={landuseFilters}
         playerPos={playerRef.current ? playerRef.current.position : { x: 0, z: 0 }}
         currentDistrict={currentDistrict}
+        dongId={currentDongId}
+        currentDong={currentDong}
         onZoneLoaded={setSharedZoneData}
         elevation={debugConfig.mapElevation + 0.1}
         heightScale={debugConfig.terrainHeightScale}
@@ -421,6 +423,8 @@ const RpgWorld = ({
         visible={showCityBlocks}
         heightScale={debugConfig.terrainHeightScale}
         currentDistrict={currentDistrict}
+        dongId={currentDongId}
+        currentDong={currentDong}
       />
 
       {/* 등고선 지형 (Zone 데이터로 텍스쳐 페인팅) */}
