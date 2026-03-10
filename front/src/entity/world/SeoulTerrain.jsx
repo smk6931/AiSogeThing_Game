@@ -82,10 +82,6 @@ function buildLineGeometry(features, maskArea = null) {
   for (const f of features) {
     const coords = f.coords;
     if (!coords || coords.length < 2) continue;
-    if (maskCoords) {
-      const [lat, lng] = coords[0];
-      if (!pointInPolygon(lat, lng, maskCoords)) continue;
-    }
 
     const isGps = coords[0][0] > 30;
     const isBridge = f.bridge === 'yes' || f.highway === 'motorway_link';
@@ -93,6 +89,15 @@ function buildLineGeometry(features, maskArea = null) {
     const halfW = (f.width || baseW) / 2;
 
     for (let i = 0; i < coords.length - 1; i++) {
+      if (maskCoords) {
+        // [최적화 & 버그수정] 긴 강줄기나 고속도로가 구역 밖으로 삐져나가지 않도록 두 점이 모두 구역 밖이면 생략
+        const lat1 = coords[i][0], lng1 = coords[i][1];
+        const lat2 = coords[i + 1][0], lng2 = coords[i + 1][1];
+        if (!pointInPolygon(lat1, lng1, maskCoords) && !pointInPolygon(lat2, lng2, maskCoords)) {
+          continue;
+        }
+      }
+
       const p1 = isGps ? gpsToGame(coords[i][0], coords[i][1]) : { x: coords[i][0], z: coords[i][1] };
       const p2 = isGps ? gpsToGame(coords[i + 1][0], coords[i + 1][1]) : { x: coords[i + 1][0], z: coords[i + 1][1] };
 
@@ -131,7 +136,7 @@ function buildLineGeometry(features, maskArea = null) {
   try { return mergeGeometries(geos, false); } catch (_) { return null; }
 }
 
-const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, textureUrl = null }) => {
+const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, textureUrl = null, useStencil = false }) => {
   if (!geometry) return null;
   const isRoadMajor = color.r > 0.9 && color.g > 0.9;
   const materialProps = isWater ? {
@@ -147,10 +152,49 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
     roughness: 0.5,
   } : { color: color };
 
+  if (useStencil) {
+    materialProps.stencilWrite = true;
+    materialProps.stencilRef = 2; // Terrain 전용 Ref
+    materialProps.stencilFunc = THREE.EqualStencilFunc;
+  }
+
   return (
-    <mesh rotation={rotation} position={position}>
+    <mesh rotation={rotation} position={position} renderOrder={10}>
       <primitive object={geometry} attach="geometry" />
       <meshStandardMaterial {...materialProps} side={THREE.DoubleSide} />
+    </mesh>
+  );
+};
+
+// [NEW] 구/동 경계 모양대로 스텐실 도장을 찍어주는 컴포넌트
+const TerrainMask = ({ maskArea, elevation }) => {
+  const geo = useMemo(() => {
+    if (!maskArea || !maskArea.coords || maskArea.coords.length === 0) return null;
+    try {
+      const shape = new THREE.Shape();
+      const first = gpsToGame(maskArea.coords[0][0], maskArea.coords[0][1]);
+      shape.moveTo(first.x, first.z);
+      for (let i = 1; i < maskArea.coords.length; i++) {
+        const p = gpsToGame(maskArea.coords[i][0], maskArea.coords[i][1]);
+        shape.lineTo(p.x, p.z);
+      }
+      return new THREE.ShapeGeometry(shape);
+    } catch (e) { return null; }
+  }, [maskArea]);
+
+  if (!geo) return null;
+
+  return (
+    <mesh geometry={geo} rotation={[-Math.PI / 2, 0, 0]} position={[0, elevation, 0]} renderOrder={5}>
+      <meshBasicMaterial
+        colorWrite={false}
+        depthWrite={false}
+        stencilWrite={true}
+        stencilRef={2}
+        stencilFunc={THREE.AlwaysStencilFunc}
+        stencilZPass={THREE.ReplaceStencilOp}
+        side={THREE.DoubleSide}
+      />
     </mesh>
   );
 };
@@ -216,19 +260,25 @@ const SeoulTerrain = ({
 
   if (!visible || !geos) return null;
 
+  const activeMask = currentDong || currentDistrict;
+
   return (
     <group name="seoul-terrain-group" position={[geos.shiftX, elevation, geos.shiftZ]}>
+
+      {/* 0. 스텐실 마스크 렌더링 (구/동 모양 도장 찍기) */}
+      {activeMask && <TerrainMask maskArea={activeMask} elevation={0.01} />}
+
       {showNature && (
         <group name="nature-layer">
-          <MergedMesh geometry={geos.grass} color={COLORS.grass} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} />
-          <MergedMesh geometry={geos.forest} color={COLORS.forest} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]} />
-          <MergedMesh geometry={geos.waterPoly} color={COLORS.water} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} isWater={true} />
-          <MergedMesh geometry={geos.waterLine} color={COLORS.water} isWater={true} />
+          <MergedMesh geometry={geos.grass} color={COLORS.grass} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} useStencil={!!activeMask} />
+          <MergedMesh geometry={geos.forest} color={COLORS.forest} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]} useStencil={!!activeMask} />
+          <MergedMesh geometry={geos.waterPoly} color={COLORS.water} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} isWater={true} useStencil={!!activeMask} />
+          <MergedMesh geometry={geos.waterLine} color={COLORS.water} isWater={true} useStencil={!!activeMask} />
         </group>
       )}
       {showRoads && (
         <group name="roads-layer" position={[0, 0.05, 0]}>
-          <MergedMesh geometry={geos.roadFeatures} color={COLORS.road_major} textureUrl={roadTextureUrl} />
+          <MergedMesh geometry={geos.roadFeatures} color={COLORS.road_major} textureUrl={roadTextureUrl} useStencil={!!activeMask} />
         </group>
       )}
     </group>

@@ -101,7 +101,8 @@ const MapTiles = ({ playerPos, zoomLevel = 16, showOsmMap = true, cameraMode = '
   // 주변 타일 목록 생성 (쿼터뷰 모드일 땐 반경 축소하여 성능 향상)
   const tiles = useMemo(() => {
     const t = [];
-    const radius = 5; // 퀘터뷰/360도 구분 없이 시원하게 반경 5타일(11x11) 로드
+    // 쿼터뷰 모드일 땐 반경 3(7x7=49개), 360도일 땐 가시거리가 머니까 속도 향상을 위해 조정
+    const radius = cameraMode === 'isometric' ? 3 : 5;
     for (let dx = -radius; dx <= radius; dx++) {
 
       for (let dy = -radius; dy <= radius; dy++) {
