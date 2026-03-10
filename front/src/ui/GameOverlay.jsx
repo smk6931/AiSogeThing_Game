@@ -230,6 +230,9 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
                 zoomLevel={mapZoom + 1}
                 districts={districts}
                 currentDistrictId={currentDistrict?.id || null}
+                interactive={true}
+                showSeoulMask={true}
+                onZoomChange={(newZoom) => setMapZoom(newZoom - 1)}
               />
             </div>
             <div style={{ position: 'absolute', top: '16px', right: '16px', color: '#ff4444', fontSize: '24px', cursor: 'pointer', zIndex: 10 }} onClick={() => setIsMapExpanded(false)}>✕</div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polyline, Polygon, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Polygon, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
@@ -14,7 +14,25 @@ const MapController = ({ center, zoom }) => {
   return null;
 };
 
-const LeafletMapBackground = ({ playerPositionRef, zoomLevel, districts = [], currentDistrictId = null }) => {
+// 맵 이벤트를 처리하는 서브 컴포넌트
+const MapEvents = ({ onZoomChange }) => {
+  const map = useMapEvents({
+    zoomend: () => {
+      if (onZoomChange) onZoomChange(map.getZoom());
+    },
+  });
+  return null;
+};
+
+const LeafletMapBackground = ({
+  playerPositionRef,
+  zoomLevel,
+  districts = [],
+  currentDistrictId = null,
+  interactive = false,
+  showSeoulMask = true,
+  onZoomChange = null
+}) => {
   const LAT_PER_M = 1 / LAT_TO_M;
   const LNG_PER_M = 1 / LNG_TO_M;
 
@@ -43,28 +61,31 @@ const LeafletMapBackground = ({ playerPositionRef, zoomLevel, districts = [], cu
   }, [playerPositionRef]);
 
   return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: '#000' }}>
+    <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: '#f4f1ea' }}>
       <MapContainer
         center={mapCenter}
         zoom={zoomLevel}
-        zoomControl={false}
-        scrollWheelZoom={false}
-        touchZoom={false}
+        zoomControl={interactive}
+        scrollWheelZoom={interactive}
+        touchZoom={interactive}
+        dragging={interactive}
+        doubleClickZoom={interactive}
         attributionControl={false}
         style={{ width: '100%', height: '100%' }}
       >
+        <MapEvents onZoomChange={onZoomChange} />
         <TileLayer
           url="https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png"
         />
 
-        {/* 서울 외곽 어둡게 마스크 (미니맵 시야 제한용) */}
-        {districts && districts.length > 0 && (
+        {/* 서울 외곽 어둡게 마스크 (미니맵 시야 제한용, 옵션으로 켜고 끔) */}
+        {showSeoulMask && districts && districts.length > 0 && (
           <Polygon
             positions={[
               [[-90, -180], [90, -180], [90, 180], [-90, 180]], // 전 세계 박스
               ...districts.map(d => d.coords) // 서울 구역들 구멍(hole)으로 뚫림
             ]}
-            pathOptions={{ color: 'transparent', fillColor: '#050510', fillOpacity: 0.85 }}
+            pathOptions={{ color: 'transparent', fillColor: '#050510', fillOpacity: 0.75 }}
           />
         )}
 
