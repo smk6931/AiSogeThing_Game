@@ -78,8 +78,9 @@ $RemoteCommand = @"
     cd back
     source ../venv/bin/activate
     pip install -r ../requirements.txt
-    export DB_PORT=5100
-    alembic upgrade head
+    
+    # export DB_PORT=5100
+    # alembic upgrade head  # DB 연결 전까지 주석 처리
 
     echo "[Step 3] Build frontend..."
     cd ../front
