@@ -436,6 +436,7 @@ const RpgWorld = ({
         currentDistrict={currentDistrict}
         dongId={currentDongId}
         currentDong={currentDong}
+        elevation={debugConfig.mapElevation + 0.08}
       />
 
       {/* 등고선 지형 (Zone 데이터로 텍스쳐 페인팅) */}

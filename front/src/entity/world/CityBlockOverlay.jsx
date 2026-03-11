@@ -274,7 +274,8 @@ const pointInPolygon = (lat, lng, coords) => {
 // ==============================================
 const CityBlockOverlay = ({
   zoneData, visible = true, heightScale = 1.0,
-  currentDistrict = null, dongId = null, currentDong = null
+  currentDistrict = null, dongId = null, currentDong = null,
+  elevation = 0.05
 }) => {
   const [hm, setHm] = useState(null);
   const textures = useTexture(BLOCK_IMAGES);
@@ -300,15 +301,9 @@ const CityBlockOverlay = ({
       'natural_site', 'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
       'park', 'forest'].forEach(cat => {
         if (zoneData.zones[cat]) {
-          const filtered = maskCoords
-            ? zoneData.zones[cat].filter(f => {
-              if (f.type !== 'polygon' || !f.coords?.length) return false;
-              // [성능 최적화] 첫 번째 좌표만 검사하여 마스크 역내 데이터인지 판별
-              const [lat, lng] = f.coords[0];
-              return pointInPolygon(lat, lng, maskCoords);
-            })
-            : zoneData.zones[cat].filter(f => f.type === 'polygon' && f.coords?.length >= 3);
-
+          // [수정] 백엔드에서 이미 Intersection으로 잘라서 보내주므로 프론트에서 또 pointInPolygon 검사를 할 필요가 없습니다.
+          // 오히려 정밀도 문제로 데이터가 누락될 수 있으므로 모든 폴리곤을 수용합니다.
+          const filtered = zoneData.zones[cat].filter(f => f.type === 'polygon' && f.coords?.length >= 3);
           allPolygons = allPolygons.concat(filtered);
         }
       });
@@ -342,7 +337,7 @@ const CityBlockOverlay = ({
   return (
     <group name="city-block-overlay">
       {/* 0. 스텐실 마스크 렌더링 (구/동 모양 도장 찍기) */}
-      {activeMask && <BlockMask maskArea={activeMask} elevation={0.015} />}
+      {activeMask && <BlockMask maskArea={activeMask} elevation={elevation + 0.01} />}
 
       {blocks.map(({ idx, geoData, defaultTexIdx }) => {
         const texIdx = blockTextureMap[idx] ?? defaultTexIdx;
