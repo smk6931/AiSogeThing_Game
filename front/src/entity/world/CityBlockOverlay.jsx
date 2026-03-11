@@ -199,6 +199,7 @@ const BlockMask = ({ maskArea, elevation }) => {
       <meshBasicMaterial
         colorWrite={false}
         depthWrite={false}
+        depthTest={false}
         stencilWrite={true}
         stencilRef={4}
         stencilFunc={THREE.AlwaysStencilFunc}

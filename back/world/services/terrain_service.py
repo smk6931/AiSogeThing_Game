@@ -163,6 +163,43 @@ class TerrainService:
             "layers": {"water": [], "forest": [], "grass": [], "roads": []}
         }
 
+        # [핵심 리팩토링] 지형 기하구조를 현재 구/동 경계(poly) 면적으로 칼같이 잘라내는(Intersection) 헬퍼
+        def _clip_geom(geom, is_polygon=True):
+            items = []
+            try:
+                if not geom.is_valid:
+                    geom = geom.buffer(0)
+                
+                # 교집합 연산 (경계 밖은 버려지고, 안쪽 면적만 추출)
+                clipped = geom.intersection(poly)
+                if clipped.is_empty:
+                    return items
+
+                # 잘려나간 조각들을 프론트에서 랜더링 가능하게 배열로 반환
+                if clipped.geom_type == "Polygon":
+                    items.append({"type": "polygon", "coords": self._polygon_to_list(clipped, ref_lat, ref_lng)})
+                elif clipped.geom_type == "MultiPolygon":
+                    for part in clipped.geoms:
+                        items.append({"type": "polygon", "coords": self._polygon_to_list(part, ref_lat, ref_lng)})
+                elif clipped.geom_type == "LineString":
+                    width = 20 if is_polygon else None
+                    base = {"type": "line", "coords": self._line_to_list(clipped, ref_lat, ref_lng)}
+                    if width: base["width"] = width
+                    items.append(base)
+                elif clipped.geom_type == "MultiLineString":
+                    for part in clipped.geoms:
+                        width = 20 if is_polygon else None
+                        base = {"type": "line", "coords": self._line_to_list(part, ref_lat, ref_lng)}
+                        if width: base["width"] = width
+                        items.append(base)
+                elif clipped.geom_type == "GeometryCollection":
+                    for part in clipped.geoms:
+                        items.extend(_clip_geom(part, is_polygon))
+            except Exception as e:
+                # print(f"[TerrainService] Clip Error: {e}")
+                pass
+            return items
+
         def fetch_water():
             items = []
             try:
@@ -171,15 +208,9 @@ class TerrainService:
                 if not gdf.empty:
                     for _, row in gdf.iterrows():
                         geom = row.geometry
-                        if geom.geom_type == "Polygon":
-                            items.append({"type": "polygon", "coords": self._polygon_to_list(geom, ref_lat, ref_lng)})
-                        elif geom.geom_type == "MultiPolygon":
-                            for part in geom.geoms:
-                                items.append({"type": "polygon", "coords": self._polygon_to_list(part, ref_lat, ref_lng)})
-                        elif geom.geom_type in ("LineString", "MultiLineString"):
-                            lines = [geom] if geom.geom_type == "LineString" else list(geom.geoms)
-                            for line in lines:
-                                items.append({"type": "line", "width": 20, "coords": self._line_to_list(line, ref_lat, ref_lng)})
+                        # 다각형인지 라인인지 여부는 OSM 피처 타입에 따름
+                        is_poly = geom.geom_type in ["Polygon", "MultiPolygon"]
+                        items.extend(_clip_geom(geom, is_polygon=is_poly))
             except Exception as e: print(f"[TerrainService] Water Error: {e}")
             return items
 
@@ -191,11 +222,7 @@ class TerrainService:
                 if not gdf.empty:
                     for _, row in gdf.iterrows():
                         geom = row.geometry
-                        if geom.geom_type == "Polygon":
-                            items.append({"type": "polygon", "coords": self._polygon_to_list(geom, ref_lat, ref_lng)})
-                        elif geom.geom_type == "MultiPolygon":
-                            for part in geom.geoms:
-                                items.append({"type": "polygon", "coords": self._polygon_to_list(part, ref_lat, ref_lng)})
+                        items.extend(_clip_geom(geom, is_polygon=True))
             except Exception as e: print(f"[TerrainService] Forest Error: {e}")
             return items
 
@@ -213,14 +240,12 @@ class TerrainService:
                         if hw not in major_hw: continue
                         bridge = row.get("bridge", "no")
                         if isinstance(bridge, list): bridge = bridge[0]
-                        lines = [geom] if geom.geom_type == "LineString" else (list(geom.geoms) if geom.geom_type == "MultiLineString" else [])
-                        for line in lines:
-                            items.append({
-                                "type": "line",
-                                "highway": hw,
-                                "bridge": bridge,
-                                "coords": self._line_to_list(line, ref_lat, ref_lng)
-                            })
+                        
+                        clipped_lines = _clip_geom(geom, is_polygon=False)
+                        for line_data in clipped_lines:
+                            line_data["highway"] = hw
+                            line_data["bridge"] = bridge
+                            items.append(line_data)
             except Exception as e: print(f"[TerrainService] Road Error: {e}")
             return items
 
@@ -239,11 +264,13 @@ class TerrainService:
 
     def _polygon_to_list(self, polygon, ref_lat, ref_lng):
         if not polygon or not hasattr(polygon, 'exterior'): return []
-        return [self.gps_to_game(lat, lng, ref_lat, ref_lng) for lng, lat in list(polygon.exterior.coords)]
+        # [수정] 프론트엔드의 gpsToGame 함수를 제대로 타도록 순수 GPS(lat, lng) 반환
+        return [[lat, lng] for lng, lat in list(polygon.exterior.coords)]
 
     def _line_to_list(self, line, ref_lat, ref_lng):
         if not line or not hasattr(line, 'coords'): return []
-        return [self.gps_to_game(lat, lng, ref_lat, ref_lng) for lng, lat in list(line.coords)]
+        # [수정] 순수 GPS 반환
+        return [[lat, lng] for lng, lat in list(line.coords)]
 
     def _fetch_area_elevations(self, lat, lng, dist, grid_size):
         # OpenTopoData API 호출 (현재 비활성 상태 유지)

@@ -52,18 +52,13 @@ function buildPolygonGeometry(features, maskArea = null) {
 
   for (const f of features) {
     if (!f.coords || f.coords.length < 3) continue;
-    if (maskCoords) {
-      const [lat, lng] = f.coords[0];
-      if (!pointInPolygon(lat, lng, maskCoords)) continue;
-    }
 
     try {
       const shape = new THREE.Shape();
-      const isGps = f.coords[0][0] > 30;
-      const first = isGps ? gpsToGame(f.coords[0][0], f.coords[0][1]) : { x: f.coords[0][0], z: f.coords[0][1] };
+      const first = gpsToGame(f.coords[0][0], f.coords[0][1]);
       shape.moveTo(first.x, first.z);
       for (let i = 1; i < f.coords.length; i++) {
-        const p = isGps ? gpsToGame(f.coords[i][0], f.coords[i][1]) : { x: f.coords[i][0], z: f.coords[i][1] };
+        const p = gpsToGame(f.coords[i][0], f.coords[i][1]);
         shape.lineTo(p.x, p.z);
       }
       shape.closePath();
@@ -77,29 +72,17 @@ function buildPolygonGeometry(features, maskArea = null) {
 // 라인 생성
 function buildLineGeometry(features, maskArea = null) {
   const geos = [];
-  const maskCoords = maskArea?.coords;
 
   for (const f of features) {
     const coords = f.coords;
     if (!coords || coords.length < 2) continue;
 
-    const isGps = coords[0][0] > 30;
-    const isBridge = f.bridge === 'yes' || f.highway === 'motorway_link';
     const baseW = (f.highway === 'motorway' || f.highway === 'trunk') ? 40 : 25;
     const halfW = (f.width || baseW) / 2;
 
     for (let i = 0; i < coords.length - 1; i++) {
-      if (maskCoords) {
-        // [최적화 & 버그수정] 긴 강줄기나 고속도로가 구역 밖으로 삐져나가지 않도록 두 점이 모두 구역 밖이면 생략
-        const lat1 = coords[i][0], lng1 = coords[i][1];
-        const lat2 = coords[i + 1][0], lng2 = coords[i + 1][1];
-        if (!pointInPolygon(lat1, lng1, maskCoords) && !pointInPolygon(lat2, lng2, maskCoords)) {
-          continue;
-        }
-      }
-
-      const p1 = isGps ? gpsToGame(coords[i][0], coords[i][1]) : { x: coords[i][0], z: coords[i][1] };
-      const p2 = isGps ? gpsToGame(coords[i + 1][0], coords[i + 1][1]) : { x: coords[i + 1][0], z: coords[i + 1][1] };
+      const p1 = gpsToGame(coords[i][0], coords[i][1]);
+      const p2 = gpsToGame(coords[i + 1][0], coords[i + 1][1]);
 
       const ax = p1.x, az = p1.z;
       const bx = p2.x, bz = p2.z;
@@ -186,6 +169,7 @@ const TerrainMask = ({ maskArea, elevation }) => {
       <meshBasicMaterial
         colorWrite={false}
         depthWrite={false}
+        depthTest={false}
         stencilWrite={true}
         stencilRef={2}
         stencilFunc={THREE.AlwaysStencilFunc}
@@ -236,12 +220,6 @@ const SeoulTerrain = ({
     const build = async () => {
       const { water, forest, grass, roads } = data.layers;
       const roadFeatures = dongId ? roads : roads.filter(r => ROAD_CLASS[r.highway] === 'major' || ROAD_CLASS[r.highway] === 'mid');
-      // [OFF] 등고선 비활성화 - heightmap 로딩 건너뛰기
-      // if (typeof loadHeightMap === 'function') await loadHeightMap();
-
-      const isGpsData = (grass[0]?.coords?.[0]?.[0] > 30) || (roads[0]?.coords?.[0]?.[0] > 30);
-      const activeShiftX = isGpsData ? 0 : shiftX;
-      const activeShiftZ = isGpsData ? 0 : shiftZ;
       const maskArea = currentDong || currentDistrict;
 
       setGeos({
@@ -250,7 +228,7 @@ const SeoulTerrain = ({
         waterPoly: buildPolygonGeometry(water.filter(f => f.type === 'polygon'), maskArea),
         waterLine: buildLineGeometry(water.filter(f => f.type === 'line'), maskArea),
         roadFeatures: buildLineGeometry(roadFeatures, maskArea),
-        isGps: isGpsData, shiftX: activeShiftX, shiftZ: activeShiftZ
+        shiftX: 0, shiftZ: 0
       });
     };
     build();

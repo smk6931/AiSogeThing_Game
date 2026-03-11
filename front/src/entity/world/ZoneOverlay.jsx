@@ -247,6 +247,7 @@ const ZoneMask = ({ maskArea, elevation }) => {
       <meshBasicMaterial
         colorWrite={false}
         depthWrite={false}
+        depthTest={false}
         stencilWrite={true}
         stencilRef={3}
         stencilFunc={THREE.AlwaysStencilFunc}
