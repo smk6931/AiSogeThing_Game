@@ -56,10 +56,10 @@ function buildPolygonGeometry(features, maskArea = null) {
     try {
       const shape = new THREE.Shape();
       const first = gpsToGame(f.coords[0][0], f.coords[0][1]);
-      shape.moveTo(first.x, first.z);
+      shape.moveTo(first.x, -first.z);
       for (let i = 1; i < f.coords.length; i++) {
         const p = gpsToGame(f.coords[i][0], f.coords[i][1]);
-        shape.lineTo(p.x, p.z);
+        shape.lineTo(p.x, -p.z);
       }
       shape.closePath();
       geos.push(new THREE.ShapeGeometry(shape));
@@ -153,10 +153,10 @@ const TerrainMask = ({ maskArea, elevation }) => {
     try {
       const shape = new THREE.Shape();
       const first = gpsToGame(maskArea.coords[0][0], maskArea.coords[0][1]);
-      shape.moveTo(first.x, first.z);
+      shape.moveTo(first.x, -first.z);
       for (let i = 1; i < maskArea.coords.length; i++) {
         const p = gpsToGame(maskArea.coords[i][0], maskArea.coords[i][1]);
-        shape.lineTo(p.x, p.z);
+        shape.lineTo(p.x, -p.z);
       }
       return new THREE.ShapeGeometry(shape);
     } catch (e) { return null; }

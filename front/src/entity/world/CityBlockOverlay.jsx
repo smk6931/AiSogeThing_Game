@@ -183,10 +183,10 @@ const BlockMask = ({ maskArea, elevation }) => {
     try {
       const shape = new THREE.Shape();
       const first = gpsToGame(maskArea.coords[0][0], maskArea.coords[0][1]);
-      shape.moveTo(first.x, first.z);
+      shape.moveTo(first.x, -first.z);
       for (let i = 1; i < maskArea.coords.length; i++) {
         const p = gpsToGame(maskArea.coords[i][0], maskArea.coords[i][1]);
-        shape.lineTo(p.x, p.z);
+        shape.lineTo(p.x, -p.z);
       }
       return new THREE.ShapeGeometry(shape);
     } catch (e) { return null; }

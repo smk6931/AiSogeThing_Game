@@ -108,6 +108,14 @@ $RemoteCommand = @'
         sudo cp ~/game.sogething/nginx_game_sogething.conf /etc/nginx/sites-available/game.sogething &&
         sudo rm -f /etc/nginx/sites-enabled/game.sogething &&
         sudo ln -s /etc/nginx/sites-available/game.sogething /etc/nginx/sites-enabled/game.sogething &&
+        
+        # SSL 인증서 발급 (없을 경우만)
+        if [ ! -d /etc/letsencrypt/live/game.sogething.com ]; then
+            echo "[SSL] game.sogething.com 인증서 발급..." &&
+            sudo certbot --nginx -d game.sogething.com -d www.game.sogething.com --non-interactive --agree-tos --email admin@sogething.com ||
+            echo "⚠️ SSL 인증서 발급 실패 (도메인 DNS 확인 필요)";
+        fi &&
+        
         sudo nginx -t && sudo systemctl reload nginx &&
         echo "✅ Nginx 설정 완료";
     else

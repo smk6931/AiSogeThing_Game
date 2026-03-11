@@ -197,7 +197,7 @@ const ZoneMesh = React.memo(({ geometry, color, opacity, elevation, useStencil }
         side={THREE.DoubleSide}
         depthWrite={false}
         stencilWrite={useStencil}
-        stencilRef={3} // ZoneOverlay 전용 Ref
+        stencilRef={1} // 통일
         stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
       />
     </mesh>
@@ -217,7 +217,7 @@ const ZoneLineMesh = React.memo(({ geometry, color, opacity, elevation, useStenc
         side={THREE.DoubleSide}
         depthWrite={false}
         stencilWrite={useStencil}
-        stencilRef={3}
+        stencilRef={1} // 통일
         stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
       />
     </mesh>
@@ -231,10 +231,10 @@ const ZoneMask = ({ maskArea, elevation }) => {
     try {
       const shape = new THREE.Shape();
       const first = gpsToGame(maskArea.coords[0][0], maskArea.coords[0][1]);
-      shape.moveTo(first.x, first.z);
+      shape.moveTo(first.x, -first.z);
       for (let i = 1; i < maskArea.coords.length; i++) {
         const p = gpsToGame(maskArea.coords[i][0], maskArea.coords[i][1]);
-        shape.lineTo(p.x, p.z);
+        shape.lineTo(p.x, -p.z);
       }
       return new THREE.ShapeGeometry(shape);
     } catch (e) { return null; }

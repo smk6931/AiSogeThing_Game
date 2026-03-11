@@ -4,6 +4,8 @@
 - 빠른 개발을 위해 로컬에서 서버 DB에 직접 연결
 - 나중에 첫 배포 시 다시 로컬/서버 DB 분리 예정
 
+./scripts/deploy_server.ps1
+
 .\venv\Scripts\activate; python -m uvicorn main:app --reload --port 8100
 
 [1단계] SSH 터널링 설정 (PowerShell)
