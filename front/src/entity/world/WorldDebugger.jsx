@@ -12,6 +12,9 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
       width: 300
     });
 
+    // [개선] 게임 접속 시 World Editor를 접어놓기 (클릭 시 펼침)
+    gui.close();
+
     gui.domElement.style.zIndex = '1000';
 
     // 1. 환경 설정 (안개, 조명)

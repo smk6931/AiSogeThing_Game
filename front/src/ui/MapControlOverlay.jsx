@@ -1,24 +1,52 @@
 import React from 'react';
 
 /**
- * 지도 레이어 토글 컨트롤 오버레이
- * 게임 테마(Gold Border + Glassmorphism)와 일관된 디자인 적용
+ * MapControlOverlay - 지도 레이어 토글 컨트롤
+ *
+ * 리펙토링 후 구성:
+ * - 지도(OSM 타일), 도로 동선, 자연 지형, 블록 텍스처
+ * - 용도 구역 (세부 필터 드롭다운 포함)
+ * - 구 경계 (포스필드)
+ * - 시점 전환 (쿼터뷰/360)
+ *
+ * [제거됨] 등고선(HeightMap) — 코드는 보존, UI 버튼만 제거
  */
+
 const GAME_FONT = "'Cinzel', 'Noto Sans KR', serif";
 const GOLD = '#c8a84b';
-const PANEL_BG = 'rgba(8, 8, 16, 0.82)';
+const PANEL_BG = 'rgba(8, 8, 16, 0.85)';
 const BORDER_ON = 'rgba(180, 140, 60, 0.6)';
 const BORDER_OFF = 'rgba(100, 100, 100, 0.35)';
-const GLOW = '0 0 12px rgba(200, 168, 75, 0.2)';
+const GLOW = '0 0 12px rgba(200, 168, 75, 0.25)';
 
+// 용도 구역 세부 필터 목록
+const LANDUSE_LABELS = {
+  residential: { label: '주거지역', color: '#8bc34a' },
+  commercial: { label: '상업시설', color: '#2196f3' },
+  industrial: { label: '공업구역', color: '#ffc107' },
+  institutional: { label: '공공기관', color: '#9c27b0' },
+  educational: { label: '교육시설', color: '#ff5722' },
+  medical: { label: '의료시설', color: '#f44336' },
+  parking: { label: '주차공간', color: '#9e9e9e' },
+  natural_site: { label: '자연지', color: '#c5e1a5' },
+  military: { label: '군사시설', color: '#795548' },
+  religious: { label: '종교시설', color: '#e91e63' },
+  sports: { label: '스포츠', color: '#00bcd4' },
+  cemetery: { label: '묘지', color: '#607d8b' },
+  transport: { label: '교통', color: '#455a64' },
+  port: { label: '항구', color: '#1a237e' },
+  unexplored: { label: '미개척', color: '#4a3728' },
+};
+
+// 토글 버튼 정의 (등고선 제거됨)
 const BUTTONS = [
   { key: 'showOsmMap', label: '지도', icon: '🗺', colorOn: 'rgba(30,80,160,0.7)' },
-  { key: 'showSeoulRoads', label: '도로 동선', icon: '🛣️', colorOn: 'rgba(255,100,0,0.7)' },
-  { key: 'showSeoulNature', label: '자연 지형', icon: '🌲', colorOn: 'rgba(30,120,50,0.7)' },
-  { key: 'showCityBlocks', label: '블록 텍스처', icon: '🏙️', colorOn: 'rgba(120,60,160,0.7)' },
-  { key: 'showLanduseZones', label: '용도 구역', icon: '🏷️', colorOn: 'rgba(200,80,120,0.7)' },
-  { key: 'showHeightMap', label: '등고선', icon: '⛰', colorOn: 'rgba(160,100,30,0.7)' },
-  { key: 'showDistrictBoundaries', label: '구 경계', icon: '🏛️', colorOn: 'rgba(0,180,200,0.7)' },
+  { key: 'showGroundMesh', label: '바닥 채우기', icon: '🎨', colorOn: 'rgba(50,150,50,0.7)' },
+  { key: 'showSeoulRoads', label: '도로', icon: '🛣', colorOn: 'rgba(255,100,0,0.7)' },
+  { key: 'showSeoulNature', label: '지형', icon: '🌲', colorOn: 'rgba(30,120,50,0.7)' },
+  { key: 'showCityBlocks', label: '블록', icon: '🏙', colorOn: 'rgba(120,60,160,0.7)' },
+  { key: 'showLanduseZones', label: '용도구역', icon: '◆', colorOn: 'rgba(200,80,120,0.7)' },
+  { key: 'showDistrictBoundaries', label: '경계', icon: '🏛', colorOn: 'rgba(0,180,200,0.7)' },
 ];
 
 const MapControlOverlay = ({
@@ -28,162 +56,181 @@ const MapControlOverlay = ({
   showCityBlocks, setShowCityBlocks,
   showLanduseZones, setShowLanduseZones,
   landuseFilters, setLanduseFilters,
-  showHeightMap, setShowHeightMap,
+  showGroundMesh, setShowGroundMesh,
   showDistrictBoundaries, setShowDistrictBoundaries,
   cameraMode, setCameraMode,
+  // showHeightMap, setShowHeightMap 은 UI에서 제거 (코드 보존)
 }) => {
-  // 용도 구역 세부 설정 패널의 독립적인 표시 상태
   const [isLandusePanelOpen, setIsLandusePanelOpen] = React.useState(false);
 
-  // 레이어 토글 시 패널 상태 연동
   const toggleLanduse = () => {
-    const nextValue = !showLanduseZones;
-    setShowLanduseZones(nextValue);
-    // 켜질 때는 패널도 같이 열어줌
-    if (nextValue) setIsLandusePanelOpen(true);
+    const next = !showLanduseZones;
+    setShowLanduseZones(next);
+    if (next) setIsLandusePanelOpen(true);
     else setIsLandusePanelOpen(false);
   };
 
   const stateMap = {
     showOsmMap: { value: showOsmMap, setter: setShowOsmMap },
+    showGroundMesh: { value: showGroundMesh, setter: setShowGroundMesh },
     showSeoulRoads: { value: showSeoulRoads, setter: setShowSeoulRoads },
     showSeoulNature: { value: showSeoulNature, setter: setShowSeoulNature },
     showCityBlocks: { value: showCityBlocks, setter: setShowCityBlocks },
-    showLanduseZones: { value: showLanduseZones, setter: toggleLanduse }, // 커스텀 토글 핸들러 사용
-    showHeightMap: { value: showHeightMap, setter: setShowHeightMap },
+    showLanduseZones: { value: showLanduseZones, setter: toggleLanduse },
     showDistrictBoundaries: { value: showDistrictBoundaries, setter: setShowDistrictBoundaries },
   };
+
+  // 공통 버튼 스타일 생성
+  const getBtnStyle = (isOn, colorOn) => ({
+    padding: '6px 10px',
+    background: isOn ? colorOn : PANEL_BG,
+    color: isOn ? '#fff' : '#777',
+    border: `1px solid ${isOn ? BORDER_ON : BORDER_OFF}`,
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '11px',
+    fontWeight: '600',
+    fontFamily: GAME_FONT,
+    letterSpacing: '0.3px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    transition: 'all 0.2s ease',
+    backdropFilter: 'blur(10px)',
+    boxShadow: isOn ? GLOW : 'none',
+    transform: isOn ? 'translateY(-1px)' : 'none',
+    userSelect: 'none',
+    whiteSpace: 'nowrap',
+  });
 
   return (
     <div style={{
       position: 'absolute',
-      top: 20,
-      left: 180,
+      top: 16,
+      left: 170,
       zIndex: 100,
       display: 'flex',
-      gap: '8px',
+      gap: '5px',
+      flexWrap: 'wrap',
+      maxWidth: 'calc(100vw - 360px)',
       fontFamily: GAME_FONT,
     }}>
+      {/* 레이어 토글 버튼들 */}
       {BUTTONS.map(({ key, label, icon, colorOn }) => {
         const isOn = stateMap[key].value;
         const isLanduseBtn = key === 'showLanduseZones';
+
         return (
           <div key={key} style={{ position: 'relative' }}>
             <button
               onClick={() => stateMap[key].setter(prev => !prev)}
-              style={{
-                padding: '7px 13px',
-                background: isOn ? colorOn : PANEL_BG,
-                color: isOn ? '#fff' : '#888',
-                border: `1px solid ${isOn ? BORDER_ON : BORDER_OFF}`,
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: '600',
-                fontFamily: GAME_FONT,
-                letterSpacing: '0.5px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                backdropFilter: 'blur(12px)',
-                boxShadow: isOn ? GLOW : 'none',
-                transform: isOn ? 'translateY(-1px)' : 'translateY(0)',
-                userSelect: 'none',
-              }}
+              style={getBtnStyle(isOn, colorOn)}
             >
-              <span>{icon}</span>
+              <span style={{ fontSize: '13px' }}>{icon}</span>
               <span>{label}</span>
               <span style={{
-                fontSize: '10px',
-                color: isOn ? '#aeffae' : '#666',
-                marginLeft: '2px',
+                fontSize: '9px',
+                padding: '1px 4px',
+                borderRadius: '3px',
+                background: isOn ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
+                color: isOn ? '#aeffae' : '#555',
                 fontWeight: '700',
               }}>
                 {isOn ? 'ON' : 'OFF'}
               </span>
             </button>
 
-            {/* 용도 구역 세부 필터 드롭다운 패널 */}
+            {/* 용도 구역 세부 필터 드롭다운 */}
             {isLanduseBtn && isOn && isLandusePanelOpen && landuseFilters && (
               <div style={{
-                position: 'absolute', top: '100%', left: 0, marginTop: '8px',
-                background: PANEL_BG, border: `1px solid ${BORDER_OFF}`,
-                borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column',
-                gap: '8px', minWidth: '160px', backdropFilter: 'blur(14px)', boxShadow: '0 4px 12px rgba(0,0,0,0.7)'
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '6px',
+                background: PANEL_BG,
+                border: `1px solid ${BORDER_OFF}`,
+                borderRadius: '8px',
+                padding: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '5px',
+                minWidth: '170px',
+                backdropFilter: 'blur(14px)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                maxHeight: '60vh',
+                overflowY: 'auto',
               }}>
-                <div style={{ display: 'flex', gap: '5px', marginBottom: '4px' }}>
-                  <button onClick={() => setLanduseFilters(Object.keys(landuseFilters).reduce((acc, k) => ({ ...acc, [k]: true }), {}))}
-                    style={{ flex: 1, padding: '5px', fontSize: '11px', background: 'rgba(50,50,50,0.8)', color: '#fff', border: `1px solid ${BORDER_OFF}`, borderRadius: '4px', cursor: 'pointer', fontFamily: GAME_FONT }}>전체 켜기</button>
-                  <button onClick={() => setLanduseFilters(Object.keys(landuseFilters).reduce((acc, k) => ({ ...acc, [k]: false }), {}))}
-                    style={{ flex: 1, padding: '5px', fontSize: '11px', background: 'rgba(50,50,50,0.8)', color: '#fff', border: `1px solid ${BORDER_OFF}`, borderRadius: '4px', cursor: 'pointer', fontFamily: GAME_FONT }}>전체 끄기</button>
+                {/* 전체 ON/OFF */}
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                  <button
+                    onClick={() => setLanduseFilters(Object.keys(landuseFilters).reduce((acc, k) => ({ ...acc, [k]: true }), {}))}
+                    style={{
+                      flex: 1, padding: '4px', fontSize: '10px',
+                      background: 'rgba(80,160,80,0.3)', color: '#aeffae',
+                      border: '1px solid rgba(80,160,80,0.5)', borderRadius: '4px',
+                      cursor: 'pointer', fontFamily: GAME_FONT,
+                    }}
+                  >전체 ON</button>
+                  <button
+                    onClick={() => setLanduseFilters(Object.keys(landuseFilters).reduce((acc, k) => ({ ...acc, [k]: false }), {}))}
+                    style={{
+                      flex: 1, padding: '4px', fontSize: '10px',
+                      background: 'rgba(160,60,60,0.3)', color: '#ffaaaa',
+                      border: '1px solid rgba(160,60,60,0.5)', borderRadius: '4px',
+                      cursor: 'pointer', fontFamily: GAME_FONT,
+                    }}
+                  >전체 OFF</button>
                 </div>
-                {Object.entries({
-                  residential: '가옥/거주 (초록)', commercial: '상업시설 (파랑)', industrial: '공업/건설 (노랑)',
-                  institutional: '공공기관 (보라)', educational: '교육시설 (주홍)', medical: '의료병원 (빨강)',
-                  parking: '주차공간 (회색)', natural_site: '비개발/자연지 (연녹)',
-                  military: '군사시설 (갈색)', religious: '종교시설 (핑크)', sports: '스포츠시설 (하늘)',
-                  cemetery: '공동묘지 (청회)', transport: '교통/공항 (다크)', port: '항구/부두 (남색)',
-                  unexplored: '🗺 미개척 지형 (다크브라운)'
-                }).map(([fKey, fLabel]) => (
-                  <label key={fKey} style={{ fontSize: '11px', display: 'flex', alignItems: 'center', cursor: 'pointer', color: landuseFilters[fKey] ? '#fff' : '#aaa', transition: 'color 0.2s', fontFamily: GAME_FONT }}>
-                    <input type="checkbox" checked={!!landuseFilters[fKey]} style={{ marginRight: '8px', accentColor: GOLD }}
-                      onChange={() => setLanduseFilters(prev => ({ ...prev, [fKey]: !prev[fKey] }))} />
+
+                {/* 카테고리 체크박스 */}
+                {Object.entries(LANDUSE_LABELS).map(([fKey, { label: fLabel, color: fColor }]) => (
+                  <label key={fKey} style={{
+                    fontSize: '11px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    color: landuseFilters[fKey] ? '#eee' : '#666',
+                    transition: 'color 0.15s',
+                    fontFamily: GAME_FONT,
+                    gap: '6px',
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={!!landuseFilters[fKey]}
+                      onChange={() => setLanduseFilters(prev => ({ ...prev, [fKey]: !prev[fKey] }))}
+                      style={{ marginRight: '2px', accentColor: fColor }}
+                    />
+                    <span style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: fColor, display: 'inline-block', flexShrink: 0,
+                    }} />
                     {fLabel}
                   </label>
                 ))}
 
-                {/* 닫기 버튼 수정: 레이어는 끄지 않고 패널만 닫음 */}
+                {/* 닫기 */}
                 <button
                   onClick={() => setIsLandusePanelOpen(false)}
                   style={{
-                    marginTop: '4px',
-                    padding: '6px',
-                    fontSize: '11px',
-                    background: 'rgba(160, 50, 50, 0.4)',
-                    color: '#ffaaaa',
-                    border: '1px solid rgba(160, 50, 50, 0.6)',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontFamily: GAME_FONT,
-                    transition: 'all 0.2s'
+                    marginTop: '4px', padding: '5px', fontSize: '10px',
+                    background: 'rgba(100,100,100,0.3)', color: '#999',
+                    border: '1px solid rgba(100,100,100,0.4)', borderRadius: '4px',
+                    cursor: 'pointer', fontFamily: GAME_FONT,
                   }}
-                  onMouseOver={(e) => e.target.style.background = 'rgba(160, 50, 50, 0.6)'}
-                  onMouseOut={(e) => e.target.style.background = 'rgba(160, 50, 50, 0.4)'}
-                >
-                  ✕ 팝업만 가리기
-                </button>
+                >✕ 닫기</button>
               </div>
             )}
           </div>
         );
       })}
 
-      {/* Camera Mode Toggle Button */}
+      {/* 시점 전환 버튼 */}
       <button
         onClick={() => setCameraMode(prev => prev === 'isometric' ? '360' : 'isometric')}
-        style={{
-          padding: '7px 13px',
-          background: cameraMode === 'isometric' ? 'rgba(160,50,50,0.7)' : 'rgba(50,50,160,0.7)',
-          color: '#fff',
-          border: `1px solid ${BORDER_ON}`,
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontSize: '12px',
-          fontWeight: '600',
-          fontFamily: GAME_FONT,
-          letterSpacing: '0.5px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '5px',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          backdropFilter: 'blur(12px)',
-          boxShadow: GLOW,
-          userSelect: 'none',
-        }}
+        style={getBtnStyle(true, cameraMode === 'isometric' ? 'rgba(140,50,50,0.7)' : 'rgba(50,50,140,0.7)')}
       >
-        <span>🎥</span>
-        <span>시점: {cameraMode === 'isometric' ? '쿼터뷰' : '360도'}</span>
+        <span style={{ fontSize: '13px' }}>🎥</span>
+        <span>{cameraMode === 'isometric' ? '쿼터뷰' : '360도'}</span>
       </button>
     </div>
   );

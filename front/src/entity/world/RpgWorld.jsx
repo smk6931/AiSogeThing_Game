@@ -137,6 +137,7 @@ const RpgWorld = ({
   showLanduseZones,
   landuseFilters = {},
   showHeightMap,
+  showGroundMesh,
   showDistrictBoundaries = false,
   orbitRef,
   cameraMode
@@ -373,7 +374,7 @@ const RpgWorld = ({
         currentDong={currentDong}
         currentDistrict={currentDistrict}
         elevation={debugConfig.mapElevation + 0.02}
-        visible={true}
+        visible={showGroundMesh}
       />
 
       {/* 2. [LOD 0] 동 단위 정밀 지형 레이어 (지하철 노선과 조화) */}
@@ -388,7 +389,8 @@ const RpgWorld = ({
       />
 
       {/* 3. 지하철 노선도 (레이어 설정에 따라 표시/숨김) */}
-      <SeoulSubwayLines visible={showDistrictBoundaries || showSeoulRoads} />
+      {/* [오해 방지] 초록색 선이 구역 경계선으로 오해되므로 일단 지하철 노선도는 비활성화 */}
+      {/* <SeoulSubwayLines visible={showDistrictBoundaries || showSeoulRoads} /> */}
 
       {/* 4. OSM 구역 오버레이 (용도구역 등 실시간 데이터) */}
       <ZoneOverlay

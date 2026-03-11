@@ -24,6 +24,7 @@ const GameCanvas = ({
   showLanduseZones,
   landuseFilters,
   showHeightMap,
+  showGroundMesh,
   showDistrictBoundaries,
   cameraMode
 }) => {
@@ -77,6 +78,7 @@ const GameCanvas = ({
           showLanduseZones={showLanduseZones}
           landuseFilters={landuseFilters}
           showHeightMap={showHeightMap}
+          showGroundMesh={showGroundMesh}
           showDistrictBoundaries={showDistrictBoundaries}
           cameraMode={cameraMode}
           orbitRef={orbitRef}

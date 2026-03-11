@@ -1,7 +1,7 @@
 # ========================================================
 #  AiSogeThing 원클릭 배포 스크립트 (Windows용)
 # ========================================================
-# 사용법: .\deploy_remote.ps1 "커밋 메시지"
+# 사용법: .\deploy.ps1 "커밋 메시지"
 
 param (
     [string]$CommitMessage = "Update: Auto-deploy via script"
@@ -39,12 +39,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "✅ Git Push 완료!" -ForegroundColor Green
-Write-Host "🚀 [2/3] 서버 접속 및 배포 명령 전송..." -ForegroundColor Cyan
+Write-Host "🚀 [2/3] 서버 접속 및 전체 배포 실행..." -ForegroundColor Cyan
 
-# 2. SSH를 통해 원격 명령 실행 (git reset + deploy.sh)
-# 주의: 서버의 deploy.sh가 실행 권한이 있어야 함
-$RemoteCommand = "cd $REMOTE_DIR && git fetch --all && git reset --hard origin/main && chmod +x scripts/deploy.sh && ./scripts/deploy.sh"
+# 2. SSH를 통해 원격에서 통합 배포 스크립트 실행
+$RemoteCommand = @"
+cd $REMOTE_DIR && 
+chmod +x scripts/deploy_unified.sh && 
+./scripts/deploy_unified.sh
+"@
 
 ssh -i $SSH_KEY $SSH_HOST $RemoteCommand
 
-Write-Host "🎉 [3/3] 배포 명령 전송 완료! (서버 로그를 확인하세요)" -ForegroundColor Green
+Write-Host "🎉 [3/3] 배포 완료! (서버 로그를 확인하세요)" -ForegroundColor Green

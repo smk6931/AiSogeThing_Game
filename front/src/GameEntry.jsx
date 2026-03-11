@@ -75,6 +75,7 @@ const GameEntry = () => {
     cemetery: true, transport: true, port: true, unexplored: true
   });
   const [showHeightMap, setShowHeightMap] = useState(false); // [OFF] 등고선 비활성화 (나중에 true로 복원 가능)
+  const [showGroundMesh, setShowGroundMesh] = useState(true);
   const [showDistrictBoundaries, setShowDistrictBoundaries] = useState(false);
   const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
 
@@ -167,6 +168,7 @@ const GameEntry = () => {
           showLanduseZones={showLanduseZones}
           landuseFilters={landuseFilters}
           showHeightMap={showHeightMap}
+          showGroundMesh={showGroundMesh}
           showDistrictBoundaries={showDistrictBoundaries}
           cameraMode={cameraMode}
         />
@@ -245,7 +247,7 @@ const GameEntry = () => {
         showCityBlocks={showCityBlocks} setShowCityBlocks={setShowCityBlocks}
         showLanduseZones={showLanduseZones} setShowLanduseZones={setShowLanduseZones}
         landuseFilters={landuseFilters} setLanduseFilters={setLanduseFilters}
-        showHeightMap={showHeightMap} setShowHeightMap={setShowHeightMap}
+        showGroundMesh={showGroundMesh} setShowGroundMesh={setShowGroundMesh}
         showDistrictBoundaries={showDistrictBoundaries} setShowDistrictBoundaries={setShowDistrictBoundaries}
         cameraMode={cameraMode} setCameraMode={setCameraMode}
       />

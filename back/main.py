@@ -27,17 +27,14 @@ async def startup_event():
     logger = logging.getLogger("uvicorn.access")
     logger.addFilter(EndpointFilter())
 
-# CORS 설정 (프론트엔드/클라우드 허용)
 origins = [
     "http://localhost:3100",
     "http://127.0.0.1:3100",
-
-    "*" # 개발 편의상 유지하되, 위 명시적 주소가 우선됨
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins, # 와일드카드(*) 사용 시 브라우저에서 CORS 차단됨 (credentials=True 때문)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
