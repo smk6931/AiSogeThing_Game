@@ -134,7 +134,7 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
 
   if (useStencil) {
     materialProps.stencilWrite = true;
-    materialProps.stencilRef = 2; // Terrain 전용 Ref
+    materialProps.stencilRef = 1; // Terrain 전용 Ref 해제 (전체 통일)
     materialProps.stencilFunc = THREE.EqualStencilFunc;
   }
 
@@ -171,7 +171,7 @@ const TerrainMask = ({ maskArea, elevation }) => {
         depthWrite={false}
         depthTest={false}
         stencilWrite={true}
-        stencilRef={2}
+        stencilRef={1}
         stencilFunc={THREE.AlwaysStencilFunc}
         stencilZPass={THREE.ReplaceStencilOp}
         side={THREE.DoubleSide}

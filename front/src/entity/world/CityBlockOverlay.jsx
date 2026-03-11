@@ -201,7 +201,7 @@ const BlockMask = ({ maskArea, elevation }) => {
         depthWrite={false}
         depthTest={false}
         stencilWrite={true}
-        stencilRef={4}
+        stencilRef={1}
         stencilFunc={THREE.AlwaysStencilFunc}
         stencilZPass={THREE.ReplaceStencilOp}
         side={THREE.DoubleSide}

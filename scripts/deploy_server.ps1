@@ -46,7 +46,28 @@ Write-Host "🚀 [2/5] 서버 접속 및 전체 배포 실행..." -ForegroundCol
 
 # 서버에서 실행할 전체 명령 (하나의 스크립트로 모든 작업)
 $RemoteCommand = @'
-    cd ~/game.sogething && 
+    # 프로젝트 폴더가 없으면 초기 설정
+    if [ ! -d ~/game.sogething ]; then
+        echo "[Initial Setup] 프로젝트 클론 및 초기 설정..." &&
+        cd ~ &&
+        git clone https://github.com/smk6931/AiSogeThing_Game.git game.sogething &&
+        cd game.sogething &&
+        
+        # 가상환경 생성
+        python3 -m venv venv &&
+        source venv/bin/activate &&
+        pip install -r requirements.txt &&
+        
+        # 프론트엔드 의존성 설치
+        cd front &&
+        npm install &&
+        cd .. &&
+        
+        echo "[Initial Setup] 완료!";
+    else
+        cd ~/game.sogething;
+    fi &&
+    
     echo "[Step 1] 최신 코드 다운로드..." &&
     git fetch --all && 
     git reset --hard origin/main && 
@@ -62,12 +83,26 @@ $RemoteCommand = @'
     rm -rf node_modules/.vite &&
     npm run build &&
     echo "[Step 4] PM2 프로세스 재시작..." &&
-    pm2 delete backend || true &&
-    pm2 delete frontend || true &&
-    cd ../back &&
-    pm2 start "uvicorn main:app --host 0.0.0.0 --port 8100" --name backend --update-env &&
-    cd ../front &&
-    pm2 start "npm run dev" --name frontend --update-env &&
+    
+    # PM2 프로세스가 없으면 최초 설정
+    if ! pm2 list | grep -q "backend"; then
+        echo "[PM2 Initial] 백엔드 최초 시작..." &&
+        pm2 start "uvicorn main:app --host 0.0.0.0 --port 8100" --name backend --update-env;
+    else
+        pm2 delete backend || true &&
+        pm2 start "uvicorn main:app --host 0.0.0.0 --port 8100" --name backend --update-env;
+    fi &&
+    
+    if ! pm2 list | grep -q "frontend"; then
+        echo "[PM2 Initial] 프론트엔드 최초 시작..." &&
+        cd ../front &&
+        pm2 start "npm run dev" --name frontend --update-env;
+    else
+        pm2 delete frontend || true &&
+        cd ../front &&
+        pm2 start "npm run dev" --name frontend --update-env;
+    fi &&
+    
     echo "[Step 5] Nginx 설정 업데이트..." &&
     if [ -f ~/game.sogething/nginx_game_sogething.conf ]; then
         sudo cp ~/game.sogething/nginx_game_sogething.conf /etc/nginx/sites-available/game.sogething &&

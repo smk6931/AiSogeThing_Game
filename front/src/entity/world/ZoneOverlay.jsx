@@ -249,7 +249,7 @@ const ZoneMask = ({ maskArea, elevation }) => {
         depthWrite={false}
         depthTest={false}
         stencilWrite={true}
-        stencilRef={3}
+        stencilRef={1}
         stencilFunc={THREE.AlwaysStencilFunc}
         stencilZPass={THREE.ReplaceStencilOp}
         side={THREE.DoubleSide}
