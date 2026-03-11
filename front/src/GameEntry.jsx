@@ -74,7 +74,7 @@ const GameEntry = () => {
     natural_site: true, military: true, religious: true, sports: true,
     cemetery: true, transport: true, port: true, unexplored: true
   });
-  const [showHeightMap, setShowHeightMap] = useState(true);
+  const [showHeightMap, setShowHeightMap] = useState(false); // [OFF] 등고선 비활성화 (나중에 true로 복원 가능)
   const [showDistrictBoundaries, setShowDistrictBoundaries] = useState(false);
   const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
 
@@ -123,7 +123,8 @@ const GameEntry = () => {
     // };
     // fetchStatus();
     // const interval = setInterval(fetchStatus, 10000);
-    loadHeightMap(); // 지형 데이터 미리 로드
+    // [OFF] 등고선 비활성화 - heightmap 미리 로딩 건너뛰기
+    // loadHeightMap();
     // return () => clearInterval(interval);
   }, []);
 

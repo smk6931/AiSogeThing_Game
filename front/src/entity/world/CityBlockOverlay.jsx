@@ -45,17 +45,19 @@ const gpsToGame = (lat, lng) => ({
 // ==============================================
 let _hmData = null;
 
+// [OFF] 등고선 비활성화 - 항상 null 반환하여 평면 렌더링 (나중에 복원 가능)
 const loadHm = async () => {
-  if (_hmData) return _hmData;
-  try {
-    const res = await fetch('/seoul_heightmap.json');
-    _hmData = await res.json();
-    console.log('[CityBlock] heightmap 로드 완료');
-  } catch (_) {
-    console.warn('[CityBlock] heightmap 로드 실패 → flat 렌더링');
-    _hmData = null;
-  }
-  return _hmData;
+  // if (_hmData) return _hmData;
+  // try {
+  //   const res = await fetch('/seoul_heightmap.json');
+  //   _hmData = await res.json();
+  //   console.log('[CityBlock] heightmap 로드 완료');
+  // } catch (_) {
+  //   console.warn('[CityBlock] heightmap 로드 실패 → flat 렌더링');
+  //   _hmData = null;
+  // }
+  // return _hmData;
+  return null; // 평면 모드
 };
 
 const sampleHm = (x, z, hm, scale = 1.0) => {
@@ -285,7 +287,7 @@ const CityBlockOverlay = ({
 
   // 가용한 모든 지역 폴리곤(주거, 상업, 공원, 숲 등)을 하나로 모아 밀착 블록 생성
   const blocks = useMemo(() => {
-    if (!zoneData?.zones || !hm) return [];
+    if (!zoneData?.zones) return []; // [수정] hm 없어도 빌드 가능 (평면 모드)
 
     const districtCoords = currentDistrict?.coords;
     const dongCoords = currentDong?.coords;

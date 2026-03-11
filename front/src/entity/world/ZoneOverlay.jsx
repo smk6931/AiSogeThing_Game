@@ -299,10 +299,10 @@ const ZoneOverlay = ({
 
   const FETCH_DISTANCE = 2000; // currentDistrict 없을 때 fallback 기준
 
-  // 마운트 시 heightmap 한 번만 로드
-  useEffect(() => {
-    loadHeightmap().then(hm => setHeightmap(hm));
-  }, []);
+  // [OFF] 등고선 비활성화 - heightmap 로딩 건너뛰기 (나중에 복원 가능)
+  // useEffect(() => {
+  //   loadHeightmap().then(hm => setHeightmap(hm));
+  // }, []);
 
   // 현재 플레이어의 GPS 좌표
   const playerGps = useMemo(() => ({

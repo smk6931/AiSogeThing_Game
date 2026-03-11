@@ -110,12 +110,9 @@ function buildLineGeometry(features, maskArea = null) {
       const nx = -dz / len * halfW;
       const nz = dx / len * halfW;
 
-      let ay = getTerrainHeight(ax, az);
-      let by = getTerrainHeight(bx, bz);
-      if (isBridge || ay < 4.0 || by < 4.0) {
-        ay = Math.max(ay, 8.0);
-        by = Math.max(by, 8.0);
-      }
+      // [OFF] 등고선 비활성화 - 모든 도로가 평면(Y=0.1)에 렌더링
+      let ay = 0.1; // getTerrainHeight(ax, az);
+      let by = 0.1; // getTerrainHeight(bx, bz);
 
       const geometry = new THREE.BufferGeometry();
       const vertices = new Float32Array([
@@ -239,7 +236,8 @@ const SeoulTerrain = ({
     const build = async () => {
       const { water, forest, grass, roads } = data.layers;
       const roadFeatures = dongId ? roads : roads.filter(r => ROAD_CLASS[r.highway] === 'major' || ROAD_CLASS[r.highway] === 'mid');
-      if (typeof loadHeightMap === 'function') await loadHeightMap();
+      // [OFF] 등고선 비활성화 - heightmap 로딩 건너뛰기
+      // if (typeof loadHeightMap === 'function') await loadHeightMap();
 
       const isGpsData = (grass[0]?.coords?.[0]?.[0] > 30) || (roads[0]?.coords?.[0]?.[0] > 30);
       const activeShiftX = isGpsData ? 0 : shiftX;
