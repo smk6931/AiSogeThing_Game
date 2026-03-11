@@ -21,6 +21,7 @@ import ZoneOverlay from '@entity/world/ZoneOverlay';
 import CityBlockOverlay from '@entity/world/CityBlockOverlay';
 import SeoulDistrictOverlay from '@entity/world/SeoulDistrictOverlay';
 import SeoulTerrain from '@entity/world/SeoulTerrain';
+import DongGroundMesh from '@entity/world/DongGroundMesh';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
@@ -365,6 +366,14 @@ const RpgWorld = ({
         cameraMode={cameraMode}
         elevation={debugConfig.mapElevation}
         districts={districts} // 전체 서울 마스크를 위해 전달
+      />
+
+      {/* [NEW] 동 전체 기본 바닥 (Zone/Block 레이어 아래에서 빈 공간을 메움) */}
+      <DongGroundMesh
+        currentDong={currentDong}
+        currentDistrict={currentDistrict}
+        elevation={debugConfig.mapElevation + 0.02}
+        visible={true}
       />
 
       {/* 2. [LOD 0] 동 단위 정밀 지형 레이어 (지하철 노선과 조화) */}
