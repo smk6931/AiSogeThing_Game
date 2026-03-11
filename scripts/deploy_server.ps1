@@ -48,7 +48,7 @@ Write-Host "🚀 [2/5] 서버 접속 및 전체 배포 실행..." -ForegroundCol
 $RemoteCommand = @'
     # 프로젝트 폴더가 없으면 초기 설정
     if [ ! -d ~/game.sogething ]; then
-        echo "[Initial Setup] 프로젝트 클론 및 초기 설정..." &&
+        echo "[Initial Setup] Clone project and initial setup..." &&
         cd ~ &&
         git clone https://github.com/smk6931/AiSogeThing_Game.git game.sogething &&
         cd game.sogething &&
@@ -63,30 +63,30 @@ $RemoteCommand = @'
         npm install &&
         cd .. &&
         
-        echo "[Initial Setup] 완료!";
+        echo "[Initial Setup] Completed!";
     else
         cd ~/game.sogething;
     fi &&
     
-    echo "[Step 1] 최신 코드 다운로드..." &&
+    echo "[Step 1] Download latest code..." &&
     git fetch --all && 
     git reset --hard origin/main && 
-    echo "[Step 2] 백엔드 업데이트..." &&
+    echo "[Step 2] Update backend..." &&
     cd back &&
     source ../venv/bin/activate &&
     pip install -r ../requirements.txt &&
     export DB_PORT=5100 &&
     alembic upgrade head &&
-    echo "[Step 3] 프론트엔드 빌드..." &&
+    echo "[Step 3] Build frontend..." &&
     cd ../front &&
     npm install &&
     rm -rf node_modules/.vite &&
     npm run build &&
-    echo "[Step 4] PM2 프로세스 재시작..." &&
+    echo "[Step 4] Restart PM2 processes..." &&
     
     # PM2 프로세스가 없으면 최초 설정
     if ! pm2 list | grep -q "backend"; then
-        echo "[PM2 Initial] 백엔드 최초 시작..." &&
+        echo "[PM2 Initial] Start backend..." &&
         pm2 start "uvicorn main:app --host 0.0.0.0 --port 8100" --name backend --update-env;
     else
         pm2 delete backend || true &&
@@ -94,7 +94,7 @@ $RemoteCommand = @'
     fi &&
     
     if ! pm2 list | grep -q "frontend"; then
-        echo "[PM2 Initial] 프론트엔드 최초 시작..." &&
+        echo "[PM2 Initial] Start frontend..." &&
         cd ../front &&
         pm2 start "npm run dev" --name frontend --update-env;
     else
@@ -103,7 +103,7 @@ $RemoteCommand = @'
         pm2 start "npm run dev" --name frontend --update-env;
     fi &&
     
-    echo "[Step 5] Nginx 설정 업데이트..." &&
+    echo "[Step 5] Update Nginx config..." &&
     if [ -f ~/game.sogething/nginx_game_sogething.conf ]; then
         sudo cp ~/game.sogething/nginx_game_sogething.conf /etc/nginx/sites-available/game.sogething &&
         sudo rm -f /etc/nginx/sites-enabled/game.sogething &&
@@ -111,17 +111,17 @@ $RemoteCommand = @'
         
         # SSL 인증서 발급 (없을 경우만)
         if [ ! -d /etc/letsencrypt/live/game.sogething.com ]; then
-            echo "[SSL] game.sogething.com 인증서 발급..." &&
+            echo "[SSL] Issue certificate for game.sogething.com..." &&
             sudo certbot --nginx -d game.sogething.com -d www.game.sogething.com --non-interactive --agree-tos --email admin@sogething.com ||
-            echo "⚠️ SSL 인증서 발급 실패 (도메인 DNS 확인 필요)";
+            echo "WARNING: SSL certificate failed (check DNS)";
         fi &&
         
         sudo nginx -t && sudo systemctl reload nginx &&
-        echo "✅ Nginx 설정 완료";
+        echo "SUCCESS: Nginx config completed";
     else
-        echo "⚠️ Nginx 설정 파일 없음";
+        echo "WARNING: Nginx config file not found";
     fi &&
-    echo "🎉 배포 완료!" &&
+    echo "Deployment completed!" &&
     pm2 status
 '@
 
