@@ -29,7 +29,7 @@ if (-not $SshKey) { $SshKey = "C:\Users\ssh\ssh-key-oracle.key" }
 if (-not $SshHost) { $SshHost = "ubuntu@168.107.52.201" }
 if (-not $RemoteDir) { $RemoteDir = "~/game.sogething" }
 
-Write-Host "🚀 [1/5] Git Push 진행 중..." -ForegroundColor Cyan
+Write-Host "🚀 [1/5] Git Push in progress..." -ForegroundColor Cyan
 
 # Git 작업
 git add .
@@ -37,12 +37,12 @@ git commit -m "$CommitMessage"
 git push origin main
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Git Push 실패! 배포를 중단합니다." -ForegroundColor Red
+    Write-Host "❌ Git Push failed! Stopping deployment." -ForegroundColor Red
     exit
 }
 
-Write-Host "✅ Git Push 완료!" -ForegroundColor Green
-Write-Host "🚀 [2/5] 서버 접속 및 전체 배포 실행..." -ForegroundColor Cyan
+Write-Host "✅ Git Push completed!" -ForegroundColor Green
+Write-Host "🚀 [2/5] Connecting to server and running deployment..." -ForegroundColor Cyan
 
 # 서버에서 실행할 전체 명령 (하나의 스크립트로 모든 작업)
 $RemoteCommand = @'
@@ -125,8 +125,9 @@ $RemoteCommand = @'
     pm2 status
 '@
 
-# SSH로 서버에서 전체 배포 실행
-ssh -i "$SshKey" "$SshHost" "$RemoteCommand"
+# SSH로 서버에서 전체 배포 실행 (smart_security 방식 적용)
+$NormalizedCommand = $RemoteCommand.Replace("`r", "").Replace("`n", " ")
+ssh -i "$SshKey" "$SshHost" "$NormalizedCommand"
 
-Write-Host "🎉 배포 완료! (Deployment Completed)" -ForegroundColor Green
-Write-Host "🌐 접속 주소: https://game.sogething.com" -ForegroundColor Cyan
+Write-Host "🎉 Deployment completed! (Deployment Completed)" -ForegroundColor Green
+Write-Host "🌐 Access URL: https://game.sogething.com" -ForegroundColor Cyan

@@ -106,11 +106,15 @@ def _classify_way(tags, categories):
     for cat in categories:
         if cat in ZONE_CATEGORIES:
             # 단순 키워드 매칭으로 성능 최적화 (서빙용)
-            if any(tag_part in t_str for tag_part in ["forest", "wood"]) and cat == "forest": return "forest"
-            if any(tag_part in t_str for tag_part in ["water", "river"]) and cat == "water": return "water"
-            if any(tag_part in t_str for tag_part in ["park", "garden"]) and cat == "park": return "park"
-            if "residential" in t_str and cat == "residential": return "residential"
-            if any(k in t_str for k in ["commercial", "retail"]) and cat == "commercial": return "commercial"
+            if any(k in t_str for k in ["forest", "wood"]) and cat == "forest": return "forest"
+            if any(k in t_str for k in ["water", "river", "stream", "canal", "lake"]) and cat == "water": return "water"
+            if any(k in t_str for k in ["park", "garden", "leisure"]) and cat == "park": return "park"
+            if any(k in t_str for k in ["residential", "apartments", "house"]) and cat == "residential": return "residential"
+            if any(k in t_str for k in ["commercial", "retail", "marketplace", "office"]) and cat == "commercial": return "commercial"
+            if any(k in t_str for k in ["industrial", "factory", "works"]) and cat == "industrial": return "industrial"
+            if any(k in t_str for k in ["school", "university", "college", "kindergarten"]) and cat == "educational": return "educational"
+            if any(k in t_str for k in ["hospital", "clinic", "doctors", "pharmacy"]) and cat == "medical": return "medical"
+            if any(k in t_str for k in ["parking", "garage"]) and cat == "parking": return "parking"
     return None
 
 def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None, district_id: int = None, dong_id: int = None):

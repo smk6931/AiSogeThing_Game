@@ -169,7 +169,7 @@ const BlockMesh = React.memo(({ geoData, texture, isSelected, onClick, useStenci
         polygonOffsetUnits={-2}
         color={isSelected ? '#ffffff' : '#dddddd'}
         stencilWrite={useStencil}
-        stencilRef={4}
+        stencilRef={1}
         stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
       />
     </mesh>
@@ -297,7 +297,7 @@ const CityBlockOverlay = ({
 
     // 여러 카테고리의 폴리곤들을 하나의 배열로 통합
     let allPolygons = [];
-    ['residential', 'commercial', 'industrial', 'institutional', 'educational', 'medical', 'parking',
+    ['residential', 'commercial', 'industrial', 'institutional', 'educational', 'medical', 'parking', 'unexplored',
       'natural_site', 'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
       'park', 'forest'].forEach(cat => {
         if (zoneData.zones[cat]) {
@@ -335,7 +335,7 @@ const CityBlockOverlay = ({
   const activeMask = currentDong || currentDistrict;
 
   return (
-    <group name="city-block-overlay">
+    <group name="city-block-overlay" position={[0, elevation, 0]}>
       {/* 0. 스텐실 마스크 렌더링 (구/동 모양 도장 찍기) */}
       {activeMask && <BlockMask maskArea={activeMask} elevation={elevation + 0.01} />}
 
