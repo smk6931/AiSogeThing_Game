@@ -44,28 +44,18 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✅ Git Push completed!" -ForegroundColor Green
 Write-Host "🚀 [2/5] Connecting to server and running deployment..." -ForegroundColor Cyan
 
-# 서버에서 실행할 전체 명령 (bash stdin으로 전달 예정)
-$RemoteCommand = @"
-    set -e
-
+# 서버에서 실행할 전체 명령 (bash stdin으로 전달)
+$RemoteCommand = @'
     # 프로젝트 폴더가 없으면 초기 설정
     if [ ! -d ~/game.sogething ]; then
-        echo "[Initial Setup] Clone project and initial setup..."
+        echo "[Initial Setup] Clone project..."
         cd ~
         git clone https://github.com/smk6931/AiSogeThing_Game.git game.sogething
         cd game.sogething
-        
-        # 가상환경 생성
         python3 -m venv venv
         source venv/bin/activate
         pip install -r requirements.txt
-        
-        # 프론트엔드 의존성 설치
-        cd front
-        npm install
-        cd ..
-        
-        echo "[Initial Setup] Completed!"
+        cd front && npm install && cd ..
     else
         cd ~/game.sogething
     fi
@@ -78,30 +68,39 @@ $RemoteCommand = @"
     cd back
     source ../venv/bin/activate
     pip install -r ../requirements.txt
-    
-    # export DB_PORT=5100
-    # alembic upgrade head  # DB 연결 전까지 주석 처리
+    # alembic upgrade head (DB 연결 전까지 주석)
+    cd ..
 
     echo "[Step 3] Build frontend..."
-    cd ../front
+    cd front
     npm install
     rm -rf node_modules/.vite dist
     npm run build
+    cd ..
 
     echo "[Step 4] Restart PM2 processes..."
-    # 백엔드: 무중단 또는 환경변수 업데이트를 위해 restart 사용
-    if pm2 list | grep -q "backend"; then
-        echo "[PM2] Restarting backend..."
-        pm2 restart backend --update-env
+    # Legacy Cleanup (기존 이름 삭제)
+    pm2 delete backend > /dev/null 2>&1 || true
+    pm2 delete frontend > /dev/null 2>&1 || true
+
+    # Back-end: game-back
+    if pm2 list | grep -q "game-back"; then
+        echo "[PM2] Reloading game-back..."
+        pm2 reload game-back --update-env
     else
-        echo "[PM2] Starting backend..."
-        pm2 start "uvicorn main:app --host 0.0.0.0 --port 8100" --name backend --update-env
+        echo "[PM2] Starting game-back..."
+        cd back
+        pm2 start "uvicorn main:app --host 0.0.0.0 --port 8100" --name game-back --update-env
+        cd ..
     fi
 
-    # 프론트엔드: Nginx가 빌드된 정적 파일(dist)을 직접 서빙하므로 PM2 프로세스 불필요
-    if pm2 list | grep -q "frontend"; then
-        echo "[PM2] Removing legacy frontend process..."
-        pm2 delete frontend || true
+    # Front-end: game-front (PM2 serve 방식으로 목록 유지)
+    if pm2 list | grep -q "game-front"; then
+        echo "[PM2] Reloading game-front..."
+        pm2 reload game-front --update-env
+    else
+        echo "[PM2] Starting game-front..."
+        pm2 serve front/dist 3100 --name game-front --spa
     fi
     
     echo "[Step 5] Update Nginx config..."
@@ -110,23 +109,20 @@ $RemoteCommand = @"
         sudo rm -f /etc/nginx/sites-enabled/game.sogething
         sudo ln -s /etc/nginx/sites-available/game.sogething /etc/nginx/sites-enabled/game.sogething
         
-        # SSL 인증서 발급 (없을 경우만)
+        # SSL 인증서 (실패 시 무시)
         if [ ! -d /etc/letsencrypt/live/game.sogething.com ]; then
-            echo "[SSL] Issue certificate for game.sogething.com..."
-            sudo certbot --nginx -d game.sogething.com -d www.game.sogething.com --non-interactive --agree-tos --email admin@sogething.com || \
-            echo "WARNING: SSL certificate failed - Check DNS manually"
+            echo "[SSL] Attempting certificate issue..."
+            sudo certbot --nginx -d game.sogething.com -d www.game.sogething.com --non-interactive --agree-tos --email admin@sogething.com || echo "SSL Skip"
         fi
         
         sudo nginx -t && sudo systemctl reload nginx
         echo "SUCCESS: Nginx config completed"
-    else
-        echo "WARNING: Nginx config file not found"
     fi
     echo "Deployment completed!"
     pm2 status
-"@
+'@
 
-# SSH로 서버에서 전체 배포 실행 (명령어 뭉치기 대신 파이핑 사용으로 주석/개행 문제 원천 차단)
+# SSH로 서버에서 전체 배포 실행
 $RemoteCommand | ssh -i "$SshKey" "$SshHost" "bash"
 
 Write-Host "🎉 Deployment completed! (Deployment Completed)" -ForegroundColor Green
