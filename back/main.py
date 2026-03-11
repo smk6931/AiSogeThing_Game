@@ -30,6 +30,8 @@ async def startup_event():
 origins = [
     "http://localhost:3100",
     "http://127.0.0.1:3100",
+    "https://game.sogething.com",
+    "https://www.game.sogething.com",
 ]
 
 app.add_middleware(
