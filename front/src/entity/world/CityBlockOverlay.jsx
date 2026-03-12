@@ -150,24 +150,23 @@ const buildTerrainBlock = (coords, hm, heightScale) => {
 // ==============================================
 // 단일 블록 메쉬 (회전 없이 XZ 평면에 직접 배치)
 // ==============================================
-const BlockMesh = React.memo(({ geoData, texture, isSelected, onClick, useStencil }) => {
+const BlockMesh = React.memo(({ geoData, texture, useStencil }) => {
   if (!geoData?.geo) return null;
   return (
     <mesh
       geometry={geoData.geo}
-      onClick={onClick}
       renderOrder={4}
     >
       <meshBasicMaterial
         map={texture}
         transparent={true}
-        opacity={isSelected ? 0.95 : 0.72}
+        opacity={0.72}
         side={THREE.DoubleSide}
         depthWrite={false}
         polygonOffset={true}
         polygonOffsetFactor={-2}
         polygonOffsetUnits={-2}
-        color={isSelected ? '#ffffff' : '#dddddd'}
+        color={'#dddddd'}
         stencilWrite={useStencil}
         stencilRef={1}
         stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
@@ -279,7 +278,6 @@ const CityBlockOverlay = ({
 }) => {
   const [hm, setHm] = useState(null);
   const textures = useTexture(BLOCK_IMAGES);
-  const [selectedBlock, setSelectedBlock] = useState(null);
   const [blockTextureMap, setBlockTextureMap] = useState({});
 
   // heightmap 로드 (전역 캐시 활용)
@@ -317,18 +315,8 @@ const CityBlockOverlay = ({
     }).filter(b => b.geoData !== null);
   }, [zoneData, hm, heightScale, currentDistrict, currentDong]);
 
-  const handleBlockClick = useCallback((e, blockIdx) => {
-    e.stopPropagation();
-    setSelectedBlock(prev => (prev === blockIdx ? null : blockIdx)); // 같은 블록 재클릭 시 닫기
-  }, []);
 
-  const handleSelectImage = useCallback((imgPath) => {
-    if (selectedBlock === null) return;
-    const texIdx = BLOCK_IMAGES.indexOf(imgPath);
-    setBlockTextureMap(prev => ({ ...prev, [selectedBlock]: texIdx >= 0 ? texIdx : 0 }));
-  }, [selectedBlock]);
-
-  const handleClosePalette = useCallback(() => setSelectedBlock(null), []);
+  const handleClosePalette = useCallback(() => { }, []);
 
   if (!visible || blocks.length === 0) return null;
 
@@ -347,23 +335,10 @@ const CityBlockOverlay = ({
             key={idx}
             geoData={geoData}
             texture={texture}
-            isSelected={selectedBlock === idx}
-            onClick={(e) => handleBlockClick(e, idx)}
             useStencil={!!activeMask}
           />
         );
       })}
-
-      {selectedBlock !== null && (
-        <Html position={[0, 0, 0]} zIndexRange={[9000, 9001]} prepend fullscreen>
-          <TexturePaletteUI
-            images={BLOCK_IMAGES}
-            selectedBlock={selectedBlock}
-            onSelectImage={handleSelectImage}
-            onClose={handleClosePalette}
-          />
-        </Html>
-      )}
     </group>
   );
 };
