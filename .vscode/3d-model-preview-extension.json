@@ -1,0 +1,40 @@
+{
+  "name": "3d-model-preview",
+  "displayName": "3D Model Preview",
+  "description": "Preview 3D models (.glb, .gltf) in VS Code",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onLanguage:gltf"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "gltf",
+        "aliases": ["glTF", "gltf"],
+        "extensions": [".glb", ".gltf"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "3dmodel.openPreview",
+        "title": "Open 3D Preview",
+        "icon": "$(eye)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "3dmodel.openPreview",
+          "when": "resourceLangId == gltf",
+          "group": "navigation"
+        }
+      ]
+    }
+  }
+}

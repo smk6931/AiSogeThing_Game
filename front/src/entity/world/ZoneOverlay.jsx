@@ -90,7 +90,8 @@ const ZONE_COLORS = {
   cemetery: '#607d8b',
   transport: '#455a64',
   port: '#1a237e',
-  unexplored: '#4a3728'
+  unexplored: '#4a3728',
+  sectors: '#a58aff'
 };
 
 const ZONE_OPACITY = {
@@ -113,7 +114,8 @@ const ZONE_OPACITY = {
   cemetery: 0.25,
   transport: 0.25,
   port: 0.25,
-  unexplored: 0.2
+  unexplored: 0.2,
+  sectors: 0.45
 };
 
 // 폴리곤 피처를 Three.js Geometry로 변환
@@ -331,7 +333,7 @@ const ZoneOverlay = ({
 
     const targetId = dongId || currentDistrict?.id;
     const targetName = dongId ? (currentDong?.name || dongId) : currentDistrict?.name;
-    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v3_${targetId}`;
+    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v13_${targetId}`;
 
     const fetchAreaData = async () => {
       // 1. 메모리 캐시
@@ -340,9 +342,9 @@ const ZoneOverlay = ({
         setZoneDataStrict(zoneCache.current.get(cacheKey));
         return;
       }
-      // 2. 브라우저 영구 캐시
+      // 2. 브라우저 영구 캐시 (v13)
       try {
-        const browserCache = await caches.open('zone-data-v10');
+        const browserCache = await caches.open('zone-data-v13');
         const cachedRes = await browserCache.match(cacheKey);
         if (cachedRes) {
           const data = await cachedRes.json();
@@ -359,7 +361,6 @@ const ZoneOverlay = ({
       console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 서버 패치: ${targetName}`);
       setLoadingGroups({ world_zones: true });
 
-      // 동 전환 시에는 이전 동 데이터를 클리어할지, 누적할지 선택 가능 (일단 클리어)
       if (dongId) {
         setZoneData({ zones: {}, categories: {} });
       }
@@ -374,7 +375,7 @@ const ZoneOverlay = ({
         setZoneDataStrict(data);
         zoneCache.current.set(cacheKey, data);
 
-        const browserCache = await caches.open('zone-data-v10');
+        const browserCache = await caches.open('zone-data-v13');
         browserCache.put(cacheKey, new Response(JSON.stringify(data)));
         console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 로드 완료: ${targetName}`);
       } catch (err) {
@@ -430,7 +431,7 @@ const ZoneOverlay = ({
       'water', 'park', 'forest', 'natural_site',
       'residential', 'commercial', 'industrial', 'institutional', 'educational', 'medical', 'parking',
       'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
-      'road_major', 'road_minor', 'unexplored'
+      'road_major', 'road_minor', 'unexplored', 'sectors'
     ];
     fetchGroup('world_zones', ALL_CATS);
   }, [visible, playerGps.lat, playerGps.lng]);

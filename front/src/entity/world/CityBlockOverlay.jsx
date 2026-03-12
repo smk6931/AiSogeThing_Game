@@ -1,19 +1,15 @@
 /**
  * CityBlockOverlay.jsx
- *
- * 도로로 나뉜 구역(파티션)에 이미지 텍스처를 입히는 시스템
- * - THREE.ShapeUtils.triangulateShape 로 안정적인 삼각분할
- * - 각 버텍스마다 heightmap 샘플링 → 등고선 면에 데칼처럼 정확히 밀착
- * - 블록 클릭 → 이미지 팔레트 팝업 → 텍스처 개별 교체
+ * 
+ * [동(Dong) 단위 스트리밍 원칙 적용]
+ * 1. 블록(CityBlocks): 동 경계선 안쪽의 용도 구역만 텍스처로 렌더링
+ * 2. 스텐실 마스크: 현재 동 경계면을 기준으로 레이어를 도려내어 정확히 동 안쪽만 표시
  */
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
-import { useTexture, Html } from '@react-three/drei';
+import { useTexture } from '@react-three/drei';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
-// ==============================================
-// 사용할 이미지 목록 (public/images 폴더)
-// ==============================================
 export const BLOCK_IMAGES = [
   '/images/2b8a23a7dec37e59d324efa9d0f0ef99.jpg',
   '/images/2cd8ebd98fadce0b168e865df1ce7a7c.jpg',
@@ -30,166 +26,68 @@ export const BLOCK_IMAGES = [
   '/images/ec1cbe7ba65ab0e674808182127c8b6b.jpg',
   '/images/f9b808c6e9318d035e1d64cd546d23d3.jpg',
   '/images/image.png',
+  '/images/rock.png',
+  '/images/sand.png',
 ];
 
-// ==============================================
-// GPS → 게임 좌표 변환
-// ==============================================
 const gpsToGame = (lat, lng) => ({
   x: (lng - GIS_ORIGIN.lng) * LNG_TO_M,
   z: (GIS_ORIGIN.lat - lat) * LAT_TO_M,
 });
 
-// ==============================================
-// Heightmap 샘플러 (ZoneOverlay과 동일한 로직)
-// ==============================================
-let _hmData = null;
-
-// [OFF] 등고선 비활성화 - 항상 null 반환하여 평면 렌더링 (나중에 복원 가능)
-const loadHm = async () => {
-  // if (_hmData) return _hmData;
-  // try {
-  //   const res = await fetch('/seoul_heightmap.json');
-  //   _hmData = await res.json();
-  //   console.log('[CityBlock] heightmap 로드 완료');
-  // } catch (_) {
-  //   console.warn('[CityBlock] heightmap 로드 실패 → flat 렌더링');
-  //   _hmData = null;
-  // }
-  // return _hmData;
-  return null; // 평면 모드
-};
-
-const sampleHm = (x, z, hm, scale = 1.0) => {
-  if (!hm) return 0;
-  const { grid_size, world_width, world_height, elevations, elev_min, offset_x, offset_z } = hm;
-  const localX = x - (offset_x + world_width / 2);
-  const localZ = z - (offset_z + world_height / 2);
-  const u = (localX + world_width / 2) / world_width;
-  const v = (localZ + world_height / 2) / world_height;
-  if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
-  const gx = u * (grid_size - 1);
-  const gz = v * (grid_size - 1);
-  const ix = Math.floor(gx), iy = Math.floor(gz);
-  const fx = gx - ix, fy = gz - iy;
-  const ix2 = Math.min(ix + 1, grid_size - 1);
-  const iy2 = Math.min(iy + 1, grid_size - 1);
-  const e00 = Math.max(0, (elevations[iy * grid_size + ix] ?? elev_min) - elev_min);
-  const e10 = Math.max(0, (elevations[iy * grid_size + ix2] ?? elev_min) - elev_min);
-  const e01 = Math.max(0, (elevations[iy2 * grid_size + ix] ?? elev_min) - elev_min);
-  const e11 = Math.max(0, (elevations[iy2 * grid_size + ix2] ?? elev_min) - elev_min);
-  return (e00 * (1 - fx) * (1 - fy) + e10 * fx * (1 - fy) + e01 * (1 - fx) * fy + e11 * fx * fy) * scale;
-};
-
-// ==============================================
-// 폴리곤 → 지형 밀착 BufferGeometry 빌드
-//
-// 핵심: ShapeUtils.triangulateShape → 삼각형 인덱스 추출
-//       각 버텍스 Y = heightmap 샘플값 + 오프셋 (데칼 효과)
-//       UV = 폴리곤 AABB 정규화 → 텍스처가 블록 전체에 꽉 참
-// ==============================================
-const buildTerrainBlock = (coords, hm, heightScale) => {
+const buildTerrainBlock = (coords) => {
   if (!coords || coords.length < 3) return null;
-
-  // GPS → 게임 좌표
   const pts = coords.map(([lat, lng]) => gpsToGame(lat, lng));
-
-  // AABB 계산 (UV 정규화용)
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  pts.forEach(p => {
-    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-    if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
-  });
-  const rangeX = maxX - minX || 1;
-  const rangeZ = maxZ - minZ || 1;
-
-  // THREE.ShapeUtils.triangulateShape 용 Vector2 배열
-  // Shape 좌표계: x = game X, y = game Z (부호 유지, 이후 UV에서 처리)
   const contour = pts.map(p => new THREE.Vector2(p.x, p.z));
-
   let faces;
   try {
     faces = THREE.ShapeUtils.triangulateShape(contour, []);
-  } catch (_) {
-    return null; // 자기교차 폴리곤 등 삼각분할 실패 시 스킵
-  }
+  } catch (_) { return null; }
   if (!faces || faces.length === 0) return null;
 
-  // BufferGeometry 직접 구성
   const vertCount = faces.length * 3;
   const positions = new Float32Array(vertCount * 3);
   const uvs = new Float32Array(vertCount * 2);
-
-  const DECAL_OFFSET = 0.5; // 지형 면보다 이 만큼 위에 올림 (Z-fighting 방지)
-
   let vi = 0, ui = 0;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  pts.forEach(p => {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+  });
+  const rX = maxX - minX || 1; const rZ = maxZ - minZ || 1;
+
   for (const [a, b, c] of faces) {
     for (const idx of [a, b, c]) {
-      const gx = contour[idx].x; // game X
-      const gz = contour[idx].y; // game Z
-      const gy = sampleHm(gx, gz, hm, heightScale) + DECAL_OFFSET;
-
-      positions[vi++] = gx;
-      positions[vi++] = gy;
-      positions[vi++] = gz;
-
-      // UV: AABB 정규화 → 텍스처가 블록 전체를 꽉 채움
-      uvs[ui++] = (gx - minX) / rangeX;
-      uvs[ui++] = (gz - minZ) / rangeZ;
+      const p = pts[idx];
+      positions[vi++] = p.x;
+      positions[vi++] = 0.55;
+      positions[vi++] = p.z;
+      uvs[ui++] = (p.x - minX) / rX;
+      uvs[ui++] = (p.z - minZ) / rZ;
     }
   }
-
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geo.computeVertexNormals();
-
-  return { geo, centerX: (minX + maxX) / 2, centerZ: (minZ + maxZ) / 2 };
+  return geo;
 };
 
-// ==============================================
-// 단일 블록 메쉬 (회전 없이 XZ 평면에 직접 배치)
-// ==============================================
-const BlockMesh = React.memo(({ geoData, texture, useStencil }) => {
-  if (!geoData?.geo) return null;
-  return (
-    <mesh
-      geometry={geoData.geo}
-      renderOrder={4}
-    >
-      <meshBasicMaterial
-        map={texture}
-        transparent={true}
-        opacity={0.72}
-        side={THREE.DoubleSide}
-        depthWrite={false}
-        polygonOffset={true}
-        polygonOffsetFactor={-2}
-        polygonOffsetUnits={-2}
-        color={'#dddddd'}
-        stencilWrite={useStencil}
-        stencilRef={1}
-        stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
-      />
-    </mesh>
-  );
-});
-
-// [NEW] 구/동 경계 모양대로 스텐실 도장을 찍어주는 컴포넌트
-const BlockMask = ({ maskArea, elevation }) => {
+// [NEW] 동 경계선을 뚫어주는 스텐실 마스크 컴포넌트
+const DongMask = ({ currentDong, elevation }) => {
   const geo = useMemo(() => {
-    if (!maskArea || !maskArea.coords || maskArea.coords.length === 0) return null;
+    if (!currentDong?.coords || currentDong.coords.length < 3) return null;
     try {
       const shape = new THREE.Shape();
-      const first = gpsToGame(maskArea.coords[0][0], maskArea.coords[0][1]);
-      shape.moveTo(first.x, -first.z);
-      for (let i = 1; i < maskArea.coords.length; i++) {
-        const p = gpsToGame(maskArea.coords[i][0], maskArea.coords[i][1]);
-        shape.lineTo(p.x, -p.z);
+      const first = gpsToGame(currentDong.coords[0][0], currentDong.coords[0][1]);
+      shape.moveTo(first.x, first.z);
+      for (let i = 1; i < currentDong.coords.length; i++) {
+        const p = gpsToGame(currentDong.coords[i][0], currentDong.coords[i][1]);
+        shape.lineTo(p.x, p.z);
       }
       return new THREE.ShapeGeometry(shape);
     } catch (e) { return null; }
-  }, [maskArea]);
+  }, [currentDong]);
 
   if (!geo) return null;
 
@@ -198,147 +96,77 @@ const BlockMask = ({ maskArea, elevation }) => {
       <meshBasicMaterial
         colorWrite={false}
         depthWrite={false}
-        depthTest={false}
         stencilWrite={true}
         stencilRef={1}
         stencilFunc={THREE.AlwaysStencilFunc}
-        stencilZPass={THREE.ReplaceStencilOp}
-        side={THREE.DoubleSide}
+        stencilPass={THREE.ReplaceStencilOp}
       />
     </mesh>
   );
 };
 
-// ==============================================
-// 이미지 팔레트 UI
-// ==============================================
-const TexturePaletteUI = ({ images, selectedBlock, onSelectImage, onClose }) => (
-  <div style={{
-    position: 'fixed',
-    right: '220px',
-    top: '80px',
-    width: '196px',
-    background: 'rgba(8, 8, 18, 0.95)',
-    border: '1px solid rgba(212, 175, 55, 0.55)',
-    borderRadius: '14px',
-    padding: '14px',
-    zIndex: 9000,
-    backdropFilter: 'blur(14px)',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.7)',
-    fontFamily: "'Cinzel', sans-serif",
-    color: 'white',
-    pointerEvents: 'auto',
-  }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-      <span style={{ fontSize: '11px', color: '#d4af37', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-        블록 텍스처 선택 #{selectedBlock}
-      </span>
-      <button onClick={onClose} style={{
-        background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '15px',
-      }}>✕</button>
-    </div>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px' }}>
-      {images.map((img, idx) => (
-        <div key={idx} onClick={() => onSelectImage(img)} style={{
-          width: '54px', height: '54px', borderRadius: '6px', overflow: 'hidden',
-          cursor: 'pointer', border: '2px solid transparent', transition: 'border 0.12s',
-        }}
-          onMouseOver={e => e.currentTarget.style.border = '2px solid #d4af37'}
-          onMouseOut={e => e.currentTarget.style.border = '2px solid transparent'}
-        >
-          <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-// Ray-casting Point-in-Polygon
-const pointInPolygon = (lat, lng, coords) => {
-  let inside = false;
-  const n = coords.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    const yi = coords[i][0], xi = coords[i][1];
-    const yj = coords[j][0], xj = coords[j][1];
-    if (((yi > lat) !== (yj > lat)) &&
-      (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  return inside;
-};
-
-// ==============================================
-// 메인 컴포넌트
-// ==============================================
-const CityBlockOverlay = ({
-  zoneData, visible = true, heightScale = 1.0,
-  currentDistrict = null, dongId = null, currentDong = null,
-  elevation = 0.05
-}) => {
-  const [hm, setHm] = useState(null);
+const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0.05 }) => {
   const textures = useTexture(BLOCK_IMAGES);
-  const [blockTextureMap, setBlockTextureMap] = useState({});
 
-  // heightmap 로드 (전역 캐시 활용)
-  useEffect(() => {
-    loadHm().then(data => setHm(data));
-  }, []);
+  const { originalBlocks, sectorBlocks } = useMemo(() => {
+    if (!zoneData?.zones) return { originalBlocks: [], sectorBlocks: [] };
 
-  // 가용한 모든 지역 폴리곤(주거, 상업, 공원, 숲 등)을 하나로 모아 밀착 블록 생성
-  const blocks = useMemo(() => {
-    if (!zoneData?.zones) return []; // [수정] hm 없어도 빌드 가능 (평면 모드)
+    const ob = [];
+    const sb = [];
+    const blockCats = [
+      'residential', 'commercial', 'industrial', 'park', 'forest',
+      'educational', 'medical', 'parking', 'natural_site',
+      'military', 'religious', 'sports', 'cemetery', 'transport', 'port', 'water'
+    ];
 
-    const districtCoords = currentDistrict?.coords;
-    const dongCoords = currentDong?.coords;
-    const maskCoords = dongCoords || districtCoords; // 동 경계가 있으면 동으로, 없으면 구로 마스킹
-
-    // 여러 카테고리의 폴리곤들을 하나의 배열로 통합
-    let allPolygons = [];
-    ['residential', 'commercial', 'industrial', 'institutional', 'educational', 'medical', 'parking', 'unexplored',
-      'natural_site', 'military', 'religious', 'sports', 'cemetery', 'transport', 'port',
-      'park', 'forest'].forEach(cat => {
-        if (zoneData.zones[cat]) {
-          // [수정] 백엔드에서 이미 Intersection으로 잘라서 보내주므로 프론트에서 또 pointInPolygon 검사를 할 필요가 없습니다.
-          // 오히려 정밀도 문제로 데이터가 누락될 수 있으므로 모든 폴리곤을 수용합니다.
-          const filtered = zoneData.zones[cat].filter(f => f.type === 'polygon' && f.coords?.length >= 3);
-          allPolygons = allPolygons.concat(filtered);
+    blockCats.forEach(cat => {
+      const features = zoneData.zones[cat] || [];
+      features.forEach((f, idx) => {
+        if (f.type === 'polygon' && f.coords?.length >= 3) {
+          const geo = buildTerrainBlock(f.coords);
+          if (geo) {
+            const hash = (cat.charCodeAt(0) * 13 + cat.length * 17 + idx * 7) % BLOCK_IMAGES.length;
+            ob.push({ geo, texIdx: hash });
+          }
         }
       });
+    });
 
-    console.log(`[CityBlock] ${allPolygons.length}개 블록 통합 빌드 (구 마스킹 적용)`);
+    // 섹터 (사용자 요청 시 다시 활성화할 수 있도록 로직만 유지)
+    const sectorFeatures = zoneData.zones['sectors'] || [];
+    sectorFeatures.forEach((f, idx) => {
+      if (f.type === 'polygon' && f.coords?.length >= 3) {
+        const geo = buildTerrainBlock(f.coords);
+        if (geo) sb.push({ geo, texIdx: (idx * 31 + 42) % BLOCK_IMAGES.length });
+      }
+    });
 
-    return allPolygons.map((f, idx) => {
-      const geoData = buildTerrainBlock(f.coords, hm, heightScale);
-      const defaultTexIdx = idx % BLOCK_IMAGES.length;
-      return { idx, geoData, defaultTexIdx };
-    }).filter(b => b.geoData !== null);
-  }, [zoneData, hm, heightScale, currentDistrict, currentDong]);
+    return { originalBlocks: ob, sectorBlocks: sb };
+  }, [zoneData]);
 
-
-  const handleClosePalette = useCallback(() => { }, []);
-
-  if (!visible || blocks.length === 0) return null;
-
-  const activeMask = currentDong || currentDistrict;
+  if (!visible) return null;
 
   return (
-    <group name="city-block-overlay" position={[0, elevation, 0]}>
-      {/* 0. 스텐실 마스크 렌더링 (구/동 모양 도장 찍기) */}
-      {activeMask && <BlockMask maskArea={activeMask} elevation={elevation + 0.01} />}
+    <group>
+      {/* 동 마스크: 이 경계 안쪽만 렌더링됨 */}
+      <DongMask currentDong={currentDong} elevation={elevation + 0.01} />
 
-      {blocks.map(({ idx, geoData, defaultTexIdx }) => {
-        const texIdx = blockTextureMap[idx] ?? defaultTexIdx;
-        const texture = Array.isArray(textures) ? textures[texIdx] : textures;
-        return (
-          <BlockMesh
-            key={idx}
-            geoData={geoData}
-            texture={texture}
-            useStencil={!!activeMask}
-          />
-        );
-      })}
+      <group position={[0, elevation, 0]}>
+        {originalBlocks.map((b, i) => (
+          <mesh key={`ob-${i}`} geometry={b.geo} renderOrder={4}>
+            <meshStandardMaterial
+              map={textures[b.texIdx]}
+              transparent
+              opacity={0.7}
+              stencilWrite={true}
+              stencilRef={1}
+              stencilFunc={THREE.EqualStencilFunc}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        ))}
+      </group>
     </group>
   );
 };
