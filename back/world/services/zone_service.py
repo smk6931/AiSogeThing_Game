@@ -45,8 +45,8 @@ ZONE_CATEGORIES = {
     "industrial": {"tags": ['way["landuse"="industrial"]', 'relation["landuse"="industrial"]'], "color": "#ffc107", "label": "공업구역"},
     "educational": {"tags": ['way["amenity"~"school|university|college"]'], "color": "#ff5722", "label": "교육시설"},
     "medical": {"tags": ['way["amenity"~"hospital|clinic"]'], "color": "#f44336", "label": "의료시설"},
-    "road_major": {"tags": ['way["highway"~"motorway|trunk|primary"]'], "color": "#ff9800", "label": "주요도로"},
-    "road_minor": {"tags": ['way["highway"~"secondary|tertiary|residential|service|unclassified"]'], "color": "#ffeb3b", "label": "일반도로"},
+    "road_major": {"tags": ['way["highway"~"motorway|trunk|primary|secondary|motorway_link|trunk_link|primary_link"]'], "color": "#777777", "label": "주요도로"},
+    "road_minor": {"tags": ['way["highway"~"tertiary|residential|service|unclassified|living_street|pedestrian|path|footway|secondary_link|tertiary_link"]'], "color": "#bbbbbb", "label": "일반도로"},
 }
 
 
@@ -203,7 +203,7 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None, distr
     area_type = "district" if district_id else ("dong" if dong_id else "point")
     area_id = district_id or dong_id or f"{lat:.3f}_{lng:.3f}"
     
-    cache_key = f"v13_{area_type}_{area_id}.json" # 버전업 (v13)
+    cache_key = f"v16_{area_type}_{area_id}.json" # 버전업 (도로 강화 v16)
     cache_path = os.path.join(CACHE_DIR, cache_key)
 
     if os.path.exists(cache_path):

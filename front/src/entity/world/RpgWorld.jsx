@@ -181,8 +181,9 @@ const RpgWorld = ({
 
     // OSM 구역 패치 반경 및 도로 너비
     zoneFetchRadius: 2500,
-    roadWidthMajor: 25,
-    roadWidthMinor: 12
+    roadWidthMajor: 20,
+    roadWidthMid: 10,
+    roadWidthMinor: 5
   });
 
   const [controlMode, setControlMode] = useState('translate');
@@ -387,6 +388,7 @@ const RpgWorld = ({
         dongId={currentDongId}
         currentDong={currentDong}
         roadWidthMajor={debugConfig.roadWidthMajor}
+        roadWidthMid={debugConfig.roadWidthMid}
         roadWidthMinor={debugConfig.roadWidthMinor}
         elevation={0.05} // 지면보다 살짝 위
         shiftZ={0}
@@ -409,6 +411,7 @@ const RpgWorld = ({
         heightScale={debugConfig.terrainHeightScale}
         zoneRadius={debugConfig.zoneFetchRadius}
         roadWidthMajor={debugConfig.roadWidthMajor}
+        roadWidthMid={debugConfig.roadWidthMid}
         roadWidthMinor={debugConfig.roadWidthMinor}
         enabledZones={{
           water: showSeoulNature,

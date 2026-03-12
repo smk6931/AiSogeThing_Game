@@ -13,15 +13,17 @@ const COLORS = {
   water: new THREE.Color(0x2a6ab5),
   forest: new THREE.Color(0x2d6a28),
   grass: new THREE.Color(0x5a9e45),
-  road_major: new THREE.Color(0xffffff),
-  road_mid: new THREE.Color(0xdddddd),
-  road_minor: new THREE.Color(0xbbbbbb),
+  road_major: new THREE.Color(0x999999), // 더 연한 주요도로
+  road_mid: new THREE.Color(0xcccccc),   // 중간도로
+  road_minor: new THREE.Color(0xe0e0e0), // 아주 연한 소형도로
 };
 
 const ROAD_CLASS = {
   motorway: 'major', trunk: 'major', primary: 'major',
-  secondary: 'mid', tertiary: 'mid',
-  residential: 'minor', unclassified: 'minor', service: 'minor'
+  motorway_link: 'major', trunk_link: 'major', primary_link: 'major',
+  secondary: 'mid', secondary_link: 'mid', tertiary: 'mid', tertiary_link: 'mid',
+  residential: 'minor', unclassified: 'minor', service: 'minor',
+  living_street: 'minor', pedestrian: 'minor', footway: 'minor', path: 'minor'
 };
 
 // GPS → 게임 좌표 변환
@@ -70,15 +72,15 @@ function buildPolygonGeometry(features, maskArea = null) {
 }
 
 // 라인 생성
-function buildLineGeometry(features, roadWidthMajor = 40, roadWidthMinor = 25, maskArea = null) {
+function buildLineGeometry(features, roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 6, maskArea = null) {
   const geos = [];
 
   for (const f of features) {
     const coords = f.coords;
     if (!coords || coords.length < 2) continue;
 
-    const isMajor = (f.highway === 'motorway' || f.highway === 'trunk' || f.highway === 'primary');
-    const width = isMajor ? roadWidthMajor : roadWidthMinor;
+    const rClass = ROAD_CLASS[f.highway] || 'minor';
+    const width = rClass === 'major' ? roadWidthMajor : (rClass === 'mid' ? roadWidthMid : roadWidthMinor);
     const halfW = width / 2;
 
     for (let i = 0; i < coords.length - 1; i++) {
@@ -185,7 +187,7 @@ const SeoulTerrain = ({
   visible = true, showRoads = true, showNature = true, roadTextureUrl = null,
   districtId = null, dongId = null, currentDistrict = null, currentDong = null,
   elevation = 0, shiftX = -450, shiftZ = 320,
-  roadWidthMajor = 40, roadWidthMinor = 25
+  roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 8
 }) => {
   const [data, setData] = useState(null);
   const [geos, setGeos] = useState(null);
@@ -228,13 +230,13 @@ const SeoulTerrain = ({
         grass: buildPolygonGeometry(grass.filter(f => f.type === 'polygon'), maskArea),
         forest: buildPolygonGeometry(forest.filter(f => f.type === 'polygon'), maskArea),
         waterPoly: buildPolygonGeometry(water.filter(f => f.type === 'polygon'), maskArea),
-        waterLine: buildLineGeometry(water.filter(f => f.type === 'line'), 30, 30, maskArea),
-        roadFeatures: buildLineGeometry(roadFeatures, roadWidthMajor, roadWidthMinor, maskArea),
+        waterLine: buildLineGeometry(water.filter(f => f.type === 'line'), 30, 15, 5, maskArea),
+        roadFeatures: buildLineGeometry(roadFeatures, roadWidthMajor, roadWidthMid, roadWidthMinor, maskArea),
         shiftX: 0, shiftZ: 0
       });
     };
     build();
-  }, [data, shiftX, shiftZ, currentDistrict, currentDong, roadWidthMajor, roadWidthMinor]);
+  }, [data, shiftX, shiftZ, currentDistrict, currentDong, roadWidthMajor, roadWidthMid, roadWidthMinor]);
 
   if (!visible || !geos) return null;
 

@@ -70,12 +70,20 @@ const gpsToGame = (lat, lng) => ({
 });
 
 // 카테고리별 색상 (WorldDebugger에서도 활용)
+const ROAD_CLASS = {
+  motorway: 'major', trunk: 'major', primary: 'major',
+  motorway_link: 'major', trunk_link: 'major', primary_link: 'major',
+  secondary: 'mid', secondary_link: 'mid', tertiary: 'mid', tertiary_link: 'mid',
+  residential: 'minor', unclassified: 'minor', service: 'minor',
+  living_street: 'minor', pedestrian: 'minor', footway: 'minor', path: 'minor'
+};
+
 const ZONE_COLORS = {
   water: '#2a6ab5',
   park: '#4caf50',
   forest: '#2d6a28',
-  road_major: '#ff9800',
-  road_minor: '#ffeb3b',
+  road_major: '#999999', // 큰도로: 중간 회색
+  road_minor: '#d0d0d0', // 작은도로: 연한 회색 (거의 흰색)
   residential: '#8bc34a',
   commercial: '#2196f3',
   industrial: '#ffc107',
@@ -142,16 +150,16 @@ const buildZonePolygonGeometry = (features) => {
 };
 
 // 라인 피처를 Three.js Geometry로 변환 (지형 높이 추종)
-const buildZoneLineGeometry = (features, width = 15, heightmap = null, heightScale = 1.0) => {
+const buildZoneLineGeometry = (features, roadWidthMajor = 20, roadWidthMid = 10, roadWidthMinor = 5, heightmap = null, heightScale = 1.0) => {
   const geos = [];
-  const halfW = width / 2;
 
   for (const f of features) {
     const coords = f.coords;
     if (!coords || coords.length < 2) continue;
 
-    const highway = f.tags?.highway || '';
-    const actualHalfW = (highway === 'motorway' || highway === 'trunk') ? halfW * 2 : halfW;
+    const rClass = ROAD_CLASS[f.tags?.highway] || 'minor';
+    const width = rClass === 'major' ? roadWidthMajor : (rClass === 'mid' ? roadWidthMid : roadWidthMinor);
+    const halfW = width / 2;
 
     for (let i = 0; i < coords.length - 1; i++) {
       const a = gpsToGame(coords[i][0], coords[i][1]);
@@ -161,12 +169,12 @@ const buildZoneLineGeometry = (features, width = 15, heightmap = null, heightSca
       const len = Math.sqrt(dx * dx + dz * dz);
       if (len < 0.1) continue;
 
-      const nx = -dz / len * actualHalfW;
-      const nz = dx / len * actualHalfW;
+      const nx = -dz / len * halfW;
+      const nz = dx / len * halfW;
 
-      // 지형 높이 샘플링
-      const yA = sampleHeight(a.x, a.z, heightmap, heightScale);
-      const yB = sampleHeight(b.x, b.z, heightmap, heightScale);
+      // 지형 높이 샘플링 (사용자 요청으로 일단 비활성화 - Flat)
+      const yA = 0; // sampleHeight(a.x, a.z, heightmap, heightScale);
+      const yB = 0; // sampleHeight(b.x, b.z, heightmap, heightScale);
 
       const geometry = new THREE.BufferGeometry();
       const vertices = new Float32Array([
@@ -290,7 +298,7 @@ const calcDistrictBbox = (coords) => {
 const ZoneOverlay = ({
   playerPos, currentDistrict = null, dongId = null, currentDong = null,
   elevation = 0.05, heightScale = 1.0, onZoneLoaded, visible = true, enabledZones = {},
-  zoneRadius = 2500, roadWidthMajor = 25, roadWidthMinor = 12
+  zoneRadius = 2500, roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 8
 }) => {
   const [zoneData, setZoneData] = useState({ zones: {}, categories: {} });
   const [loadingGroups, setLoadingGroups] = useState({});
@@ -333,7 +341,7 @@ const ZoneOverlay = ({
 
     const targetId = dongId || currentDistrict?.id;
     const targetName = dongId ? (currentDong?.name || dongId) : currentDistrict?.name;
-    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v13_${targetId}`;
+    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v16_${targetId}`;
 
     const fetchAreaData = async () => {
       // 1. 메모리 캐시
@@ -342,9 +350,9 @@ const ZoneOverlay = ({
         setZoneDataStrict(zoneCache.current.get(cacheKey));
         return;
       }
-      // 2. 브라우저 영구 캐시 (v13)
+      // 2. 브라우저 영구 캐시 (v16)
       try {
-        const browserCache = await caches.open('zone-data-v13');
+        const browserCache = await caches.open('zone-data-v16');
         const cachedRes = await browserCache.match(cacheKey);
         if (cachedRes) {
           const data = await cachedRes.json();
@@ -361,9 +369,10 @@ const ZoneOverlay = ({
       console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 서버 패치: ${targetName}`);
       setLoadingGroups({ world_zones: true });
 
-      if (dongId) {
-        setZoneData({ zones: {}, categories: {} });
-      }
+      // [Fix] 동 전환 시 데이터를 비우지 않고 교체하여 깜빡임 방지
+      // if (dongId) {
+      //   setZoneData({ zones: {}, categories: {} });
+      // }
 
       try {
         const response = dongId
@@ -375,7 +384,7 @@ const ZoneOverlay = ({
         setZoneDataStrict(data);
         zoneCache.current.set(cacheKey, data);
 
-        const browserCache = await caches.open('zone-data-v13');
+        const browserCache = await caches.open('zone-data-v16');
         browserCache.put(cacheKey, new Response(JSON.stringify(data)));
         console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 로드 완료: ${targetName}`);
       } catch (err) {
@@ -471,23 +480,22 @@ const ZoneOverlay = ({
     // 라인 카테고리 (도로) - heightmap 전달로 지형 추종
     for (const cat of ['road_major', 'road_minor']) {
       const lines = (zones[cat] || []).filter(f => f.type === 'line');
-      const width = cat === 'road_major' ? roadWidthMajor : roadWidthMinor;
-      const lineGeo = lines.length > 0
-        ? buildZoneLineGeometry(lines, width, heightmap, heightScale)
-        : null;
-      if (lineGeo) {
-        geos[cat] = { type: 'line', geometry: lineGeo };
+      if (lines.length > 0) {
+        geos[cat] = {
+          type: 'line',
+          geometry: buildZoneLineGeometry(lines, roadWidthMajor, roadWidthMid, roadWidthMinor, heightmap, heightScale)
+        };
       }
     }
 
     // 수계(강) 라인도 지형 추종
     const waterLines = (zones.water || []).filter(f => f.type === 'line');
     if (waterLines.length > 0) {
-      geos['water_line'] = { type: 'line', geometry: buildZoneLineGeometry(waterLines, 30, heightmap, heightScale) };
+      geos['water_line'] = { type: 'line', geometry: buildZoneLineGeometry(waterLines, 30, 15, 5, heightmap, heightScale) };
     }
 
     return geos;
-  }, [zoneData, heightmap, roadWidthMajor, roadWidthMinor]); // 도로 너비 변경 시에도 재빌드
+  }, [zoneData, heightmap, roadWidthMajor, roadWidthMid, roadWidthMinor]); // 도로 너비 변경 시에도 재빌드
 
   if (!visible || !zoneData) return null;
 
