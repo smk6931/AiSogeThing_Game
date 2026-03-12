@@ -288,7 +288,7 @@ const calcDistrictBbox = (coords) => {
 const ZoneOverlay = ({
   playerPos, currentDistrict = null, dongId = null, currentDong = null,
   elevation = 0.05, heightScale = 1.0, onZoneLoaded, visible = true, enabledZones = {},
-  zoneRadius = 2500
+  zoneRadius = 2500, roadWidthMajor = 25, roadWidthMinor = 12
 }) => {
   const [zoneData, setZoneData] = useState({ zones: {}, categories: {} });
   const [loadingGroups, setLoadingGroups] = useState({});
@@ -470,8 +470,9 @@ const ZoneOverlay = ({
     // 라인 카테고리 (도로) - heightmap 전달로 지형 추종
     for (const cat of ['road_major', 'road_minor']) {
       const lines = (zones[cat] || []).filter(f => f.type === 'line');
+      const width = cat === 'road_major' ? roadWidthMajor : roadWidthMinor;
       const lineGeo = lines.length > 0
-        ? buildZoneLineGeometry(lines, cat === 'road_major' ? 25 : 12, heightmap, heightScale)
+        ? buildZoneLineGeometry(lines, width, heightmap, heightScale)
         : null;
       if (lineGeo) {
         geos[cat] = { type: 'line', geometry: lineGeo };
@@ -485,7 +486,7 @@ const ZoneOverlay = ({
     }
 
     return geos;
-  }, [zoneData, heightmap]); // heightmap 로드 시 자동 재빌드
+  }, [zoneData, heightmap, roadWidthMajor, roadWidthMinor]); // 도로 너비 변경 시에도 재빌드
 
   if (!visible || !zoneData) return null;
 

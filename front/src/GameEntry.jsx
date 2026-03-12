@@ -209,7 +209,10 @@ const GameEntry = () => {
         <div style={{ fontSize: '10px', opacity: 0.8, fontWeight: 'bold', letterSpacing: '1px' }}>MOVE SPEED</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
           <button
-            onClick={() => setMoveSpeed(prev => Math.max(5, prev - 5))}
+            onClick={() => setMoveSpeed(prev => {
+              if (prev <= 5) return Math.max(1, prev - 1);
+              return Math.max(5, prev - 5);
+            })}
             style={{
               flex: 1, height: '32px', background: 'rgba(255,255,255,0.1)', border: 'none',
               color: 'white', fontSize: '16px', borderRadius: '8px', cursor: 'pointer',
@@ -226,7 +229,10 @@ const GameEntry = () => {
             {moveSpeed.toFixed(0)}
           </div>
           <button
-            onClick={() => setMoveSpeed(prev => Math.min(50, prev + 5))}
+            onClick={() => setMoveSpeed(prev => {
+              if (prev < 5) return prev + 1;
+              return Math.min(50, prev + 5);
+            })}
             style={{
               flex: 1, height: '32px', background: 'rgba(255,255,255,0.1)', border: 'none',
               color: 'white', fontSize: '16px', borderRadius: '8px', cursor: 'pointer',
@@ -250,6 +256,10 @@ const GameEntry = () => {
         showGroundMesh={showGroundMesh} setShowGroundMesh={setShowGroundMesh}
         showDistrictBoundaries={showDistrictBoundaries} setShowDistrictBoundaries={setShowDistrictBoundaries}
         cameraMode={cameraMode} setCameraMode={setCameraMode}
+        onPlayView={() => {
+          setZoomLevel(18.5); // 캐릭터가 크게 보이도록 줌인
+          setCameraMode('isometric');
+        }}
       />
 
       {/* ================= Joystick ================= */}

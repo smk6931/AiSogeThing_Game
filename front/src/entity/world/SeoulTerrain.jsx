@@ -70,15 +70,16 @@ function buildPolygonGeometry(features, maskArea = null) {
 }
 
 // 라인 생성
-function buildLineGeometry(features, maskArea = null) {
+function buildLineGeometry(features, roadWidthMajor = 40, roadWidthMinor = 25, maskArea = null) {
   const geos = [];
 
   for (const f of features) {
     const coords = f.coords;
     if (!coords || coords.length < 2) continue;
 
-    const baseW = (f.highway === 'motorway' || f.highway === 'trunk') ? 40 : 25;
-    const halfW = (f.width || baseW) / 2;
+    const isMajor = (f.highway === 'motorway' || f.highway === 'trunk' || f.highway === 'primary');
+    const width = isMajor ? roadWidthMajor : roadWidthMinor;
+    const halfW = width / 2;
 
     for (let i = 0; i < coords.length - 1; i++) {
       const p1 = gpsToGame(coords[i][0], coords[i][1]);
@@ -183,7 +184,8 @@ const TerrainMask = ({ maskArea, elevation }) => {
 const SeoulTerrain = ({
   visible = true, showRoads = true, showNature = true, roadTextureUrl = null,
   districtId = null, dongId = null, currentDistrict = null, currentDong = null,
-  elevation = 0, shiftX = -450, shiftZ = 320
+  elevation = 0, shiftX = -450, shiftZ = 320,
+  roadWidthMajor = 40, roadWidthMinor = 25
 }) => {
   const [data, setData] = useState(null);
   const [geos, setGeos] = useState(null);
@@ -226,13 +228,13 @@ const SeoulTerrain = ({
         grass: buildPolygonGeometry(grass.filter(f => f.type === 'polygon'), maskArea),
         forest: buildPolygonGeometry(forest.filter(f => f.type === 'polygon'), maskArea),
         waterPoly: buildPolygonGeometry(water.filter(f => f.type === 'polygon'), maskArea),
-        waterLine: buildLineGeometry(water.filter(f => f.type === 'line'), maskArea),
-        roadFeatures: buildLineGeometry(roadFeatures, maskArea),
+        waterLine: buildLineGeometry(water.filter(f => f.type === 'line'), 30, 30, maskArea),
+        roadFeatures: buildLineGeometry(roadFeatures, roadWidthMajor, roadWidthMinor, maskArea),
         shiftX: 0, shiftZ: 0
       });
     };
     build();
-  }, [data, shiftX, shiftZ, currentDistrict, currentDong]);
+  }, [data, shiftX, shiftZ, currentDistrict, currentDong, roadWidthMajor, roadWidthMinor]);
 
   if (!visible || !geos) return null;
 

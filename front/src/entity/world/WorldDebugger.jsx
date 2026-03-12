@@ -54,6 +54,8 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
     // 5. OSM 데이터 설정
     const osmFolder = gui.addFolder('OSM Data (Zones)').close();
     osmFolder.add(config, 'zoneFetchRadius', 500, 10000).step(100).name('OSM 패치 반경 (m)').onFinishChange(onUpdate).listen();
+    osmFolder.add(config, 'roadWidthMajor', 1, 100).step(1).name('주요도로 너비 (m)').onChange(onUpdate).listen();
+    osmFolder.add(config, 'roadWidthMinor', 1, 50).step(1).name('일반도로 너비 (m)').onChange(onUpdate).listen();
 
     // 6. 카메라 설정 (공통 + 쿼터뷰)
     const camFolder = gui.addFolder('Camera Settings').close();

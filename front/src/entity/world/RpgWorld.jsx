@@ -152,7 +152,7 @@ const RpgWorld = ({
 
 
     // 캐릭터
-    playerScale: 0.55,
+    playerScale: 0.8,
 
     // 카메라 (공통 및 쿼터뷰)
     isOrthographic: true, // 기본 무원근(투시도 제거)
@@ -179,8 +179,10 @@ const RpgWorld = ({
       scale: [1, 1, 1]
     },
 
-    // OSM 구역 패치 반경
-    zoneFetchRadius: 2500
+    // OSM 구역 패치 반경 및 도로 너비
+    zoneFetchRadius: 2500,
+    roadWidthMajor: 25,
+    roadWidthMinor: 12
   });
 
   const [controlMode, setControlMode] = useState('translate');
@@ -384,6 +386,8 @@ const RpgWorld = ({
         showNature={showSeoulNature}
         dongId={currentDongId}
         currentDong={currentDong}
+        roadWidthMajor={debugConfig.roadWidthMajor}
+        roadWidthMinor={debugConfig.roadWidthMinor}
         elevation={0.05} // 지면보다 살짝 위
         shiftZ={0}
       />
@@ -404,6 +408,8 @@ const RpgWorld = ({
         elevation={debugConfig.mapElevation + 0.1}
         heightScale={debugConfig.terrainHeightScale}
         zoneRadius={debugConfig.zoneFetchRadius}
+        roadWidthMajor={debugConfig.roadWidthMajor}
+        roadWidthMinor={debugConfig.roadWidthMinor}
         enabledZones={{
           water: showSeoulNature,
           park: showSeoulNature,

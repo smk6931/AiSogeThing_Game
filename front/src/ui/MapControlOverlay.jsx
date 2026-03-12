@@ -58,7 +58,7 @@ const MapControlOverlay = ({
   landuseFilters, setLanduseFilters,
   showGroundMesh, setShowGroundMesh,
   showDistrictBoundaries, setShowDistrictBoundaries,
-  cameraMode, setCameraMode,
+  cameraMode, setCameraMode, onPlayView
   // showHeightMap, setShowHeightMap 은 UI에서 제거 (코드 보존)
 }) => {
   const [isLandusePanelOpen, setIsLandusePanelOpen] = React.useState(false);
@@ -231,6 +231,15 @@ const MapControlOverlay = ({
       >
         <span style={{ fontSize: '13px' }}>🎥</span>
         <span>{cameraMode === 'isometric' ? '쿼터뷰' : '360도'}</span>
+      </button>
+
+      {/* 뷰티샷/플레이 뷰 버튼 */}
+      <button
+        onClick={onPlayView}
+        style={getBtnStyle(true, 'rgba(212, 175, 55, 0.6)')}
+      >
+        <span style={{ fontSize: '13px' }}>🎮</span>
+        <span>플레이 뷰</span>
       </button>
     </div>
   );
