@@ -15,27 +15,7 @@ const Player = forwardRef(({ input, actions, onMove, onAction, chat, zoomLevel, 
   return (
     <group ref={ref} {...props}>
 
-      {/* ===== 닉네임 표시 ===== */}
-      <Html position={[0, 4.2, 0]} center>
-        <div style={{
-          background: 'rgba(8, 8, 18, 0.85)',
-          border: '1px solid rgba(180, 140, 60, 0.6)',
-          color: '#c8a84b',
-          padding: '3px 10px',
-          borderRadius: '6px',
-          fontSize: '12px',
-          fontFamily: "'Cinzel', sans-serif",
-          fontWeight: '600',
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-          letterSpacing: '0.8px',
-          textShadow: '0 0 6px rgba(200, 168, 75, 0.6)',
-          backdropFilter: 'blur(4px)',
-          boxShadow: '0 0 10px rgba(200, 168, 75, 0.15)',
-        }}>
-          {nickname || 'Hero'}
-        </div>
-      </Html>
+      {/* 캐릭터 본인의 닉네임은 좌상단 스탯창(HUD)에 표시되므로 월드에서는 숨깁니다. */}
 
       {/* ===== 신체 그룹 (발바닥 피벗 기준) ===== */}
       <group position={[0, 0, 0]}>

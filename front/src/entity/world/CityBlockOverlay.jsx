@@ -119,14 +119,26 @@ const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0
       'military', 'religious', 'sports', 'cemetery', 'transport', 'port', 'water'
     ];
 
+    // 텍스처 매핑 테이블 (용도별 분위기 고정)
+    const catToIdx = {
+      residential: [0, 4, 8, 12], // 따뜻한/주형 느낌
+      commercial: [1, 5, 9, 13],  // 화려한/사이버펑크 느낌
+      industrial: [2, 6, 10],     // 기계적/어두운 느낌
+      park: [14], forest: [14],    // 숲/자연
+      water: [14],                // 수계 (텍스처로 대체 가능)
+      parking: [11], medical: [7], institutional: [3]
+    };
+
     blockCats.forEach(cat => {
       const features = zoneData.zones[cat] || [];
+      const idxList = catToIdx[cat] || [idx % BLOCK_IMAGES.length];
+
       features.forEach((f, idx) => {
         if (f.type === 'polygon' && f.coords?.length >= 3) {
           const geo = buildTerrainBlock(f.coords);
           if (geo) {
-            const hash = (cat.charCodeAt(0) * 13 + cat.length * 17 + idx * 7) % BLOCK_IMAGES.length;
-            ob.push({ geo, texIdx: hash });
+            const texIdx = idxList[idx % idxList.length];
+            ob.push({ geo, texIdx });
           }
         }
       });
@@ -157,12 +169,14 @@ const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0
             <meshStandardMaterial
               map={textures[b.texIdx]}
               transparent
-              opacity={0.7}
+              opacity={0.88} // 더 선명하게 (빈틈 가 가려지도록)
               stencilWrite={true}
               stencilRef={1}
               stencilFunc={THREE.EqualStencilFunc}
               side={THREE.DoubleSide}
               depthWrite={false}
+              roughness={0.7}
+              metalness={0.2}
             />
           </mesh>
         ))}

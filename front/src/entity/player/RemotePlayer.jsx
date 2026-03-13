@@ -58,9 +58,9 @@ const RemotePlayer = ({ position, rotation, animation, nickname, chat, scale = 1
         <div style={{
           background: 'rgba(0, 0, 0, 0.6)',
           color: 'white',
-          padding: '2px 8px',
+          padding: '2px 6px',
           borderRadius: '4px',
-          fontSize: '12px',
+          fontSize: '10px',
           whiteSpace: 'nowrap'
         }}>
           {nickname}
@@ -69,13 +69,13 @@ const RemotePlayer = ({ position, rotation, animation, nickname, chat, scale = 1
 
       {/* 말풍선 */}
       {showChat && (
-        <Html position={[0, 4.0, 0]} center>
+        <Html position={[0, 3.8, 0]} center>
           <div style={{
             background: 'white',
             color: 'black',
-            padding: '8px 12px',
-            borderRadius: '12px',
-            fontSize: '14px',
+            padding: '6px 10px',
+            borderRadius: '10px',
+            fontSize: '12px',
             fontWeight: 'bold',
             whiteSpace: 'nowrap',
             border: '2px solid #333',

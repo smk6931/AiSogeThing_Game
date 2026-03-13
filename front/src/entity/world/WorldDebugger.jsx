@@ -49,7 +49,8 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
 
     // 4. 캐릭터 설정
     const playerFolder = gui.addFolder('Character').close();
-    playerFolder.add(config, 'playerScale', 0.1, 10).step(0.05).name('Scale').onChange(onUpdate).listen();
+    playerFolder.add(config, 'playerHeightMeters', 1, 30).step(0.1).name('Height (m)').onChange(onUpdate).listen();
+    playerFolder.add(config, 'playerScale', 0.1, 10).step(0.01).name('Internal Scale (Ref)').disable().listen();
 
     // 5. OSM 데이터 설정
     const osmFolder = gui.addFolder('OSM Data (Zones)').close();

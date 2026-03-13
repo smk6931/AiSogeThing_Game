@@ -15,13 +15,13 @@ const PlayerChat = ({ chat }) => {
   if (!showChat) return null;
 
   return (
-    <Html position={[0, 4.0, 0]} center>
+    <Html position={[0, 4.4, 0]} center>
       <div style={{
         background: 'white',
         color: 'black',
-        padding: '8px 12px',
-        borderRadius: '12px',
-        fontSize: '14px',
+        padding: '6px 10px',
+        borderRadius: '10px',
+        fontSize: '12px',
         fontWeight: 'bold',
         whiteSpace: 'nowrap',
         border: '2px solid #333',

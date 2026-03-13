@@ -151,8 +151,9 @@ const RpgWorld = ({
     hdriUrl: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/industrial_sunset_02_1k.hdr',
 
 
-    // 캐릭터
-    playerScale: 0.8,
+    // 캐릭터 (기본 모델 높이 약 3.2m 기준)
+    playerHeightMeters: 2.0,
+    playerScale: 0.625, // playerHeightMeters / 3.2
 
     // 카메라 (공통 및 쿼터뷰)
     isOrthographic: true, // 기본 무원근(투시도 제거)
@@ -181,9 +182,9 @@ const RpgWorld = ({
 
     // OSM 구역 패치 반경 및 도로 너비
     zoneFetchRadius: 2500,
-    roadWidthMajor: 20,
-    roadWidthMid: 10,
-    roadWidthMinor: 5
+    roadWidthMajor: 24, // 조금 더 넓혀서 빈틈 방지
+    roadWidthMid: 12,
+    roadWidthMinor: 8
   });
 
   const [controlMode, setControlMode] = useState('translate');
@@ -201,7 +202,12 @@ const RpgWorld = ({
 
   // 특정 파라미터 업데이트 시 리렌더링 강제용 (lil-gui 연동)
   const [, setTick] = useState(0);
-  const updateVisuals = () => setTick(t => t + 1);
+  const updateVisuals = () => {
+    // Height(m)가 변경되면 Scale 자동 계산
+    const BASE_H = 3.2;
+    debugConfig.playerScale = debugConfig.playerHeightMeters / BASE_H;
+    setTick(t => t + 1);
+  };
 
   // [Zone Painting] ZoneOverlay에서 로드된 데이터를 SeoulHeightMap과 공유
   const [sharedZoneData, setSharedZoneData] = useState(null);
@@ -484,7 +490,7 @@ const RpgWorld = ({
             rotation={data.rotation}
             nickname={data.nickname || 'Unknown'}
             chat={latestChatMap[id]}
-            scale={0.55}
+            scale={debugConfig.playerScale}
           />
         ))}
 
@@ -533,7 +539,7 @@ const RpgWorld = ({
             maxHp={m.maxHp}
             state={m.state}
             textureUrl={targetTexture}
-            scale={0.55}
+            scale={debugConfig.playerScale}
           />
         );
       })}
@@ -576,7 +582,7 @@ const RpgWorld = ({
           remove={handleRemoveProjectile}
           onUpdatePosition={(pos) => handleProjectileUpdate(p.id, pos)}
           add={addProjectile}
-          scale={0.55}
+          scale={debugConfig.playerScale}
           {...p}
         />
       ))}

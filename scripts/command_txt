@@ -6,7 +6,7 @@
 
 ./scripts/deploy_server.ps1
 
-.\venv\Scripts\activate; python -m uvicorn main:app --reload --port 8100
+.\venv\Scripts\activate python -m uvicorn main:app --reload --port 8100
 
 [1단계] SSH 터널링 설정 (PowerShell)
 

@@ -22,31 +22,37 @@ const gpsToGame = (lat, lng) => ({
 // ==============================================
 let _groundTexture = null;
 
-const getGroundTexture = (repeat = 200) => {
+const getGroundTexture = (repeat = 1000) => {
   if (!_groundTexture) {
-    const size = 256;
+    const size = 512;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
 
-    // 기본 토양/잔디 색상
-    ctx.fillStyle = '#5a7a3a';
+    // 1. 기본 아스팔트/콘크리트 색상
+    ctx.fillStyle = '#444444';
     ctx.fillRect(0, 0, size, size);
 
-    // 잔디 풀잎 디테일
-    for (let i = 0; i < 1200; i++) {
-      const shade = Math.random() * 0.15;
-      ctx.fillStyle = `rgba(${70 + Math.random() * 30}, ${100 + Math.random() * 40}, ${40 + Math.random() * 20}, ${0.3 + shade})`;
-      const x = Math.random() * size;
-      const y = Math.random() * size;
-      ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 3);
+    // 2. 미세한 노이즈 (거친 표면 질감)
+    for (let i = 0; i < 2000; i++) {
+      const shade = Math.random() * 20;
+      ctx.fillStyle = `rgb(${60 + shade}, ${60 + shade}, ${60 + shade})`;
+      ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
     }
 
-    // 약간의 흙 디테일
-    for (let i = 0; i < 300; i++) {
-      ctx.fillStyle = `rgba(120, 90, 50, ${Math.random() * 0.1})`;
-      ctx.fillRect(Math.random() * size, Math.random() * size, 3, 3);
+    // 3. 보도블록/도로 크랙 느낌 (아주 얇은 선들)
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 30; i++) {
+        ctx.beginPath();
+        ctx.moveTo(Math.random() * size, 0);
+        ctx.lineTo(Math.random() * size, size);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, Math.random() * size);
+        ctx.lineTo(size, Math.random() * size);
+        ctx.stroke();
     }
 
     _groundTexture = new THREE.CanvasTexture(canvas);
