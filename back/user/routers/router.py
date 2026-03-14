@@ -64,26 +64,32 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
 @router.post("/guest-login", response_model=schemas.Token)
 async def guest_login():
     """
-    DB가 없거나 꺼져 있는 상태에서도 무조건 통과하는 강제 게스트(Admin) 접속
-    (DB 인증 없이 바로 Fake Token 발급)
+    DB 인증 없이 매번 고유한 ID를 부여하여 여러 게스트가 서로를 볼 수 있게 함
     """
-    guest_email = "admin@guest.com"
-    fake_user_id = 9999
-    fake_nickname = "AdminGuest"
+    import random
+    import string
     
-    # 토큰 발급 (auth 모듈 사용하여 정상 토큰 형식 유지)
+    # 1. 고유 ID 생성 (50000~99999 사이 랜덤)
+    unique_id = random.randint(50000, 99999)
+    # 2. 랜덤 닉네임 생성 (Guest_XXXX)
+    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    unique_nickname = f"Guest_{suffix}"
+    guest_email = f"{unique_nickname}@guest.com"
+    
+    # 토큰 발급
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": guest_email, "uid": fake_user_id},
+        data={"sub": guest_email, "uid": unique_id},
         expires_delta=access_token_expires
     )
     
     return {
         "access_token": access_token, 
         "token_type": "bearer",
-        "user_id": fake_user_id,
-        "nickname": fake_nickname
+        "user_id": unique_id,
+        "nickname": unique_nickname
     }
+
 
 # ========================================================
 #  내 정보 조회 API (토큰 검증)
