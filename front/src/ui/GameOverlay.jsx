@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import LeafletMapBackground from './LeafletMapBackground';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M, getAllMaps } from '@entity/world/mapConfig';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
+import { useSeoulDongs } from '@hooks/useSeoulDongs';
 
 // =============================
 // 공통 가이드 & 유틸리티
@@ -37,8 +38,12 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
   const [showZoneTitle, setShowZoneTitle] = useState(false);
   const lastDistrictRef = useRef('');
 
-  // 서울 구 경계 데이터 로드 (최초 1회, 30일 로컬 캐시)
+  // 서울 구/동 경계 데이터 로드
   const { districts, getDistrictAt } = useSeoulDistricts();
+  const { dongs, getDongAt } = useSeoulDongs();
+
+  const [currentDong, setCurrentDong] = useState(null);
+  const lastDongRef = useRef('');
 
   // 실시간 GPS 및 구역 추적 (성능 최적화를 위해 500ms 주기로 샘플링)
   useEffect(() => {
@@ -51,15 +56,24 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
         // 1. GPS 위치 업데이트 (지도의 중심)
         setGpsCoords({ lat, lng });
 
-        // 2. 실제 서울 구 경계 폴리곤 기반 판별
+        // 2. 실제 서울 구/동 경계 폴리곤 기반 판별
         if (getDistrictAt) {
-          const found = getDistrictAt(lat, lng);
-          const distName = found ? found.name : null;
+          const foundDist = getDistrictAt(lat, lng);
+          const distName = foundDist ? foundDist.name : null;
           if (distName && distName !== lastDistrictRef.current) {
-            setCurrentDistrict(found);
+            setCurrentDistrict(foundDist);
             lastDistrictRef.current = distName;
             setShowZoneTitle(true);
             setTimeout(() => setShowZoneTitle(false), 3000);
+          }
+        }
+
+        if (getDongAt) {
+          const foundDong = getDongAt(lat, lng);
+          const dongName = foundDong ? foundDong.name : null;
+          if (dongName && dongName !== lastDongRef.current) {
+            setCurrentDong(foundDong);
+            lastDongRef.current = dongName;
           }
         }
       }
@@ -209,9 +223,12 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
                 playerPositionRef={myPositionRef}
                 zoomLevel={mapZoom}
                 districts={districts}
+                dongs={dongs}
                 currentDistrictId={currentDistrict?.id || null}
+                currentDongId={currentDong?.id || null}
               />
             </div>
+
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '8px', height: '8px', background: '#4ade80', borderRadius: '50%', boxShadow: '0 0 10px #4ade80', zIndex: 10 }} />
             <div style={{ position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)', fontSize: '10px', color: '#fff', background: 'rgba(0,0,0,0.6)', padding: '2px 8px', borderRadius: '10px', zIndex: 11 }}>
               <Users size={10} color={GOLD} /> {onlineCount}
@@ -229,12 +246,15 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
                 playerPositionRef={myPositionRef}
                 zoomLevel={mapZoom + 1}
                 districts={districts}
+                dongs={dongs}
                 currentDistrictId={currentDistrict?.id || null}
+                currentDongId={currentDong?.id || null}
                 interactive={true}
                 showSeoulMask={true}
                 onZoomChange={(newZoom) => setMapZoom(newZoom - 1)}
               />
             </div>
+
             <div style={{ position: 'absolute', top: '16px', right: '16px', color: '#ff4444', fontSize: '24px', cursor: 'pointer', zIndex: 10 }} onClick={() => setIsMapExpanded(false)}>✕</div>
             <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(0,0,0,0.8)', padding: '10px', borderRadius: '8px', color: '#4ade80', zIndex: 10 }}>
               <div style={{ fontSize: '10px', color: '#aaa' }}>GPS TRACKING</div>
