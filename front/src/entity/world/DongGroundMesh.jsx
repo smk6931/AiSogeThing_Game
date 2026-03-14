@@ -126,15 +126,18 @@ const DongGroundMesh = ({
       geometry={geometry}
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, elevation, 0]}
-      renderOrder={-1}
+      renderOrder={-10} // 모든 레이어 중 가장 밑바닥
       receiveShadow
     >
       <meshStandardMaterial
         map={texture}
-        color="#8ca86a"
-        roughness={0.95}
+        color="#7ca05a" // 약간 더 차분한 톤으로 변경
+        transparent={true}
+        opacity={0.6} // 베이스이므로 너무 튀지 않게
+        roughness={1.0}
         metalness={0.0}
         side={THREE.DoubleSide}
+        depthWrite={false}
       />
     </mesh>
   );

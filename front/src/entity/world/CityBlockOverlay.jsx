@@ -164,12 +164,13 @@ const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0
       <DongMask currentDong={currentDong} elevation={elevation + 0.01} />
 
       <group position={[0, elevation, 0]}>
+        {/* 1. 용도구역 기반 오리지널 블록 */}
         {originalBlocks.map((b, i) => (
           <mesh key={`ob-${i}`} geometry={b.geo} renderOrder={4}>
             <meshStandardMaterial
               map={textures[b.texIdx]}
               transparent
-              opacity={0.88} // 더 선명하게 (빈틈 가 가려지도록)
+              opacity={0.88}
               stencilWrite={true}
               stencilRef={1}
               stencilFunc={THREE.EqualStencilFunc}
@@ -177,6 +178,25 @@ const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0
               depthWrite={false}
               roughness={0.7}
               metalness={0.2}
+            />
+          </mesh>
+        ))}
+
+        {/* 2. 도로망으로 쪼개진 섹터 블록 (빈틈 메우기용) */}
+        {sectorBlocks.map((b, i) => (
+          <mesh key={`sb-${i}`} geometry={b.geo} renderOrder={3}>
+            <meshStandardMaterial
+              map={textures[b.texIdx]}
+              color="#d8d8d8" // 살짝 톤다운하여 기본 지형 느낌 강조
+              transparent
+              opacity={0.8}
+              stencilWrite={true}
+              stencilRef={1}
+              stencilFunc={THREE.EqualStencilFunc}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+              roughness={0.8}
+              metalness={0.1}
             />
           </mesh>
         ))}
