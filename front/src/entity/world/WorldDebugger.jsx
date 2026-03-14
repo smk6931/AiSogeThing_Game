@@ -66,11 +66,11 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
     const isoSub = camFolder.addFolder('Isometric Details');
     isoSub.add(config, 'camIsoPitch', 0, 90).step(1).name('Pitch (수직)').onChange(onUpdate).listen();
     isoSub.add(config, 'camIsoAzimuth', -180, 180).step(1).name('Azimuth (수평)').onChange(onUpdate).listen();
-    isoSub.add(config, 'camIsoDistMult', 5, 2000).step(1).name('Dist Mult').onChange(onUpdate).listen();
+    isoSub.add(config, 'camIsoDistMult', 1, 2000).step(1).name('Dist Mult').onChange(onUpdate).listen();
 
     const playSub = camFolder.addFolder('Play Mode Details');
     playSub.add(config, 'playCamPitch', 0, 90).step(1).name('Pitch (수직)').onChange(onUpdate).listen();
-    playSub.add(config, 'playCamDistMult', 5, 1000).step(1).name('Dist Mult').onChange(onUpdate).listen();
+    playSub.add(config, 'playCamDistMult', 1, 1000).step(1).name('Dist Mult').onChange(onUpdate).listen();
 
 
     // 6. 배치 모드 설정
@@ -88,7 +88,11 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
       saveConfig: () => {
         console.log('=== Saved World Configuration ===');
         console.log(JSON.stringify(config, null, 2));
-        alert('현재 모든 설정값이 브라우저 콘솔(F12)에 저장되었습니다!');
+        
+        // 브라우저 로컬 저장소에 반영구적 저장
+        localStorage.setItem('world_debug_config', JSON.stringify(config));
+        
+        alert('모든 설정값이 브라우저 저장소(localStorage)에 저장되었습니다! 이제 새로고침해도 유지됩니다.');
       },
       toggleAll: () => {
         const folders = gui.folders;

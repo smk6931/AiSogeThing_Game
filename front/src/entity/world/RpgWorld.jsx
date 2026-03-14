@@ -74,6 +74,7 @@ const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => 
         const dist = state.camera.isOrthographicCamera ? 10000 : isoDistMult * Math.pow(2, 16.5 - zoomLevel);
         const pitch = ((debugConfig?.camIsoPitch || 25) * Math.PI) / 180;
 
+        // 무원근 모드일 때 캐릭터 크기 조절 (줌 연동)
         if (state.camera.isOrthographicCamera) {
           state.camera.zoom = 50 / isoDistMult; 
           state.camera.updateProjectionMatrix();
@@ -83,13 +84,12 @@ const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => 
         cz = targetPos.z + dist * Math.sin(pitch);
         baseHeight = dist * Math.cos(pitch);
       } else {
-        // [개선] 플레이 뷰(Play View) 설정 적용
+        // 플레이 뷰(Play View) 설정 실시간 적용
         const playDistMult = debugConfig?.playCamDistMult || 20;
         const playPitch = ((debugConfig?.playCamPitch || 60) * Math.PI) / 180;
         
-        const dist = state.camera.isOrthographicCamera
-          ? 10000
-          : playDistMult * Math.pow(2, 16.5 - zoomLevel);
+        const dist = state.camera.isOrthographicCamera ? 10000 : playDistMult * Math.pow(2, 16.5 - zoomLevel);
+
 
         if (state.camera.isOrthographicCamera) {
           state.camera.zoom = 50 / playDistMult;
@@ -156,53 +156,65 @@ const RpgWorld = ({
   orbitRef,
   cameraMode
 }) => {
-  const [debugConfig, setDebugConfig] = useState({
-    // 환경
-    fogNear: 10,
-    fogFar: 800,
-    fogColor: '#88ccee',
-    ambientIntensity: 0.4,
-    hdriUrl: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/industrial_sunset_02_1k.hdr',
+  const [debugConfig, setDebugConfig] = useState(() => {
+    // 1. 브라우저 저장소(localStorage)에서 기존 설정 불러오기 프리뷰
+    const saved = localStorage.getItem('world_debug_config');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved world config', e);
+      }
+    }
 
+    // 2. 저장된 설정이 없을 때의 기본값
+    return {
+      // 환경
+      fogNear: 10,
+      fogFar: 800,
+      fogColor: '#88ccee',
+      ambientIntensity: 0.4,
+      hdriUrl: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/industrial_sunset_02_1k.hdr',
 
-    // 캐릭터 (기본 모델 높이 약 3.2m 기준)
-    playerHeightMeters: 2.0,
-    playerScale: 0.625, // playerHeightMeters / 3.2
+      // 캐릭터 (기본 모델 높이 약 3.2m 기준)
+      playerHeightMeters: 2.0,
+      playerScale: 0.625,
 
-    // 카메라 (공통 및 쿼터뷰)
-    isOrthographic: true, // 기본 무원근(투시도 제거)
-    cameraFov: 45,
-    camIsoPitch: 25,
-    camIsoAzimuth: 0,
-    camIsoDistMult: 50,
+      // 카메라 (공통 및 쿼터뷰)
+      isOrthographic: true,
+      cameraFov: 45,
+      camIsoPitch: 25,
+      camIsoAzimuth: 0,
+      camIsoDistMult: 40, // 초기값 최적화
 
-    // 플레이 뷰 전용 설정
-    playCamPitch: 60,
-    playCamDistMult: 20, // 더 가깝게 (기본 30에서 축소)
+      // 플레이 뷰 전용 설정
+      playCamPitch: 60,
+      playCamDistMult: 20, 
 
-    // 지면
-    showBaseFloor: false,
-    floorColor: '#1a1a1a',
-    floorOpacity: 1,
-    showGrid: false,
-    terrainHeightScale: 1.0, // 1.0 = 실제 비율 (1 게임 유닛 = 1미터)
-    terrainBaseHeight: 0.0,
-    mapElevation: -0.2,
-    baseFloorElevation: -1.0,
-    gridElevation: 0.05,
+      // 지면
+      showBaseFloor: false,
+      floorColor: '#1a1a1a',
+      floorOpacity: 1,
+      showGrid: false,
+      terrainHeightScale: 1.0,
+      terrainBaseHeight: 0.0,
+      mapElevation: -0.2,
+      baseFloorElevation: -1.0,
+      gridElevation: 0.05,
 
-    // 오브젝트
-    objectState: {
-      position: [15, 0.1, 15],
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1]
-    },
+      // 오브젝트
+      objectState: {
+        position: [15, 0.1, 15],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1]
+      },
 
-    // OSM 구역 패치 반경 및 도로 너비
-    zoneFetchRadius: 2500,
-    roadWidthMajor: 24, // 조금 더 넓혀서 빈틈 방지
-    roadWidthMid: 12,
-    roadWidthMinor: 8
+      // OSM 구역 패치 반경 및 도로 너비
+      zoneFetchRadius: 2500,
+      roadWidthMajor: 24,
+      roadWidthMid: 12,
+      roadWidthMinor: 8
+    };
   });
 
   const [controlMode, setControlMode] = useState('translate');
