@@ -62,13 +62,24 @@
 
         window.loadModel = function() {
             const loader = new GLTFLoader();
-            loader.load('/models/trees/oak_tree.glb', (gltf) => {
+            loader.load('/models/glb_format/tree.glb', (gltf) => {
                 const model = gltf.scene;
                 model.scale.setScalar(0.5);
+                model.position.set(0, 0, 0);
                 scene.add(model);
-                console.log('✅ 모델 로드 완료');
-            }, undefined, (error) => {
+                console.log('✅ 나무 모델 로드 완료');
+                
+                // 성공 메시지 표시
+                const info = document.querySelector('.info');
+                info.innerHTML += '<p style="color: green;">✅ 나무 모델 로드 성공!</p>';
+            }, (progress) => {
+                console.log('로딩 진행:', (progress.loaded / progress.total * 100) + '%');
+            }, (error) => {
                 console.error('❌ 모델 로드 실패:', error);
+                
+                // 에러 메시지 표시
+                const info = document.querySelector('.info');
+                info.innerHTML += '<p style="color: red;">❌ 모델 로드 실패 - 파일 경로 확인</p>';
             });
         };
 

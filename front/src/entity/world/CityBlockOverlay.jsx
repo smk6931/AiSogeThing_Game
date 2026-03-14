@@ -129,9 +129,9 @@ const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0
       parking: [11], medical: [7], institutional: [3]
     };
 
-    blockCats.forEach(cat => {
+    blockCats.forEach((cat, catIdx) => {
       const features = zoneData.zones[cat] || [];
-      const idxList = catToIdx[cat] || [idx % BLOCK_IMAGES.length];
+      const idxList = catToIdx[cat] || [catIdx % BLOCK_IMAGES.length];
 
       features.forEach((f, idx) => {
         if (f.type === 'polygon' && f.coords?.length >= 3) {

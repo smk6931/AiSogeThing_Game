@@ -5,7 +5,8 @@ const client = axios.create({
   // PROD 환경이면 같은 도메인의 /api를 사용 (상대 경로), 아니면 환경변수/로컬 주소 사용
   baseURL: import.meta.env.PROD
     ? ''
-    : (import.meta.env.VITE_API_URL || 'http://localhost:8100'),
+    //  : (import.meta.env.VITE_API_URL || 'http://localhost:8100'),
+    : (import.meta.env.VITE_API_URL || ''),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
