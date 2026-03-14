@@ -70,22 +70,36 @@ const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => 
       }
 
       if (cameraMode === 'isometric') {
-        const dist = state.camera.isOrthographicCamera
-          ? 10000
-          : (debugConfig?.camIsoDistMult || 50) * Math.pow(2, 16.5 - zoomLevel);
-        const pitch = ((debugConfig?.camIsoPitch || 15) * Math.PI) / 180;
+        const isoDistMult = debugConfig?.camIsoDistMult || 50;
+        const dist = state.camera.isOrthographicCamera ? 10000 : isoDistMult * Math.pow(2, 16.5 - zoomLevel);
+        const pitch = ((debugConfig?.camIsoPitch || 25) * Math.PI) / 180;
+
+        if (state.camera.isOrthographicCamera) {
+          state.camera.zoom = 50 / isoDistMult; 
+          state.camera.updateProjectionMatrix();
+        }
 
         cx = targetPos.x;
         cz = targetPos.z + dist * Math.sin(pitch);
         baseHeight = dist * Math.cos(pitch);
       } else {
+        // [개선] 플레이 뷰(Play View) 설정 적용
+        const playDistMult = debugConfig?.playCamDistMult || 20;
+        const playPitch = ((debugConfig?.playCamPitch || 60) * Math.PI) / 180;
+        
         const dist = state.camera.isOrthographicCamera
           ? 10000
-          : 30 * Math.pow(2, 16.5 - zoomLevel);
-        const radius = dist * 0.45;
+          : playDistMult * Math.pow(2, 16.5 - zoomLevel);
+
+        if (state.camera.isOrthographicCamera) {
+          state.camera.zoom = 50 / playDistMult;
+          state.camera.updateProjectionMatrix();
+        }
+
+        const radius = dist * Math.cos(playPitch);
         cx = targetPos.x;
         cz = targetPos.z + radius;
-        baseHeight = dist * 0.8;
+        baseHeight = dist * Math.sin(playPitch);
       }
 
       state.camera.position.set(cx, targetPos.y + baseHeight, cz);
@@ -157,10 +171,14 @@ const RpgWorld = ({
 
     // 카메라 (공통 및 쿼터뷰)
     isOrthographic: true, // 기본 무원근(투시도 제거)
-    cameraFov: 15, // Perspective 모드일 때 사용
-    camIsoPitch: 15,
+    cameraFov: 45,
+    camIsoPitch: 25,
     camIsoAzimuth: 0,
     camIsoDistMult: 50,
+
+    // 플레이 뷰 전용 설정
+    playCamPitch: 60,
+    playCamDistMult: 20, // 더 가깝게 (기본 30에서 축소)
 
     // 지면
     showBaseFloor: false,

@@ -68,6 +68,11 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
     isoSub.add(config, 'camIsoAzimuth', -180, 180).step(1).name('Azimuth (수평)').onChange(onUpdate).listen();
     isoSub.add(config, 'camIsoDistMult', 5, 2000).step(1).name('Dist Mult').onChange(onUpdate).listen();
 
+    const playSub = camFolder.addFolder('Play Mode Details');
+    playSub.add(config, 'playCamPitch', 0, 90).step(1).name('Pitch (수직)').onChange(onUpdate).listen();
+    playSub.add(config, 'playCamDistMult', 5, 1000).step(1).name('Dist Mult').onChange(onUpdate).listen();
+
+
     // 6. 배치 모드 설정
     const transformFolder = gui.addFolder('Object Editor').close();
     if (controls) {
