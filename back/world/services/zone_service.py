@@ -171,8 +171,16 @@ def _generate_sector_blocks(zones, area_poly_coords):
             if cat in ["road_major", "road_minor", "sectors"]: continue
             for f in features:
                 if f["type"] == "polygon" and len(f["coords"]) >= 3:
-                    p = Polygon(f["coords"])
-                    if p.is_valid: filled_polys.append(p)
+                    holes = f.get("holes") or []
+                    p = Polygon(f["coords"], holes)
+                    if not p.is_valid:
+                        p = p.buffer(0)
+                    if isinstance(p, Polygon) and p.is_valid:
+                        filled_polys.append(p)
+                    elif hasattr(p, 'geoms'):
+                        for geom in p.geoms:
+                            if isinstance(geom, Polygon) and geom.is_valid:
+                                filled_polys.append(geom)
         
         filled_union = unary_union(filled_polys) if filled_polys else None
 
@@ -201,9 +209,15 @@ def _generate_sector_blocks(zones, area_poly_coords):
             for p in final_polys:
                 if p.area > 0.00000001: # 약 1제곱미터 이상의 의미 있는 조각만 수용
                     coords = [[lat, lng] for lat, lng in p.exterior.coords]
+                    holes = [
+                        [[lat, lng] for lat, lng in interior.coords]
+                        for interior in p.interiors
+                        if len(interior.coords) >= 3
+                    ]
                     sector_features.append({
                         "type": "polygon",
                         "coords": coords,
+                        "holes": holes,
                         "tags": {"name": "Sector Plot"}
                     })
         return sector_features
@@ -218,7 +232,7 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None, distr
     area_type = "district" if district_id else ("dong" if dong_id else "point")
     area_id = district_id or dong_id or f"{lat:.3f}_{lng:.3f}"
     
-    cache_key = f"v19_{area_type}_{area_id}.json" # 버전업 (분류기 수정 + 섹터 차감 v19)
+    cache_key = f"v20_{area_type}_{area_id}.json" # 버전업 (hole 보존 + 차감 보정 v20)
     cache_path = os.path.join(CACHE_DIR, cache_key)
 
     if os.path.exists(cache_path):

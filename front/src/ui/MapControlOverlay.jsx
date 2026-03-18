@@ -41,11 +41,11 @@ const LANDUSE_LABELS = {
 // 토글 버튼 정의 (등고선 제거됨)
 const BUTTONS = [
   { key: 'showOsmMap', label: '지도', icon: '🗺', colorOn: 'rgba(30,80,160,0.7)' },
-  { key: 'showGroundMesh', label: '바닥 채우기', icon: '🎨', colorOn: 'rgba(50,150,50,0.7)' },
+  { key: 'showGroundMesh', label: '바닥', icon: '🎨', colorOn: 'rgba(50,150,50,0.7)' },
   { key: 'showSeoulRoads', label: '도로', icon: '🛣', colorOn: 'rgba(255,100,0,0.7)' },
   { key: 'showSeoulNature', label: '지형', icon: '🌲', colorOn: 'rgba(30,120,50,0.7)' },
-  { key: 'showLanduseTextureLayer', label: '용도텍스처', icon: '🧱', colorOn: 'rgba(100,80,180,0.7)' },
-  { key: 'showRoadSplitLayer', label: '도로분할블록', icon: '🧩', colorOn: 'rgba(150,90,200,0.7)' },
+  { key: 'showLanduseTextureLayer', label: '용도', icon: '🧱', colorOn: 'rgba(100,80,180,0.7)' },
+  { key: 'showRoadSplitLayer', label: '분할', icon: '🧩', colorOn: 'rgba(150,90,200,0.7)' },
   { key: 'showLanduseZones', label: '용도구역', icon: '◆', colorOn: 'rgba(200,80,120,0.7)' },
   { key: 'showDistrictBoundaries', label: '경계', icon: '🏛', colorOn: 'rgba(0,180,200,0.7)' },
 ];

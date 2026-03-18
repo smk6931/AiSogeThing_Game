@@ -344,7 +344,7 @@ const ZoneOverlay = ({
     const targetId = dongId || currentDistrict?.id;
     if (!targetId) return;
     const targetName = dongId ? (currentDong?.name || dongId) : currentDistrict?.name;
-    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v19_${targetId}`;
+    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v20_${targetId}`;
     const requestId = ++latestAreaRequestRef.current;
 
     const fetchAreaData = async () => {
@@ -355,9 +355,9 @@ const ZoneOverlay = ({
         setZoneDataStrict(zoneCache.current.get(cacheKey));
         return;
       }
-      // 2. 브라우저 영구 캐시 (v19)
+      // 2. 브라우저 영구 캐시 (v20)
       try {
-        const browserCache = await caches.open('zone-data-v19');
+        const browserCache = await caches.open('zone-data-v20');
         const cachedRes = await browserCache.match(cacheKey);
         if (cachedRes) {
           const data = await cachedRes.json();
@@ -391,7 +391,7 @@ const ZoneOverlay = ({
         setZoneDataStrict(data);
         zoneCache.current.set(cacheKey, data);
 
-        const browserCache = await caches.open('zone-data-v19');
+        const browserCache = await caches.open('zone-data-v20');
         browserCache.put(cacheKey, new Response(JSON.stringify(data)));
         console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 로드 완료: ${targetName}`);
       } catch (err) {
@@ -412,7 +412,7 @@ const ZoneOverlay = ({
 
   // [Fallback] currentDistrict 없을 때 기존 이동거리 방식 유지
   useEffect(() => {
-    if (!visible || currentDistrict) return; // 구가 있으면 위 effect가 담당
+    if (!visible || currentDistrict || dongId) return; // 구/동이 있으면 위 effect가 담당
 
     const gridKey = `${playerGps.lat.toFixed(2)}_${playerGps.lng.toFixed(2)}`;
     const dx = (playerPos?.x || 0) - lastFetchPos.current.x;
@@ -456,7 +456,7 @@ const ZoneOverlay = ({
       'road_major', 'road_minor', 'unexplored', 'sectors'
     ];
     fetchGroup('world_zones', ALL_CATS);
-  }, [visible, playerGps.lat, playerGps.lng]);
+  }, [visible, currentDistrict, dongId, playerGps.lat, playerGps.lng]);
 
   // Zone 데이터가 축적될 때마다 부모(RpgWorld)에게 전달 → SeoulHeightMap 텍스처 페인팅용
   const lastReportedData = useRef(null);

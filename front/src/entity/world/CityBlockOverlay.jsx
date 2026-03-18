@@ -13,13 +13,16 @@ const gpsToGame = (lat, lng) => ({
 /**
  * 지형 지오메트리 생성 및 UV 설정
  */
-const buildTerrainBlock = (coords) => {
+const buildTerrainBlock = (coords, holes = []) => {
   if (!coords || coords.length < 3) return null;
   const pts = coords.map(([lat, lng]) => gpsToGame(lat, lng));
   const contour = pts.map(p => new THREE.Vector2(p.x, p.z));
+  const holePts = (holes || []).map(hole => hole.map(([lat, lng]) => gpsToGame(lat, lng)));
+  const holeContours = holePts.map(hole => hole.map(p => new THREE.Vector2(p.x, p.z)));
+  const allPts = [pts, ...holePts].flat();
   let faces;
   try {
-    faces = THREE.ShapeUtils.triangulateShape(contour, []);
+    faces = THREE.ShapeUtils.triangulateShape(contour, holeContours);
   } catch (_) { return null; }
   if (!faces || faces.length === 0) return null;
 
@@ -29,15 +32,15 @@ const buildTerrainBlock = (coords) => {
   let vi = 0, ui = 0;
   
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  pts.forEach(p => {
+  allPts.forEach(p => {
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
     minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
   });
-  const rX = maxX - minX || 1; const rZ = maxZ - minZ || 1;
+  const triangulationPts = [pts, ...holePts].flat();
 
   for (const [a, b, c] of faces) {
     for (const idx of [a, b, c]) {
-      const p = pts[idx];
+      const p = triangulationPts[idx];
       positions[vi++] = p.x;
       positions[vi++] = 0.55; 
       positions[vi++] = p.z;
@@ -120,7 +123,7 @@ const CityBlockContent = ({ texturePaths, zoneData, currentDong, elevation, show
         const features = zoneData.zones[cat] || [];
         features.forEach((f, idx) => {
           if (f.type === 'polygon' && f.coords?.length >= 3) {
-            const geo = buildTerrainBlock(f.coords);
+            const geo = buildTerrainBlock(f.coords, f.holes);
             if (geo) {
               // 위치 기반 시드 생성 (고정 무작위성)
               const seed = Math.abs(f.coords[0][0] * 12345 + f.coords[0][1] * 67890);
@@ -137,7 +140,7 @@ const CityBlockContent = ({ texturePaths, zoneData, currentDong, elevation, show
       const sectors = zoneData.zones['sectors'] || [];
       sectors.forEach((f, idx) => {
         if (f.type === 'polygon' && f.coords?.length >= 3) {
-          const geo = buildTerrainBlock(f.coords);
+          const geo = buildTerrainBlock(f.coords, f.holes);
           if (geo) {
             // 섹터는 더 높은 우선순위(Order 5)를 주어 겹칠 경우 위로 오게 함
             const seed = Math.abs(f.coords[0][0] * 99999 + f.coords[0][1] * 11111 + idx);
