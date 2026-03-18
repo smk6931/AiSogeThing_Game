@@ -41,9 +41,8 @@ const buildTerrainBlock = (coords) => {
       positions[vi++] = p.x;
       positions[vi++] = 0.55; 
       positions[vi++] = p.z;
-      // [NEW] 로컬 좌표 기반 UV 설정 (30.0m당 1회 반복되도록 스케일 고정)
-      // 각 블록의 시작점(minX, minZ)을 기준으로 UV를 계산하여 텍스처가 밀리지 않게 함
-      const TILE_SIZE = 30.0; 
+      // [NEW] 로컬 좌표 기반 UV 설정 (100.0m당 1회 반복되도록 스케일 고정)
+      const TILE_SIZE = 100.0; 
       uvs[ui++] = (p.x - minX) / TILE_SIZE;
       uvs[ui++] = (p.z - minZ) / TILE_SIZE;
     }

@@ -359,9 +359,9 @@ const RpgWorld = ({
           roadPresets: {
             'Checkerboard': 'https://threejs.org/examples/textures/floors/FloorsCheckerboard_S_Diffuse.jpg',
             'Grid': 'https://threejs.org/examples/textures/grid.png',
-            'Grass (Local)': '/textures/grass.png',
-            'Rock (Local)': '/textures/rock.png',
-            'Sand (Local)': '/textures/sand.png'
+            'Grass (Local)': '/images/image.png',
+            'Rock (Local)': '/images/rock.png',
+            'Sand (Local)': '/images/sand.png'
           }
         }}
       />

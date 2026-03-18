@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import { useTexture } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
@@ -50,12 +49,7 @@ const ZONE_PAINT = {
 const ZONE_PRIORITY = ['water', 'park', 'forest', 'residential'];
 
 
-// [수정] 절차적 캔버스 텍스처 대신 고화질 실사 이미지 텍스처를 사용합니다.
-const TEXTURE_PATHS = {
-  grass: '/textures/grass.png',
-  rock: '/textures/rock.png',
-  sand: '/textures/sand.png'
-};
+// [삭제] 텍스처 로딩 로직 제거 (정점 컬러만 사용)
 
 
 // ===========================
@@ -114,32 +108,10 @@ const SeoulHeightMap = React.memo(({
       .catch(err => console.error('[HeightMap] 로딩 실패:', err));
   }, [visible]);
 
-  // [수정] 하단 텍스처 로딩 로직 개선
-  const loadedTextures = useTexture(TEXTURE_PATHS);
-
-  const textures = useMemo(() => {
-    const t = { ...loadedTextures };
-    // [수정] 30km 맵에서 텍스처 재질이 너무 촘촘해서 안 보이던 현상 해결
-    // 30,000m / 1,200회 = 한 타일당 25m (재질감이 뚜렷하게 보임)
-    const repeatSize = 100;
-
-    Object.values(t).forEach(tex => {
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(repeatSize, repeatSize);
-      tex.needsUpdate = true;
-    });
-    return t;
-  }, [loadedTextures]);
-
-
-  // Spotlight 쉐이더 유니폼 (모든 텍스처 전달)
   const uniforms = useMemo(() => ({
     uPlayerPos: { value: new THREE.Vector2(0, 0) },
-    uHighlightRadius: { value: 800.0 }, // 반경을 조금 더 넓힘
-    tGrass: { value: textures.grass },
-    tRock: { value: textures.rock },
-    tSand: { value: textures.sand },
-  }), [textures]);
+    uHighlightRadius: { value: 800.0 },
+  }), []);
 
   // 매 프레임 플레이어 위치를 쉐이더에 전달 (Spotlight 효과)
   useFrame(() => {

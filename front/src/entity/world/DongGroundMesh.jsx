@@ -91,9 +91,9 @@ const DongGroundMesh = ({
 
       const geo = new THREE.ShapeGeometry(shape);
 
-      // [NEW] 로컬 좌표 기반 UV 설정 (50.0m당 1회 반복되도록 스케일 조정)
-      // 베이스 지면이므로 블록보다 더 넓게(50m) 배치하여 "마스크" 효과 연출
-      const TILE_SIZE = 50.0; 
+      // [NEW] 로컬 좌표 기반 UV 설정 (100.0m당 1회 반복되도록 스케일 조정)
+      // 베이스 지면이므로 블록보다 더 넓게(100.0m) 배치하여 "마스크" 효과 연출
+      const TILE_SIZE = 100.0; 
       const positions = geo.attributes.position.array;
       let minX = Infinity, minY = Infinity;
       for (let i = 0; i < positions.length; i += 3) {
