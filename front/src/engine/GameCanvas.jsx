@@ -20,7 +20,8 @@ const GameCanvas = ({
   showOsmMap,
   showSeoulRoads,
   showSeoulNature,
-  showCityBlocks,
+  showLanduseTextureLayer,
+  showRoadSplitLayer,
   showLanduseZones,
   landuseFilters,
   showHeightMap,
@@ -74,7 +75,8 @@ const GameCanvas = ({
           showOsmMap={showOsmMap}
           showSeoulRoads={showSeoulRoads}
           showSeoulNature={showSeoulNature}
-          showCityBlocks={showCityBlocks}
+          showLanduseTextureLayer={showLanduseTextureLayer}
+          showRoadSplitLayer={showRoadSplitLayer}
           showLanduseZones={showLanduseZones}
           landuseFilters={landuseFilters}
           showHeightMap={showHeightMap}

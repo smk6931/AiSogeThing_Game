@@ -126,7 +126,7 @@ def _classify_way(tags, categories):
 def _generate_sector_blocks(zones, area_poly_coords):
     """
     도로가 감싸는 안쪽 면적들을 잘게 쪼개서 '섹터(Sectors)'를 생성합니다.
-    기존 용도구역(공원, 주거지 등)과 겹치지 않는 순수 빈 땅 영역만 추출합니다.
+    기존 용도구역과의 겹침을 제거하지 않고, 동 전체를 도로 기준으로 분할한 결과를 유지합니다.
     """
     if not area_poly_coords: return []
     try:
@@ -149,19 +149,8 @@ def _generate_sector_blocks(zones, area_poly_coords):
         
         # 선들로 이루어진 면(Blocks) 추출
         blocks = list(polygonize(all_lines))
-        
-        # 2. 이미 정의된 구역(water, park, resi 등)의 합집합 생성 (오려낼 영역)
-        filled_polys = []
-        for cat, features in zones.items():
-            if cat in ["road_major", "road_minor", "sectors"]: continue
-            for f in features:
-                if f["type"] == "polygon" and len(f["coords"]) >= 3:
-                    p = Polygon(f["coords"])
-                    if p.is_valid: filled_polys.append(p)
-        
-        filled_union = unary_union(filled_polys) if filled_polys else None
 
-        # 3. 각 도로 블록에서 기존 구역을 뺀 '순수 섹터' 생성
+        # 2. 각 도로 블록을 동 내부 기준으로 잘라 그대로 섹터 생성
         sector_features = []
         for block in blocks:
             if not block.is_valid: block = block.buffer(0)
@@ -171,16 +160,10 @@ def _generate_sector_blocks(zones, area_poly_coords):
             target_part = block.intersection(dong_poly)
             if target_part.is_empty: continue
 
-            # 기존 구역(공원 등) 오려내기
-            if filled_union and target_part.intersects(filled_union):
-                diff = target_part.difference(filled_union)
-            else:
-                diff = target_part
-
             # 결과 처리 (Polygon 또는 MultiPolygon)
             final_polys = []
-            if isinstance(diff, Polygon): final_polys = [diff]
-            elif hasattr(diff, 'geoms'): final_polys = list(diff.geoms)
+            if isinstance(target_part, Polygon): final_polys = [target_part]
+            elif hasattr(target_part, 'geoms'): final_polys = list(target_part.geoms)
             else: continue
 
             for p in final_polys:
@@ -203,7 +186,7 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None, distr
     area_type = "district" if district_id else ("dong" if dong_id else "point")
     area_id = district_id or dong_id or f"{lat:.3f}_{lng:.3f}"
     
-    cache_key = f"v16_{area_type}_{area_id}.json" # 버전업 (도로 강화 v16)
+    cache_key = f"v17_{area_type}_{area_id}.json" # 버전업 (섹터 전체 분할 v17)
     cache_path = os.path.join(CACHE_DIR, cache_key)
 
     if os.path.exists(cache_path):

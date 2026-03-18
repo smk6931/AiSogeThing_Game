@@ -147,9 +147,8 @@ const RpgWorld = ({
   showOsmMap,
   showSeoulRoads,
   showSeoulNature,
-  showCityBlocks,
-  showOriginalCityBlocks,
-  showSectorBlocks,
+  showLanduseTextureLayer,
+  showRoadSplitLayer,
   showLanduseZones,
   landuseFilters = {},
   showHeightMap,
@@ -438,7 +437,7 @@ const RpgWorld = ({
 
       {/* 4. OSM 구역 오버레이 (용도구역 등 실시간 데이터) */}
       <ZoneOverlay
-        visible={(showSeoulRoads || showSeoulNature || showCityBlocks || showLanduseZones)}
+        visible={(showSeoulRoads || showSeoulNature || showLanduseTextureLayer || showRoadSplitLayer || showLanduseZones)}
         categories={landuseFilters}
         playerPos={playerRef.current ? playerRef.current.position : { x: 0, z: 0 }}
         currentDistrict={currentDistrict}
@@ -475,17 +474,30 @@ const RpgWorld = ({
         }}
       />
 
-      {/* 5. 시티 블록 (도로 중심 텍스처) */}
+      {/* 5. 용도별 텍스처 레이어 */}
       <CityBlockOverlay
         zoneData={sharedZoneData}
-        visible={showCityBlocks}
-        showOriginalBlocks={showOriginalCityBlocks}
-        showSectorBlocks={showSectorBlocks}
+        visible={showLanduseTextureLayer}
+        showOriginalBlocks={true}
+        showSectorBlocks={false}
         heightScale={debugConfig.terrainHeightScale}
         currentDistrict={currentDistrict}
         dongId={currentDongId}
         currentDong={currentDong}
         elevation={debugConfig.mapElevation + 0.08}
+      />
+
+      {/* 6. 동을 큰도로 기준으로 쪼갠 블록 레이어 */}
+      <CityBlockOverlay
+        zoneData={sharedZoneData}
+        visible={showRoadSplitLayer}
+        showOriginalBlocks={false}
+        showSectorBlocks={true}
+        heightScale={debugConfig.terrainHeightScale}
+        currentDistrict={currentDistrict}
+        dongId={currentDongId}
+        currentDong={currentDong}
+        elevation={debugConfig.mapElevation + 0.09}
       />
 
       {/* 등고선 지형 (Zone 데이터로 텍스쳐 페인팅) */}
