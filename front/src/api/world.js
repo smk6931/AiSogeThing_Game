@@ -59,6 +59,11 @@ const worldApi = {
   },
   getDongBlocks: async (dongId) => {
     return await client.get(`/api/world/blocks/dong/${dongId}`);
+  },
+  
+  // 서버의 images 폴더 내 파일 목록 조회
+  getBlockTextures: async () => {
+    return await client.get('/api/world/block-textures');
   }
 };
 

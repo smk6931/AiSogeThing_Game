@@ -111,3 +111,20 @@ async def get_district_blocks(district_id: int):
 async def get_dong_blocks(dong_id: int):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, block_service.extract_dong_blocks, dong_id)
+
+@router.get("/block-textures")
+async def get_block_textures():
+    """
+    front/public/images 폴더 내의 모든 텍스처 파일 목록을 반환합니다.
+    """
+    import os
+    # back/world/routers/router.py -> 4단계 상위가 루트
+    base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    images_dir = os.path.join(base_path, "front", "public", "grounds")
+    
+    if not os.path.exists(images_dir):
+        return []
+        
+    files = [f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+    # 프론트엔드에서 바로 접근 가능한 URL 경로로 반환
+    return [f"/grounds/{f}" for f in files]

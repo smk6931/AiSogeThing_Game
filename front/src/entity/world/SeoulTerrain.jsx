@@ -119,12 +119,12 @@ function buildLineGeometry(features, roadWidthMajor = 20, roadWidthMid = 12, roa
   try { return mergeGeometries(geos, false); } catch (_) { return null; }
 }
 
-const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, textureUrl = null, useStencil = false }) => {
+const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, isRoad = false, textureUrl = null, useStencil = false }) => {
   if (!geometry) return null;
-  const isRoadMajor = color.r > 0.9 && color.g > 0.9;
+  const isRoadHighlight = color.r > 0.9 && color.g > 0.9;
   const materialProps = isWater ? {
     color: color, transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.3, emissive: color, emissiveIntensity: 0.3,
-  } : isRoadMajor ? {
+  } : isRoadHighlight ? {
     color: '#ffffff',
     map: textureUrl ? new THREE.TextureLoader().load(textureUrl, (tex) => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -133,16 +133,24 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
     emissive: textureUrl ? '#000000' : '#44aaff',
     emissiveIntensity: textureUrl ? 0 : 2.5,
     roughness: 0.5,
-  } : { color: color };
+  } : { 
+    color: color,
+    transparent: isRoad,
+    opacity: isRoad ? 1.0 : 1.0,
+    depthWrite: !isRoad,
+    depthTest: !isRoad // 도로면 무조건 최상단 강제
+  };
 
   if (useStencil) {
     materialProps.stencilWrite = true;
-    materialProps.stencilRef = 1; // Terrain 전용 Ref 해제 (전체 통일)
+    materialProps.stencilRef = 1;
     materialProps.stencilFunc = THREE.EqualStencilFunc;
   }
 
+  const finalRenderOrder = isRoad ? 100 : (isWater ? 5 : 1);
+
   return (
-    <mesh rotation={rotation} position={position} renderOrder={10}>
+    <mesh rotation={rotation} position={position} renderOrder={finalRenderOrder}>
       <primitive object={geometry} attach="geometry" />
       <meshStandardMaterial {...materialProps} side={THREE.DoubleSide} />
     </mesh>
@@ -257,8 +265,8 @@ const SeoulTerrain = ({
         </group>
       )}
       {showRoads && (
-        <group name="roads-layer" position={[0, 0.05, 0]}>
-          <MergedMesh geometry={geos.roadFeatures} color={COLORS.road_major} textureUrl={roadTextureUrl} useStencil={!!activeMask} />
+        <group name="roads-layer" position={[0, 0.1, 0]}>
+          <MergedMesh geometry={geos.roadFeatures} color={COLORS.road_major} textureUrl={roadTextureUrl} useStencil={!!activeMask} isRoad={true} />
         </group>
       )}
     </group>

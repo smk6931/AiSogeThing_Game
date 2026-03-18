@@ -91,22 +91,20 @@ const DongGroundMesh = ({
 
       const geo = new THREE.ShapeGeometry(shape);
 
-      // UV 생성 (AABB 정규화 → 텍스처 반복 매핑 용)
+      // [NEW] 로컬 좌표 기반 UV 설정 (50.0m당 1회 반복되도록 스케일 조정)
+      // 베이스 지면이므로 블록보다 더 넓게(50m) 배치하여 "마스크" 효과 연출
+      const TILE_SIZE = 50.0; 
       const positions = geo.attributes.position.array;
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      let minX = Infinity, minY = Infinity;
       for (let i = 0; i < positions.length; i += 3) {
         if (positions[i] < minX) minX = positions[i];
-        if (positions[i] > maxX) maxX = positions[i];
-        if (positions[i + 1] < minY) minY = positions[i + 1];
-        if (positions[i + 1] > maxY) maxY = positions[i + 1];
+        if (positions[i+1] < minY) minY = positions[i+1];
       }
-      const rangeX = maxX - minX || 1;
-      const rangeY = maxY - minY || 1;
 
       const uvs = new Float32Array((positions.length / 3) * 2);
       for (let i = 0; i < positions.length / 3; i++) {
-        uvs[i * 2] = (positions[i * 3] - minX) / rangeX;
-        uvs[i * 2 + 1] = (positions[i * 3 + 1] - minY) / rangeY;
+        uvs[i * 2] = (positions[i * 3] - minX) / TILE_SIZE;
+        uvs[i * 2 + 1] = (positions[i * 3 + 1] - minY) / TILE_SIZE;
       }
       geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
 
@@ -117,7 +115,7 @@ const DongGroundMesh = ({
     }
   }, [targetArea]);
 
-  const texture = useMemo(() => getGroundTexture(200), []);
+  const texture = useMemo(() => getGroundTexture(1), []);
 
   if (!visible || !geometry) return null;
 

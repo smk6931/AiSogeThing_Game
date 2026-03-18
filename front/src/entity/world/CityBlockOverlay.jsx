@@ -1,40 +1,18 @@
-/**
- * CityBlockOverlay.jsx
- * 
- * [동(Dong) 단위 스트리밍 원칙 적용]
- * 1. 블록(CityBlocks): 동 경계선 안쪽의 용도 구역만 텍스처로 렌더링
- * 2. 스텐실 마스크: 현재 동 경계면을 기준으로 레이어를 도려내어 정확히 동 안쪽만 표시
- */
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { useTexture } from '@react-three/drei';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
+import worldApi from '@api/world';
 
-export const BLOCK_IMAGES = [
-  '/images/2b8a23a7dec37e59d324efa9d0f0ef99.jpg',
-  '/images/2cd8ebd98fadce0b168e865df1ce7a7c.jpg',
-  '/images/327b36da6402f56e679184d5cf7d7c26.jpg',
-  '/images/447c1be047db0362550eac42c361e35c.jpg',
-  '/images/59c7288fe0c809ecefb03e0610fca467.jpg',
-  '/images/5ee644c3dd0996505e2e8c2904448a8d.jpg',
-  '/images/64e5d8778128da07aa4ae0b2cbb79292.jpg',
-  '/images/735e3a457fd48501e95f1f23832ba1ad.jpg',
-  '/images/7b277889e448e30f490a55074e694ff5.jpg',
-  '/images/c26ed8d33fdd167d4688a38dc3f262d5.jpg',
-  '/images/dbe11e2e0165a947ff3943289e46a46a.jpg',
-  '/images/e2d883e3f30b7ac9e222195601498684.jpg',
-  '/images/ec1cbe7ba65ab0e674808182127c8b6b.jpg',
-  '/images/f9b808c6e9318d035e1d64cd546d23d3.jpg',
-  '/images/image.png',
-  '/images/rock.png',
-  '/images/sand.png',
-];
-
+// GPS → 게임 좌표 변환
 const gpsToGame = (lat, lng) => ({
   x: (lng - GIS_ORIGIN.lng) * LNG_TO_M,
   z: (GIS_ORIGIN.lat - lat) * LAT_TO_M,
 });
 
+/**
+ * 지형 지오메트리 생성 및 UV 설정
+ */
 const buildTerrainBlock = (coords) => {
   if (!coords || coords.length < 3) return null;
   const pts = coords.map(([lat, lng]) => gpsToGame(lat, lng));
@@ -49,6 +27,7 @@ const buildTerrainBlock = (coords) => {
   const positions = new Float32Array(vertCount * 3);
   const uvs = new Float32Array(vertCount * 2);
   let vi = 0, ui = 0;
+  
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   pts.forEach(p => {
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
@@ -60,10 +39,13 @@ const buildTerrainBlock = (coords) => {
     for (const idx of [a, b, c]) {
       const p = pts[idx];
       positions[vi++] = p.x;
-      positions[vi++] = 0.55;
+      positions[vi++] = 0.55; 
       positions[vi++] = p.z;
-      uvs[ui++] = (p.x - minX) / rX;
-      uvs[ui++] = (p.z - minZ) / rZ;
+      // [NEW] 로컬 좌표 기반 UV 설정 (30.0m당 1회 반복되도록 스케일 고정)
+      // 각 블록의 시작점(minX, minZ)을 기준으로 UV를 계산하여 텍스처가 밀리지 않게 함
+      const TILE_SIZE = 30.0; 
+      uvs[ui++] = (p.x - minX) / TILE_SIZE;
+      uvs[ui++] = (p.z - minZ) / TILE_SIZE;
     }
   }
   const geo = new THREE.BufferGeometry();
@@ -73,17 +55,19 @@ const buildTerrainBlock = (coords) => {
   return geo;
 };
 
-// [NEW] 동 경계선을 뚫어주는 스텐실 마스크 컴포넌트
+/**
+ * 동 경계선을 뚫어주는 스텐실 마스크
+ */
 const DongMask = ({ currentDong, elevation }) => {
   const geo = useMemo(() => {
     if (!currentDong?.coords || currentDong.coords.length < 3) return null;
     try {
       const shape = new THREE.Shape();
       const first = gpsToGame(currentDong.coords[0][0], currentDong.coords[0][1]);
-      shape.moveTo(first.x, first.z);
+      shape.moveTo(first.x, -first.z);
       for (let i = 1; i < currentDong.coords.length; i++) {
         const p = gpsToGame(currentDong.coords[i][0], currentDong.coords[i][1]);
-        shape.lineTo(p.x, p.z);
+        shape.lineTo(p.x, -p.z);
       }
       return new THREE.ShapeGeometry(shape);
     } catch (e) { return null; }
@@ -105,103 +89,122 @@ const DongMask = ({ currentDong, elevation }) => {
   );
 };
 
-const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0.05 }) => {
-  const textures = useTexture(BLOCK_IMAGES);
+/**
+ * 실제 렌더링을 담당하는 내부 컴포넌트
+ */
+const CityBlockContent = ({ texturePaths, zoneData, currentDong, elevation }) => {
+  const textures = useTexture(texturePaths);
 
-  const { originalBlocks, sectorBlocks } = useMemo(() => {
-    if (!zoneData?.zones) return { originalBlocks: [], sectorBlocks: [] };
+  // [NEW] 텍스처 속성 실시간 반영 (Wrapping 및 선명도 최적화)
+  useEffect(() => {
+    const texArray = Array.isArray(textures) ? textures : [textures];
+    texArray.forEach(t => {
+      if (t) {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.anisotropy = 16; // 경사면에서 텍스처 생버벅임(Blur) 방지
+        t.needsUpdate = true;
+      }
+    });
+  }, [textures]);
 
-    const ob = [];
-    const sb = [];
-    const blockCats = [
-      'residential', 'commercial', 'industrial', 'park', 'forest',
-      'educational', 'medical', 'parking', 'natural_site',
-      'military', 'religious', 'sports', 'cemetery', 'transport', 'port', 'water'
-    ];
+  const { blocks } = useMemo(() => {
+    if (!zoneData?.zones) return { blocks: [] };
 
-    // 텍스처 매핑 테이블 (용도별 분위기 고정)
-    const catToIdx = {
-      residential: [0, 4, 8, 12], // 따뜻한/주형 느낌
-      commercial: [1, 5, 9, 13],  // 화려한/사이버펑크 느낌
-      industrial: [2, 6, 10],     // 기계적/어두운 느낌
-      park: [14], forest: [14],    // 숲/자연
-      water: [14],                // 수계 (텍스처로 대체 가능)
-      parking: [11], medical: [7], institutional: [3]
-    };
-
-    blockCats.forEach((cat, catIdx) => {
+    const result = [];
+    const texCount = Array.isArray(textures) ? textures.length : 1;
+    
+    // 1. 용도구역 블록 (Original Blocks) - 기본 배경
+    const blockCats = Object.keys(zoneData.zones).filter(cat => cat !== 'sectors' && cat !== 'road_major' && cat !== 'road_minor' && cat !== 'unexplored');
+    
+    blockCats.forEach((cat) => {
       const features = zoneData.zones[cat] || [];
-      const idxList = catToIdx[cat] || [catIdx % BLOCK_IMAGES.length];
-
       features.forEach((f, idx) => {
         if (f.type === 'polygon' && f.coords?.length >= 3) {
           const geo = buildTerrainBlock(f.coords);
           if (geo) {
-            const texIdx = idxList[idx % idxList.length];
-            ob.push({ geo, texIdx });
+            // 위치 기반 시드 생성 (고정 무작위성)
+            const seed = Math.abs(f.coords[0][0] * 12345 + f.coords[0][1] * 67890);
+            const texIdx = Math.floor(seed) % texCount;
+            result.push({ geo, texIdx, order: 3 });
           }
         }
       });
     });
 
-    // 섹터 (사용자 요청 시 다시 활성화할 수 있도록 로직만 유지)
-    const sectorFeatures = zoneData.zones['sectors'] || [];
-    sectorFeatures.forEach((f, idx) => {
+    // 2. 섹터 블록 (Divided by Roads) - 더 세밀한 무작위성
+    const sectors = zoneData.zones['sectors'] || [];
+    sectors.forEach((f, idx) => {
       if (f.type === 'polygon' && f.coords?.length >= 3) {
         const geo = buildTerrainBlock(f.coords);
-        if (geo) sb.push({ geo, texIdx: (idx * 31 + 42) % BLOCK_IMAGES.length });
+        if (geo) {
+          // 섹터는 더 높은 우선순위(Order 5)를 주어 겹칠 경우 위로 오게 함
+          const seed = Math.abs(f.coords[0][0] * 99999 + f.coords[0][1] * 11111 + idx);
+          const texIdx = (Math.floor(seed) + 7) % texCount;
+          result.push({ geo, texIdx, order: 5 });
+        }
       }
     });
 
-    return { originalBlocks: ob, sectorBlocks: sb };
-  }, [zoneData]);
-
-  if (!visible) return null;
+    return { blocks: result };
+  }, [zoneData, textures]);
 
   return (
     <group>
-      {/* 동 마스크: 이 경계 안쪽만 렌더링됨 */}
       <DongMask currentDong={currentDong} elevation={elevation + 0.01} />
-
       <group position={[0, elevation, 0]}>
-        {/* 1. 용도구역 기반 오리지널 블록 */}
-        {originalBlocks.map((b, i) => (
-          <mesh key={`ob-${i}`} geometry={b.geo} renderOrder={4}>
+        {blocks.map((b, i) => (
+          <mesh key={`block-${i}`} geometry={b.geo} renderOrder={b.order}>
             <meshStandardMaterial
-              map={textures[b.texIdx]}
-              transparent
-              opacity={0.88}
+              map={(Array.isArray(textures) ? textures[b.texIdx] : textures)}
+              transparent={false}
+              opacity={1.0}
               stencilWrite={true}
               stencilRef={1}
               stencilFunc={THREE.EqualStencilFunc}
               side={THREE.DoubleSide}
-              depthWrite={false}
-              roughness={0.7}
-              metalness={0.2}
-            />
-          </mesh>
-        ))}
-
-        {/* 2. 도로망으로 쪼개진 섹터 블록 (빈틈 메우기용) */}
-        {sectorBlocks.map((b, i) => (
-          <mesh key={`sb-${i}`} geometry={b.geo} renderOrder={3}>
-            <meshStandardMaterial
-              map={textures[b.texIdx]}
-              color="#d8d8d8" // 살짝 톤다운하여 기본 지형 느낌 강조
-              transparent
-              opacity={0.8}
-              stencilWrite={true}
-              stencilRef={1}
-              stencilFunc={THREE.EqualStencilFunc}
-              side={THREE.DoubleSide}
-              depthWrite={false}
-              roughness={0.8}
-              metalness={0.1}
+              roughness={1.0}
+              metalness={0.0}
+              depthWrite={true}
             />
           </mesh>
         ))}
       </group>
     </group>
+  );
+};
+
+const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0.05 }) => {
+  const [texturePaths, setTexturePaths] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPaths = async () => {
+      try {
+        const res = await worldApi.getBlockTextures();
+        console.log("[CityBlockOverlay] 로딩된 텍스처 목록:", res.data);
+        if (res.data && res.data.length > 0) {
+          setTexturePaths(res.data);
+        } else {
+          setTexturePaths(['/images/image.png', '/images/rock.png', '/images/sand.png']);
+        }
+      } catch (e) {
+        setTexturePaths(['/images/image.png']);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPaths();
+  }, []);
+
+  if (!visible || loading || texturePaths.length === 0) return null;
+
+  return (
+    <CityBlockContent 
+      texturePaths={texturePaths}
+      zoneData={zoneData}
+      currentDong={currentDong}
+      elevation={elevation}
+    />
   );
 };
 
