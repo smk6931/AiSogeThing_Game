@@ -45,6 +45,8 @@ const BUTTONS = [
   { key: 'showSeoulRoads', label: '도로', icon: '🛣', colorOn: 'rgba(255,100,0,0.7)' },
   { key: 'showSeoulNature', label: '지형', icon: '🌲', colorOn: 'rgba(30,120,50,0.7)' },
   { key: 'showCityBlocks', label: '블록', icon: '🏙', colorOn: 'rgba(120,60,160,0.7)' },
+  { key: 'showOriginalCityBlocks', label: '원본블록', icon: '🧱', colorOn: 'rgba(100,80,180,0.7)' },
+  { key: 'showSectorBlocks', label: '섹터블록', icon: '🧩', colorOn: 'rgba(150,90,200,0.7)' },
   { key: 'showLanduseZones', label: '용도구역', icon: '◆', colorOn: 'rgba(200,80,120,0.7)' },
   { key: 'showDistrictBoundaries', label: '경계', icon: '🏛', colorOn: 'rgba(0,180,200,0.7)' },
 ];
@@ -54,6 +56,8 @@ const MapControlOverlay = ({
   showSeoulRoads, setShowSeoulRoads,
   showSeoulNature, setShowSeoulNature,
   showCityBlocks, setShowCityBlocks,
+  showOriginalCityBlocks, setShowOriginalCityBlocks,
+  showSectorBlocks, setShowSectorBlocks,
   showLanduseZones, setShowLanduseZones,
   landuseFilters, setLanduseFilters,
   showGroundMesh, setShowGroundMesh,
@@ -76,6 +80,8 @@ const MapControlOverlay = ({
     showSeoulRoads: { value: showSeoulRoads, setter: setShowSeoulRoads },
     showSeoulNature: { value: showSeoulNature, setter: setShowSeoulNature },
     showCityBlocks: { value: showCityBlocks, setter: setShowCityBlocks },
+    showOriginalCityBlocks: { value: showOriginalCityBlocks, setter: setShowOriginalCityBlocks },
+    showSectorBlocks: { value: showSectorBlocks, setter: setShowSectorBlocks },
     showLanduseZones: { value: showLanduseZones, setter: toggleLanduse },
     showDistrictBoundaries: { value: showDistrictBoundaries, setter: setShowDistrictBoundaries },
   };

@@ -67,6 +67,8 @@ const GameEntry = () => {
   const [showSeoulRoads, setShowSeoulRoads] = useState(true);
   const [showSeoulNature, setShowSeoulNature] = useState(true);
   const [showCityBlocks, setShowCityBlocks] = useState(true);
+  const [showOriginalCityBlocks, setShowOriginalCityBlocks] = useState(true);
+  const [showSectorBlocks, setShowSectorBlocks] = useState(true);
   const [showLanduseZones, setShowLanduseZones] = useState(false);
   const [landuseFilters, setLanduseFilters] = useState({
     residential: true, commercial: true, industrial: true,
@@ -165,6 +167,8 @@ const GameEntry = () => {
           showSeoulRoads={showSeoulRoads}
           showSeoulNature={showSeoulNature}
           showCityBlocks={showCityBlocks}
+          showOriginalCityBlocks={showOriginalCityBlocks}
+          showSectorBlocks={showSectorBlocks}
           showLanduseZones={showLanduseZones}
           landuseFilters={landuseFilters}
           showHeightMap={showHeightMap}
@@ -251,6 +255,8 @@ const GameEntry = () => {
         showSeoulRoads={showSeoulRoads} setShowSeoulRoads={setShowSeoulRoads}
         showSeoulNature={showSeoulNature} setShowSeoulNature={setShowSeoulNature}
         showCityBlocks={showCityBlocks} setShowCityBlocks={setShowCityBlocks}
+        showOriginalCityBlocks={showOriginalCityBlocks} setShowOriginalCityBlocks={setShowOriginalCityBlocks}
+        showSectorBlocks={showSectorBlocks} setShowSectorBlocks={setShowSectorBlocks}
         showLanduseZones={showLanduseZones} setShowLanduseZones={setShowLanduseZones}
         landuseFilters={landuseFilters} setLanduseFilters={setLanduseFilters}
         showGroundMesh={showGroundMesh} setShowGroundMesh={setShowGroundMesh}

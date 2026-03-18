@@ -148,6 +148,8 @@ const RpgWorld = ({
   showSeoulRoads,
   showSeoulNature,
   showCityBlocks,
+  showOriginalCityBlocks,
+  showSectorBlocks,
   showLanduseZones,
   landuseFilters = {},
   showHeightMap,
@@ -477,6 +479,8 @@ const RpgWorld = ({
       <CityBlockOverlay
         zoneData={sharedZoneData}
         visible={showCityBlocks}
+        showOriginalBlocks={showOriginalCityBlocks}
+        showSectorBlocks={showSectorBlocks}
         heightScale={debugConfig.terrainHeightScale}
         currentDistrict={currentDistrict}
         dongId={currentDongId}

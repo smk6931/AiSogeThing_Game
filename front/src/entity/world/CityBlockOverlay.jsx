@@ -91,7 +91,7 @@ const DongMask = ({ currentDong, elevation }) => {
 /**
  * 실제 렌더링을 담당하는 내부 컴포넌트
  */
-const CityBlockContent = ({ texturePaths, zoneData, currentDong, elevation }) => {
+const CityBlockContent = ({ texturePaths, zoneData, currentDong, elevation, showOriginalBlocks = true, showSectorBlocks = true }) => {
   const textures = useTexture(texturePaths);
 
   // [NEW] 텍스처 속성 실시간 반영 (Wrapping 및 선명도 최적화)
@@ -113,39 +113,43 @@ const CityBlockContent = ({ texturePaths, zoneData, currentDong, elevation }) =>
     const texCount = Array.isArray(textures) ? textures.length : 1;
     
     // 1. 용도구역 블록 (Original Blocks) - 기본 배경
-    const blockCats = Object.keys(zoneData.zones).filter(cat => cat !== 'sectors' && cat !== 'road_major' && cat !== 'road_minor' && cat !== 'unexplored');
-    
-    blockCats.forEach((cat) => {
-      const features = zoneData.zones[cat] || [];
-      features.forEach((f, idx) => {
+    if (showOriginalBlocks) {
+      const blockCats = Object.keys(zoneData.zones).filter(cat => cat !== 'sectors' && cat !== 'road_major' && cat !== 'road_minor' && cat !== 'unexplored');
+      
+      blockCats.forEach((cat) => {
+        const features = zoneData.zones[cat] || [];
+        features.forEach((f, idx) => {
+          if (f.type === 'polygon' && f.coords?.length >= 3) {
+            const geo = buildTerrainBlock(f.coords);
+            if (geo) {
+              // 위치 기반 시드 생성 (고정 무작위성)
+              const seed = Math.abs(f.coords[0][0] * 12345 + f.coords[0][1] * 67890);
+              const texIdx = Math.floor(seed) % texCount;
+              result.push({ geo, texIdx, order: 3 });
+            }
+          }
+        });
+      });
+    }
+
+    // 2. 섹터 블록 (Divided by Roads) - 더 세밀한 무작위성
+    if (showSectorBlocks) {
+      const sectors = zoneData.zones['sectors'] || [];
+      sectors.forEach((f, idx) => {
         if (f.type === 'polygon' && f.coords?.length >= 3) {
           const geo = buildTerrainBlock(f.coords);
           if (geo) {
-            // 위치 기반 시드 생성 (고정 무작위성)
-            const seed = Math.abs(f.coords[0][0] * 12345 + f.coords[0][1] * 67890);
-            const texIdx = Math.floor(seed) % texCount;
-            result.push({ geo, texIdx, order: 3 });
+            // 섹터는 더 높은 우선순위(Order 5)를 주어 겹칠 경우 위로 오게 함
+            const seed = Math.abs(f.coords[0][0] * 99999 + f.coords[0][1] * 11111 + idx);
+            const texIdx = (Math.floor(seed) + 7) % texCount;
+            result.push({ geo, texIdx, order: 5 });
           }
         }
       });
-    });
-
-    // 2. 섹터 블록 (Divided by Roads) - 더 세밀한 무작위성
-    const sectors = zoneData.zones['sectors'] || [];
-    sectors.forEach((f, idx) => {
-      if (f.type === 'polygon' && f.coords?.length >= 3) {
-        const geo = buildTerrainBlock(f.coords);
-        if (geo) {
-          // 섹터는 더 높은 우선순위(Order 5)를 주어 겹칠 경우 위로 오게 함
-          const seed = Math.abs(f.coords[0][0] * 99999 + f.coords[0][1] * 11111 + idx);
-          const texIdx = (Math.floor(seed) + 7) % texCount;
-          result.push({ geo, texIdx, order: 5 });
-        }
-      }
-    });
+    }
 
     return { blocks: result };
-  }, [zoneData, textures]);
+  }, [showOriginalBlocks, showSectorBlocks, zoneData, textures]);
 
   return (
     <group>
@@ -172,7 +176,7 @@ const CityBlockContent = ({ texturePaths, zoneData, currentDong, elevation }) =>
   );
 };
 
-const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0.05 }) => {
+const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0.05, showOriginalBlocks = true, showSectorBlocks = true }) => {
   const [texturePaths, setTexturePaths] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -203,6 +207,8 @@ const CityBlockOverlay = ({ zoneData, currentDong, visible = true, elevation = 0
       zoneData={zoneData}
       currentDong={currentDong}
       elevation={elevation}
+      showOriginalBlocks={showOriginalBlocks}
+      showSectorBlocks={showSectorBlocks}
     />
   );
 };
