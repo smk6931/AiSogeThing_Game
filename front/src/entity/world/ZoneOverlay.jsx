@@ -305,6 +305,7 @@ const ZoneOverlay = ({
   const [loadingGroups, setLoadingGroups] = useState({});
   const [heightmap, setHeightmap] = useState(null);
   const lastFetchPos = useRef({ x: -9999, z: -9999 });
+  const latestAreaRequestRef = useRef(0);
 
   // 프론트엔드 세션 캐시
   const zoneCache = useRef(new Map());
@@ -341,24 +342,28 @@ const ZoneOverlay = ({
     if (!currentDistrict && !dongId) return;
 
     const targetId = dongId || currentDistrict?.id;
+    if (!targetId) return;
     const targetName = dongId ? (currentDong?.name || dongId) : currentDistrict?.name;
-    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v16_${targetId}`;
+    const cacheKey = `world_zones_${dongId ? 'dong' : 'district'}_v19_${targetId}`;
+    const requestId = ++latestAreaRequestRef.current;
 
     const fetchAreaData = async () => {
       // 1. 메모리 캐시
       if (zoneCache.current.has(cacheKey)) {
         console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 메모리 캐시: ${targetName}`);
+        if (latestAreaRequestRef.current !== requestId) return;
         setZoneDataStrict(zoneCache.current.get(cacheKey));
         return;
       }
-      // 2. 브라우저 영구 캐시 (v16)
+      // 2. 브라우저 영구 캐시 (v19)
       try {
-        const browserCache = await caches.open('zone-data-v16');
+        const browserCache = await caches.open('zone-data-v19');
         const cachedRes = await browserCache.match(cacheKey);
         if (cachedRes) {
           const data = await cachedRes.json();
           if (Date.now() - (data._timestamp || 0) < 86400000 * 7) {
             console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 로컬 캐시: ${targetName}`);
+            if (latestAreaRequestRef.current !== requestId) return;
             setZoneDataStrict(data);
             zoneCache.current.set(cacheKey, data);
             return;
@@ -382,20 +387,27 @@ const ZoneOverlay = ({
 
         const data = response.data;
         data._timestamp = Date.now();
+        if (latestAreaRequestRef.current !== requestId) return;
         setZoneDataStrict(data);
         zoneCache.current.set(cacheKey, data);
 
-        const browserCache = await caches.open('zone-data-v16');
+        const browserCache = await caches.open('zone-data-v19');
         browserCache.put(cacheKey, new Response(JSON.stringify(data)));
         console.log(`[ZoneOverlay] ${dongId ? '동' : '구'} 로드 완료: ${targetName}`);
       } catch (err) {
+        if (latestAreaRequestRef.current !== requestId) return;
         console.error(`[ZoneOverlay] ${dongId ? '동' : '구'} 패치 실패:`, err);
       } finally {
+        if (latestAreaRequestRef.current !== requestId) return;
         setLoadingGroups({});
       }
     };
 
-    fetchAreaData();
+    const debounceTimer = setTimeout(() => {
+      fetchAreaData();
+    }, 400);
+
+    return () => clearTimeout(debounceTimer);
   }, [visible, currentDistrict?.id, dongId]); // 구 ID 또는 동 ID가 바뀔 때만
 
   // [Fallback] currentDistrict 없을 때 기존 이동거리 방식 유지

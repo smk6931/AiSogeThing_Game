@@ -105,34 +105,49 @@ def _parse_overpass_response(data, categories=None):
     return result
 
 def _classify_way(tags, categories):
-    t_str = str(tags).lower()
+    natural = (tags.get("natural") or "").lower()
+    waterway = (tags.get("waterway") or "").lower()
+    leisure = (tags.get("leisure") or "").lower()
+    landuse = (tags.get("landuse") or "").lower()
+    amenity = (tags.get("amenity") or "").lower()
+    highway = (tags.get("highway") or "").lower()
+
     for cat in categories:
-        if cat in ZONE_CATEGORIES:
-            # 단순 키워드 매칭으로 성능 최적화 (서빙용)
-            if any(k in t_str for k in ["forest", "wood"]) and cat == "forest": return "forest"
-            if any(k in t_str for k in ["water", "river", "stream", "canal", "lake"]) and cat == "water": return "water"
-            if any(k in t_str for k in ["park", "garden", "leisure"]) and cat == "park": return "park"
-            if any(k in t_str for k in ["residential", "apartments", "house"]) and cat == "residential": return "residential"
-            if any(k in t_str for k in ["commercial", "retail", "marketplace", "office"]) and cat == "commercial": return "commercial"
-            if any(k in t_str for k in ["industrial", "factory", "works"]) and cat == "industrial": return "industrial"
-            if any(k in t_str for k in ["school", "university", "college", "kindergarten"]) and cat == "educational": return "educational"
-            if any(k in t_str for k in ["hospital", "clinic", "doctors", "pharmacy"]) and cat == "medical": return "medical"
-            if any(k in t_str for k in ["parking", "garage"]) and cat == "parking": return "parking"
-            if "highway" in t_str:
-                if any(k in t_str for k in ["motorway", "trunk", "primary"]) and cat == "road_major": return "road_major"
-                if any(k in t_str for k in ["secondary", "tertiary", "residential", "service", "unclassified"]) and cat == "road_minor": return "road_minor"
+        if cat not in ZONE_CATEGORIES:
+            continue
+
+        if cat == "forest" and (landuse == "forest" or natural == "wood"):
+            return "forest"
+        if cat == "water" and (natural == "water" or waterway in ["river", "stream", "canal"]):
+            return "water"
+        if cat == "park" and (leisure == "park" or landuse == "recreation_ground"):
+            return "park"
+        if cat == "residential" and landuse == "residential":
+            return "residential"
+        if cat == "commercial" and landuse in ["commercial", "retail"]:
+            return "commercial"
+        if cat == "industrial" and landuse == "industrial":
+            return "industrial"
+        if cat == "educational" and amenity in ["school", "university", "college", "kindergarten", "prep_school"]:
+            return "educational"
+        if cat == "medical" and amenity in ["hospital", "clinic", "doctors", "pharmacy"]:
+            return "medical"
+        if cat == "road_major" and highway in ["motorway", "trunk", "primary", "secondary", "motorway_link", "trunk_link", "primary_link"]:
+            return "road_major"
+        if cat == "road_minor" and highway in ["tertiary", "residential", "service", "unclassified", "living_street", "pedestrian", "path", "footway", "secondary_link", "tertiary_link"]:
+            return "road_minor"
     return None
 
 def _generate_sector_blocks(zones, area_poly_coords):
     """
     도로가 감싸는 안쪽 면적들을 잘게 쪼개서 '섹터(Sectors)'를 생성합니다.
-    기존 용도구역과의 겹침을 제거하지 않고, 동 전체를 도로 기준으로 분할한 결과를 유지합니다.
+    기존 용도구역(공원, 주거지 등)과 겹치지 않는 순수 빈 땅 영역만 추출합니다.
     """
     if not area_poly_coords: return []
     try:
         dong_poly = Polygon(area_poly_coords)
         if not dong_poly.is_valid: dong_poly = dong_poly.buffer(0)
-
+ 
         # 1. 분할용 칼(도로망) 수집
         roads = zones.get("road_major", []) + zones.get("road_minor", [])
         road_lines = []
@@ -150,7 +165,18 @@ def _generate_sector_blocks(zones, area_poly_coords):
         # 선들로 이루어진 면(Blocks) 추출
         blocks = list(polygonize(all_lines))
 
-        # 2. 각 도로 블록을 동 내부 기준으로 잘라 그대로 섹터 생성
+        # 2. 이미 정의된 구역(water, park, resi 등)의 합집합 생성 (오려낼 영역)
+        filled_polys = []
+        for cat, features in zones.items():
+            if cat in ["road_major", "road_minor", "sectors"]: continue
+            for f in features:
+                if f["type"] == "polygon" and len(f["coords"]) >= 3:
+                    p = Polygon(f["coords"])
+                    if p.is_valid: filled_polys.append(p)
+        
+        filled_union = unary_union(filled_polys) if filled_polys else None
+
+        # 3. 각 도로 블록에서 기존 구역을 뺀 '순수 섹터' 생성
         sector_features = []
         for block in blocks:
             if not block.is_valid: block = block.buffer(0)
@@ -160,10 +186,16 @@ def _generate_sector_blocks(zones, area_poly_coords):
             target_part = block.intersection(dong_poly)
             if target_part.is_empty: continue
 
+            # 기존 구역(공원 등) 오려내기
+            if filled_union and target_part.intersects(filled_union):
+                diff = target_part.difference(filled_union)
+            else:
+                diff = target_part
+
             # 결과 처리 (Polygon 또는 MultiPolygon)
             final_polys = []
-            if isinstance(target_part, Polygon): final_polys = [target_part]
-            elif hasattr(target_part, 'geoms'): final_polys = list(target_part.geoms)
+            if isinstance(diff, Polygon): final_polys = [diff]
+            elif hasattr(diff, 'geoms'): final_polys = list(diff.geoms)
             else: continue
 
             for p in final_polys:
@@ -186,7 +218,7 @@ def fetch_zones(lat: float, lng: float, dist: int = 2000, categories=None, distr
     area_type = "district" if district_id else ("dong" if dong_id else "point")
     area_id = district_id or dong_id or f"{lat:.3f}_{lng:.3f}"
     
-    cache_key = f"v17_{area_type}_{area_id}.json" # 버전업 (섹터 전체 분할 v17)
+    cache_key = f"v19_{area_type}_{area_id}.json" # 버전업 (분류기 수정 + 섹터 차감 v19)
     cache_path = os.path.join(CACHE_DIR, cache_key)
 
     if os.path.exists(cache_path):
