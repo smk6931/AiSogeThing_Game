@@ -201,14 +201,19 @@ const GameEntry = () => {
 
       {/* ================= Speed Control Widget ================= */}
       <div style={{
-        position: 'absolute', top: '160px', left: '20px', zIndex: 150,
+        position: 'absolute',
+        top: isMobile ? '124px' : '160px',
+        left: isMobile ? '12px' : '20px',
+        zIndex: 150,
         background: 'rgba(0,0,0,0.6)', padding: '12px', borderRadius: '16px',
         border: '1px solid rgba(212, 175, 55, 0.4)', color: 'white',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-        fontFamily: "'Cinzel', sans-serif", width: '130px', backdropFilter: 'blur(8px)',
+        fontFamily: "'Cinzel', sans-serif",
+        width: isMobile ? '112px' : '130px',
+        backdropFilter: 'blur(8px)',
         pointerEvents: 'auto', boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
       }}>
-        <div style={{ fontSize: '10px', opacity: 0.8, fontWeight: 'bold', letterSpacing: '1px' }}>MOVE SPEED</div>
+        <div style={{ fontSize: isMobile ? '9px' : '10px', opacity: 0.8, fontWeight: 'bold', letterSpacing: '1px' }}>MOVE SPEED</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
           <button
             onClick={() => setMoveSpeed(prev => {
@@ -217,14 +222,14 @@ const GameEntry = () => {
             })}
             style={{
               flex: 1, height: '32px', background: 'rgba(255,255,255,0.1)', border: 'none',
-              color: 'white', fontSize: '16px', borderRadius: '8px', cursor: 'pointer',
+              color: 'white', fontSize: isMobile ? '14px' : '16px', borderRadius: '8px', cursor: 'pointer',
               transition: 'background 0.2s'
             }}
             onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
             onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
           >-</button>
           <div style={{
-            flex: 1.5, textAlign: 'center', fontSize: '20px', fontWeight: 'bold',
+            flex: 1.5, textAlign: 'center', fontSize: isMobile ? '17px' : '20px', fontWeight: 'bold',
             color: moveSpeed >= 40 ? '#ff4d4d' : '#d4af37',
             textShadow: '0 0 10px rgba(212, 175, 55, 0.3)'
           }}>
@@ -237,14 +242,14 @@ const GameEntry = () => {
             })}
             style={{
               flex: 1, height: '32px', background: 'rgba(255,255,255,0.1)', border: 'none',
-              color: 'white', fontSize: '16px', borderRadius: '8px', cursor: 'pointer',
+              color: 'white', fontSize: isMobile ? '14px' : '16px', borderRadius: '8px', cursor: 'pointer',
               transition: 'background 0.2s'
             }}
             onMouseOver={(e) => e.target.style.background = 'rgba(220,180,80,0.3)'}
             onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
           >+</button>
         </div>
-        <div style={{ fontSize: '9px', opacity: 0.5 }}>* Max 50 (Sprint)</div>
+        <div style={{ fontSize: isMobile ? '8px' : '9px', opacity: 0.5 }}>* Max 50</div>
       </div>
 
       {/* ================= Map Toggle Control Overlay ================= */}
@@ -259,6 +264,7 @@ const GameEntry = () => {
         showGroundMesh={showGroundMesh} setShowGroundMesh={setShowGroundMesh}
         showDistrictBoundaries={showDistrictBoundaries} setShowDistrictBoundaries={setShowDistrictBoundaries}
         cameraMode={cameraMode} setCameraMode={setCameraMode}
+        isMobile={isMobile}
         onPlayView={() => {
           setZoomLevel(18.5); // 캐릭터가 크게 보이도록 줌인
           setCameraMode('isometric');

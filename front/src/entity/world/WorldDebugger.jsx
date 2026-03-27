@@ -7,6 +7,10 @@ import { GUI } from 'lil-gui';
  */
 const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options }) => {
   useEffect(() => {
+    if (window.innerWidth <= 768) {
+      return undefined;
+    }
+
     const gui = new GUI({
       title: '🛠️ World Editor (Advanced)',
       width: 300
