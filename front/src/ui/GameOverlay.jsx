@@ -11,11 +11,11 @@ import { useSeoulDongs } from '@hooks/useSeoulDongs';
 // 공통 가이드 & 유틸리티
 // =============================
 const GAME_FONT = "'Cinzel', 'Noto Sans KR', serif";
-const PANEL_BG = 'rgba(8, 8, 16, 0.82)';
-const BORDER_COLOR = 'rgba(180, 140, 60, 0.55)';
-const GOLD = '#c8a84b';
-const HIGHLIGHT = 'rgba(200, 168, 75, 0.12)';
-const GLOW = '0 0 12px rgba(200, 168, 75, 0.25)';
+const PANEL_BG = 'linear-gradient(180deg, rgba(14, 20, 28, 0.88), rgba(8, 10, 16, 0.86))';
+const BORDER_COLOR = 'rgba(124, 171, 166, 0.45)';
+const GOLD = '#d0b16b';
+const ACCENT = '#67e8d6';
+const GLOW = '0 0 18px rgba(103, 232, 214, 0.18)';
 
 const injectFont = () => {
   if (document.getElementById('game-font-link')) return;
@@ -143,9 +143,9 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
         position: 'absolute',
         top: isMobile ? 'max(10px, env(safe-area-inset-top))' : '18px',
         left: isMobile ? 'max(10px, env(safe-area-inset-left))' : '18px',
-        width: isMobile ? '155px' : '260px',
-        padding: '12px',
-        borderRadius: '10px',
+        width: isMobile ? '148px' : '260px',
+        padding: isMobile ? '10px' : '12px',
+        borderRadius: '14px',
         background: PANEL_BG,
         backdropFilter: 'blur(16px)',
         border: `1px solid ${BORDER_COLOR}`,
@@ -154,17 +154,17 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
           <div style={{
-            background: `linear-gradient(135deg, #b8860b, ${GOLD})`,
-            color: '#1a1000', fontWeight: 'bold',
+            background: `linear-gradient(135deg, ${ACCENT}, ${GOLD})`,
+            color: '#081015', fontWeight: 'bold',
             borderRadius: '50%', width: isMobile ? '22px' : '28px',
             height: isMobile ? '22px' : '28px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: isMobile ? '11px' : '13px'
           }}>{playerStats.level}</div>
-          <span style={{ color: GOLD, fontWeight: '600', fontSize: isMobile ? '13px' : '15px' }}>{playerStats.nickname}</span>
+          <span style={{ color: GOLD, fontWeight: '700', fontSize: isMobile ? '12px' : '15px', letterSpacing: '0.3px' }}>{playerStats.nickname}</span>
         </div>
         <div style={{ marginBottom: '5px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#aaa' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '10px' : '11px', color: '#aaa' }}>
             <span style={{ color: '#ff6b6b' }}>HP</span>
             <span>{playerStats.hp}/{playerStats.maxHp}</span>
           </div>
@@ -173,7 +173,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
           </div>
         </div>
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#aaa' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '10px' : '11px', color: '#aaa' }}>
             <span style={{ color: '#60a5fa' }}>MP</span>
             <span>{playerStats.mp}/{playerStats.maxMp}</span>
           </div>
@@ -190,33 +190,17 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
         right: isMobile ? 'max(10px, env(safe-area-inset-right))' : '20px',
         display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px'
       }}>
-        {!isMapExpanded && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '8px',
+          pointerEvents: 'auto'
+        }}>
           <div style={{
-            background: 'rgba(0,0,0,0.8)',
-            border: `1px solid ${currentDistrict?.name?.includes('동작') ? '#4ade80' : BORDER_COLOR}`,
-            borderRadius: '15px',
-            padding: '2px 14px',
-            color: currentDistrict?.name?.includes('동작') ? '#4ade80' : '#fff',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            boxShadow: currentDistrict?.name?.includes('동작') ? '0 0 10px rgba(74, 222, 128, 0.4)' : 'none'
-          }}>
-            <Flame size={12} color={currentDistrict?.name?.includes('동작') ? '#4ade80' : "#ff6b6b"} />
-            {currentDistrict?.name || 'SEOUL'}
-          </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', pointerEvents: 'auto' }}>
-            <button onClick={() => setMapZoom(z => Math.min(z + 1, 19))} style={{ width: '28px', height: '28px', background: PANEL_BG, border: `1px solid ${BORDER_COLOR}`, borderRadius: '50%', color: GOLD, cursor: 'pointer' }}>+</button>
-            <button onClick={() => setMapZoom(z => Math.max(z - 1, 10))} style={{ width: '28px', height: '28px', background: PANEL_BG, border: `1px solid ${BORDER_COLOR}`, borderRadius: '50%', color: GOLD, cursor: 'pointer' }}>-</button>
-          </div>
-          <div style={{
-            position: 'relative', width: isMobile ? '88px' : '136px', height: isMobile ? '88px' : '136px',
+            position: 'relative', width: isMobile ? '94px' : '136px', height: isMobile ? '94px' : '136px',
             background: PANEL_BG, borderRadius: '50%', border: `2px solid ${BORDER_COLOR}`,
-            overflow: 'hidden', pointerEvents: 'auto', cursor: 'pointer'
+            overflow: 'hidden', pointerEvents: 'auto', cursor: 'pointer',
+            boxShadow: GLOW
           }} onClick={() => setIsMapExpanded(true)}>
             <div style={{ position: 'absolute', inset: -5, opacity: 0.85 }}>
               <LeafletMapBackground
@@ -229,12 +213,36 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
               />
             </div>
 
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '8px', height: '8px', background: '#4ade80', borderRadius: '50%', boxShadow: '0 0 10px #4ade80', zIndex: 10 }} />
-            <div style={{ position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)', fontSize: '10px', color: '#fff', background: 'rgba(0,0,0,0.6)', padding: '2px 8px', borderRadius: '10px', zIndex: 11 }}>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '8px', height: '8px', background: ACCENT, borderRadius: '50%', boxShadow: `0 0 10px ${ACCENT}`, zIndex: 10 }} />
+            <div style={{ position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)', fontSize: '10px', color: '#dffdfa', background: 'rgba(4,12,18,0.72)', padding: '2px 8px', borderRadius: '10px', zIndex: 11, display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Users size={10} color={GOLD} /> {onlineCount}
             </div>
           </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <button onClick={() => setMapZoom(z => Math.min(z + 1, 19))} style={{ width: '28px', height: '28px', background: 'rgba(10,18,26,0.86)', border: `1px solid ${BORDER_COLOR}`, borderRadius: '50%', color: ACCENT, cursor: 'pointer' }}>+</button>
+            <button onClick={() => setMapZoom(z => Math.max(z - 1, 10))} style={{ width: '28px', height: '28px', background: 'rgba(10,18,26,0.86)', border: `1px solid ${BORDER_COLOR}`, borderRadius: '50%', color: ACCENT, cursor: 'pointer' }}>-</button>
+          </div>
         </div>
+
+        {!isMapExpanded && (
+          <div style={{
+            background: 'rgba(6,12,18,0.82)',
+            border: `1px solid ${currentDistrict?.name?.includes('동작') ? ACCENT : BORDER_COLOR}`,
+            borderRadius: '999px',
+            padding: isMobile ? '4px 12px' : '4px 14px',
+            color: currentDistrict?.name?.includes('동작') ? ACCENT : '#e8f7f4',
+            fontSize: '11px',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: currentDistrict?.name?.includes('동작') ? '0 0 12px rgba(103, 232, 214, 0.22)' : 'none'
+          }}>
+            <Flame size={12} color={currentDistrict?.name?.includes('동작') ? ACCENT : GOLD} />
+            {currentDistrict?.name || 'SEOUL'}
+          </div>
+        )}
       </div>
 
       {/* 3. 월드맵 확장 모달 */}
@@ -290,7 +298,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
 
       {/* 5. 모바일 공격 */}
       {isMobile && (
-        <div onClick={() => onSimulateKey('r', true)} style={{ position: 'absolute', bottom: '40px', right: '25px', width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239,68,68,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', pointerEvents: 'auto' }}>👊</div>
+        <div onClick={() => onSimulateKey('r', true)} style={{ position: 'absolute', bottom: '40px', right: '25px', width: '64px', height: '64px', borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, rgba(255,120,120,0.95), rgba(220,38,38,0.82))', border: '1px solid rgba(255,210,180,0.32)', boxShadow: '0 10px 24px rgba(220,38,38,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', pointerEvents: 'auto' }}>👊</div>
       )}
 
       {/* 6. 구역 진입 타이틀 */}
@@ -304,12 +312,12 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
       )}
 
       {/* 설정 버튼 */}
-      <div onClick={() => setIsMenuOpen(!isMenuOpen)} style={{ position: 'absolute', top: isMobile ? '100px' : '170px', right: isMobile ? '10px' : '20px', width: '32px', height: '32px', background: PANEL_BG, border: `1px solid ${BORDER_COLOR}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', pointerEvents: 'auto' }}>
+      <div onClick={() => setIsMenuOpen(!isMenuOpen)} style={{ position: 'absolute', top: isMobile ? '150px' : '170px', right: isMobile ? '10px' : '20px', width: '32px', height: '32px', background: 'rgba(8,14,22,0.88)', border: `1px solid ${BORDER_COLOR}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', pointerEvents: 'auto', boxShadow: GLOW }}>
         <Settings size={16} color={GOLD} />
       </div>
 
       {isMenuOpen && (
-        <div style={{ position: 'absolute', top: isMobile ? '140px' : '210px', right: isMobile ? '10px' : '20px', background: PANEL_BG, border: `1px solid ${BORDER_COLOR}`, borderRadius: '8px', padding: '8px', zIndex: 100, pointerEvents: 'auto', minWidth: '120px' }}>
+        <div style={{ position: 'absolute', top: isMobile ? '190px' : '210px', right: isMobile ? '10px' : '20px', background: 'rgba(8,14,22,0.94)', border: `1px solid ${BORDER_COLOR}`, borderRadius: '12px', padding: '8px', zIndex: 100, pointerEvents: 'auto', minWidth: '120px', boxShadow: GLOW }}>
           <div onClick={() => navigate('/')} style={{ color: GOLD, padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><Home size={14} /> 홈으로</div>
           <div onClick={() => navigate('/')} style={{ color: '#ef4444', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><LogOut size={14} /> 나가기</div>
         </div>

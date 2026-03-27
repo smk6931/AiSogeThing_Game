@@ -202,36 +202,42 @@ const GameEntry = () => {
       {/* ================= Speed Control Widget ================= */}
       <div style={{
         position: 'absolute',
-        top: isMobile ? '124px' : '160px',
+        top: isMobile ? '116px' : '160px',
         left: isMobile ? '12px' : '20px',
         zIndex: 150,
-        background: 'rgba(0,0,0,0.6)', padding: '12px', borderRadius: '16px',
-        border: '1px solid rgba(212, 175, 55, 0.4)', color: 'white',
+        background: isMobile
+          ? 'linear-gradient(180deg, rgba(14, 20, 28, 0.88), rgba(8, 10, 16, 0.84))'
+          : 'rgba(0,0,0,0.6)',
+        padding: isMobile ? '10px' : '12px',
+        borderRadius: isMobile ? '14px' : '16px',
+        border: isMobile ? '1px solid rgba(124, 171, 166, 0.4)' : '1px solid rgba(212, 175, 55, 0.4)',
+        color: 'white',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
         fontFamily: "'Cinzel', sans-serif",
-        width: isMobile ? '112px' : '130px',
+        width: isMobile ? '96px' : '130px',
         backdropFilter: 'blur(8px)',
-        pointerEvents: 'auto', boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+        pointerEvents: 'auto',
+        boxShadow: isMobile ? '0 10px 24px rgba(0,0,0,0.24)' : '0 4px 15px rgba(0,0,0,0.5)'
       }}>
-        <div style={{ fontSize: isMobile ? '9px' : '10px', opacity: 0.8, fontWeight: 'bold', letterSpacing: '1px' }}>MOVE SPEED</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+        <div style={{ fontSize: isMobile ? '8px' : '10px', opacity: 0.75, fontWeight: 'bold', letterSpacing: isMobile ? '0.6px' : '1px' }}>MOVE SPEED</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '8px', width: '100%' }}>
           <button
             onClick={() => setMoveSpeed(prev => {
               if (prev <= 5) return Math.max(1, prev - 1);
               return Math.max(5, prev - 5);
             })}
             style={{
-              flex: 1, height: '32px', background: 'rgba(255,255,255,0.1)', border: 'none',
-              color: 'white', fontSize: isMobile ? '14px' : '16px', borderRadius: '8px', cursor: 'pointer',
+              flex: 1, height: isMobile ? '26px' : '32px', background: 'rgba(255,255,255,0.1)', border: 'none',
+              color: 'white', fontSize: isMobile ? '12px' : '16px', borderRadius: '8px', cursor: 'pointer',
               transition: 'background 0.2s'
             }}
             onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
             onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
           >-</button>
           <div style={{
-            flex: 1.5, textAlign: 'center', fontSize: isMobile ? '17px' : '20px', fontWeight: 'bold',
-            color: moveSpeed >= 40 ? '#ff4d4d' : '#d4af37',
-            textShadow: '0 0 10px rgba(212, 175, 55, 0.3)'
+            flex: 1.5, textAlign: 'center', fontSize: isMobile ? '15px' : '20px', fontWeight: 'bold',
+            color: moveSpeed >= 40 ? '#ff7a7a' : '#67e8d6',
+            textShadow: '0 0 10px rgba(103, 232, 214, 0.22)'
           }}>
             {moveSpeed.toFixed(0)}
           </div>
@@ -241,15 +247,15 @@ const GameEntry = () => {
               return Math.min(50, prev + 5);
             })}
             style={{
-              flex: 1, height: '32px', background: 'rgba(255,255,255,0.1)', border: 'none',
-              color: 'white', fontSize: isMobile ? '14px' : '16px', borderRadius: '8px', cursor: 'pointer',
+              flex: 1, height: isMobile ? '26px' : '32px', background: 'rgba(255,255,255,0.1)', border: 'none',
+              color: 'white', fontSize: isMobile ? '12px' : '16px', borderRadius: '8px', cursor: 'pointer',
               transition: 'background 0.2s'
             }}
             onMouseOver={(e) => e.target.style.background = 'rgba(220,180,80,0.3)'}
             onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
           >+</button>
         </div>
-        <div style={{ fontSize: isMobile ? '8px' : '9px', opacity: 0.5 }}>* Max 50</div>
+        <div style={{ fontSize: isMobile ? '7px' : '9px', opacity: 0.45 }}>* Max 50</div>
       </div>
 
       {/* ================= Map Toggle Control Overlay ================= */}
@@ -274,13 +280,13 @@ const GameEntry = () => {
       {/* ================= Joystick ================= */}
       <div style={{
         position: 'absolute',
-        bottom: 30, // 더 아래로 내림
-        left: 20,   // 더 왼쪽으로 붙임
+        bottom: 30,
+        left: isMobile ? 16 : 20,
         zIndex: 90,
         opacity: 0.8
       }}>
         <Joystick
-          size={80}
+          size={isMobile ? 72 : 80}
           sticky={false}
           baseColor="rgba(255, 255, 255, 0.2)"
           stickColor="rgba(255, 255, 255, 0.5)"
@@ -293,12 +299,12 @@ const GameEntry = () => {
       <div style={{
         position: 'absolute',
         bottom: 30,
-        right: 20,
+        right: isMobile ? 16 : 20,
         zIndex: 90,
         opacity: 0.8
       }}>
         <Joystick
-          size={80}
+          size={isMobile ? 72 : 80}
           sticky={false}
           baseColor="rgba(255, 0, 0, 0.2)"
           stickColor="rgba(255, 0, 0, 0.5)"

@@ -2,10 +2,11 @@ import React from 'react';
 
 const GAME_FONT = "'Cinzel', 'Noto Sans KR', serif";
 const GOLD = '#c8a84b';
-const PANEL_BG = 'rgba(8, 8, 16, 0.88)';
-const BORDER_ON = 'rgba(180, 140, 60, 0.6)';
+const PANEL_BG = 'rgba(8, 14, 22, 0.9)';
+const BORDER_ON = 'rgba(112, 181, 171, 0.56)';
 const BORDER_OFF = 'rgba(100, 100, 100, 0.35)';
-const GLOW = '0 0 12px rgba(200, 168, 75, 0.25)';
+const GLOW = '0 0 16px rgba(103, 232, 214, 0.18)';
+const ACCENT = '#67e8d6';
 
 const LANDUSE_LABELS = {
   residential: { label: '주거지역', color: '#8bc34a' },
@@ -177,16 +178,16 @@ const MapControlOverlay = ({
           onClick={() => setIsMobileDrawerOpen(prev => !prev)}
           style={{
             position: 'absolute',
-            top: 'max(108px, calc(env(safe-area-inset-top) + 98px))',
+            top: 'max(118px, calc(env(safe-area-inset-top) + 108px))',
             right: '12px',
             zIndex: 140,
-            padding: '10px 14px',
+            padding: '9px 12px',
             borderRadius: '999px',
             border: `1px solid ${BORDER_ON}`,
-            background: 'rgba(8, 8, 16, 0.9)',
-            color: GOLD,
+            background: 'rgba(6, 14, 22, 0.88)',
+            color: ACCENT,
             fontFamily: GAME_FONT,
-            fontSize: '12px',
+            fontSize: '11px',
             fontWeight: '700',
             boxShadow: GLOW,
             backdropFilter: 'blur(12px)',
@@ -198,13 +199,13 @@ const MapControlOverlay = ({
         {isMobileDrawerOpen && (
           <div style={{
             position: 'absolute',
-            top: 'max(152px, calc(env(safe-area-inset-top) + 142px))',
+            top: 'max(158px, calc(env(safe-area-inset-top) + 148px))',
             right: '12px',
             zIndex: 141,
             width: 'min(320px, calc(100vw - 24px))',
             maxHeight: '52vh',
             overflowY: 'auto',
-            background: 'rgba(8, 8, 16, 0.95)',
+            background: 'rgba(6, 14, 22, 0.96)',
             border: `1px solid ${BORDER_ON}`,
             borderRadius: '16px',
             padding: '12px',
@@ -218,15 +219,15 @@ const MapControlOverlay = ({
               marginBottom: '10px',
             }}>
               <div>
-                <div style={{ color: GOLD, fontSize: '13px', fontWeight: '700' }}>World Layers</div>
-                <div style={{ color: '#8d8d95', fontSize: '11px' }}>모바일 전용 접이식 패널</div>
+                <div style={{ color: GOLD, fontSize: '13px', fontWeight: '700' }}>Mirror Layers</div>
+                <div style={{ color: '#8fb2ad', fontSize: '11px' }}>서울 거울세계 시각 설정</div>
               </div>
               <button
                 onClick={() => setIsMobileDrawerOpen(false)}
                 style={{
                   border: 'none',
                   background: 'transparent',
-                  color: '#bbb',
+                  color: '#b7d8d2',
                   fontSize: '18px',
                   cursor: 'pointer'
                 }}
@@ -255,7 +256,7 @@ const MapControlOverlay = ({
                         <span style={{ fontSize: '13px' }}>{icon}</span>
                         <span>{label}</span>
                       </span>
-                      <span style={{ fontSize: '10px', color: isOn ? '#aeffae' : '#6e6e76' }}>
+                      <span style={{ fontSize: '10px', color: isOn ? '#a7fff2' : '#6e6e76' }}>
                         {isOn ? 'ON' : 'OFF'}
                       </span>
                     </button>
@@ -292,10 +293,10 @@ const MapControlOverlay = ({
   }
 
   return (
-    <div style={{
-      position: 'absolute',
-      top: 16,
-      left: 170,
+      <div style={{
+        position: 'absolute',
+        top: 16,
+        left: 170,
       zIndex: 100,
       display: 'flex',
       gap: '5px',
