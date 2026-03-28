@@ -56,10 +56,18 @@ class WorldLevelPartition(Base):
     summary = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     theme_code = Column(String(64), nullable=True, index=True)
+    group_key = Column(String(160), nullable=True, index=True)
+    group_seq = Column(Integer, nullable=True, index=True)
+    group_display_name = Column(String(128), nullable=True, index=True)
+    group_theme_code = Column(String(64), nullable=True, index=True)
     landuse_code = Column(String(64), nullable=True, index=True)
+    dominant_landuse = Column(String(64), nullable=True, index=True)
+    persona_tag = Column(String(64), nullable=True, index=True)
     texture_profile = Column(String(64), nullable=True)
     is_road = Column(Boolean, nullable=False, server_default="false")
     is_walkable = Column(Boolean, nullable=False, server_default="true")
+    area_m2 = Column(Float, nullable=True)
+    landuse_mix_score = Column(Float, nullable=True)
     centroid_lat = Column(Float, nullable=True)
     centroid_lng = Column(Float, nullable=True)
     boundary_geojson = Column(JSON, nullable=True)
@@ -88,4 +96,3 @@ class WorldPartitionAdjacency(Base):
 
     from_partition = relationship("WorldLevelPartition", foreign_keys=[from_partition_id], backref="out_edges")
     to_partition = relationship("WorldLevelPartition", foreign_keys=[to_partition_id], backref="in_edges")
-

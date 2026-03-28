@@ -46,10 +46,18 @@ async def get_region_info_by_dong_osm_id(dong_osm_id: int | None) -> dict | None
             summary,
             description,
             theme_code,
+            group_key,
+            group_seq,
+            group_display_name,
+            group_theme_code,
             landuse_code,
+            dominant_landuse,
+            persona_tag,
             texture_profile,
             is_road,
             is_walkable,
+            area_m2,
+            landuse_mix_score,
             centroid_lat,
             centroid_lng,
             boundary_geojson,
@@ -110,10 +118,18 @@ async def get_partitions_by_dong_osm_id(dong_osm_id: int | None) -> list[dict]:
             summary,
             description,
             theme_code,
+            group_key,
+            group_seq,
+            group_display_name,
+            group_theme_code,
             landuse_code,
+            dominant_landuse,
+            persona_tag,
             texture_profile,
             is_road,
             is_walkable,
+            area_m2,
+            landuse_mix_score,
             centroid_lat,
             centroid_lng,
             boundary_geojson,
@@ -129,17 +145,10 @@ async def get_partitions_by_dong_osm_id(dong_osm_id: int | None) -> list[dict]:
 
 def _find_current_partition(partition_rows: list[dict], lat: float, lng: float) -> dict | None:
     point = Point(lng, lat)
-    nearest_row = None
-    nearest_distance = None
 
     for row in partition_rows:
         boundary = row.get("boundary_geojson")
         if not boundary:
-            if row.get("centroid_lat") is not None and row.get("centroid_lng") is not None:
-                distance = (row["centroid_lat"] - lat) ** 2 + (row["centroid_lng"] - lng) ** 2
-                if nearest_distance is None or distance < nearest_distance:
-                    nearest_distance = distance
-                    nearest_row = row
             continue
         if isinstance(boundary, str):
             boundary = json.loads(boundary)
@@ -147,14 +156,9 @@ def _find_current_partition(partition_rows: list[dict], lat: float, lng: float) 
             polygon = shape(boundary)
             if polygon.is_valid and polygon.covers(point):
                 return row
-            if row.get("centroid_lat") is not None and row.get("centroid_lng") is not None:
-                distance = (row["centroid_lat"] - lat) ** 2 + (row["centroid_lng"] - lng) ** 2
-                if nearest_distance is None or distance < nearest_distance:
-                    nearest_distance = distance
-                    nearest_row = row
         except Exception:
             continue
-    return nearest_row
+    return None
 
 
 async def get_current_region_info(lat: float, lng: float) -> dict:
@@ -163,36 +167,42 @@ async def get_current_region_info(lat: float, lng: float) -> dict:
 
     current_partition = None
     if region_info:
-        current_partition = _find_current_partition(region_info.get("featured_partitions", []) + [], lat, lng)
-        if current_partition is None:
-            partition_rows = await fetch_all(
-                """
-                SELECT
-                    id,
-                    partition_key,
-                    partition_seq,
-                    partition_stage,
-                    partition_type,
-                    map_name,
-                    display_name,
-                    summary,
-                    description,
-                    theme_code,
-                    landuse_code,
-                    texture_profile,
-                    is_road,
-                    is_walkable,
-                    centroid_lat,
-                    centroid_lng,
-                    boundary_geojson,
-                    gameplay_meta
-                FROM world_level_partition
-                WHERE admin_area_id = :admin_area_id
-                ORDER BY partition_stage, partition_seq
-                """,
-                {"admin_area_id": region_info["admin_area"]["id"]},
-            )
-            current_partition = _find_current_partition(partition_rows, lat, lng)
+        partition_rows = await fetch_all(
+            """
+            SELECT
+                id,
+                partition_key,
+                partition_seq,
+                partition_stage,
+                partition_type,
+                map_name,
+                display_name,
+                summary,
+                description,
+                theme_code,
+                group_key,
+                group_seq,
+                group_display_name,
+                group_theme_code,
+                landuse_code,
+                dominant_landuse,
+                persona_tag,
+                texture_profile,
+                is_road,
+                is_walkable,
+                area_m2,
+                landuse_mix_score,
+                centroid_lat,
+                centroid_lng,
+                boundary_geojson,
+                gameplay_meta
+            FROM world_level_partition
+            WHERE admin_area_id = :admin_area_id
+            ORDER BY partition_stage, partition_seq
+            """,
+            {"admin_area_id": region_info["admin_area"]["id"]},
+        )
+        current_partition = _find_current_partition(partition_rows, lat, lng)
 
     return {
         "current_dong": current_dong,

@@ -48,6 +48,7 @@ const MapControlOverlay = ({
   showGroundMesh, setShowGroundMesh,
   showDistrictBoundaries, setShowDistrictBoundaries,
   cameraMode, setCameraMode, onPlayView,
+  moveSpeed = 20, setMoveSpeed,
   isMobile = false
 }) => {
   const [isLandusePanelOpen, setIsLandusePanelOpen] = React.useState(false);
@@ -178,65 +179,59 @@ const MapControlOverlay = ({
           onClick={() => setIsMobileDrawerOpen(prev => !prev)}
           style={{
             position: 'absolute',
-            top: 'max(118px, calc(env(safe-area-inset-top) + 108px))',
-            right: '12px',
+            top: 'max(10px, env(safe-area-inset-top))',
+            right: 'calc(max(10px, env(safe-area-inset-right)) + 104px)',
             zIndex: 140,
-            padding: '9px 12px',
-            borderRadius: '999px',
-            border: `1px solid ${BORDER_ON}`,
-            background: 'rgba(6, 14, 22, 0.88)',
-            color: ACCENT,
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            border: `1px solid ${isMobileDrawerOpen ? BORDER_ON : 'rgba(100,100,100,0.4)'}`,
+            background: isMobileDrawerOpen ? 'rgba(19,50,60,0.95)' : 'rgba(6, 14, 22, 0.88)',
+            color: isMobileDrawerOpen ? ACCENT : '#8fb2ad',
             fontFamily: GAME_FONT,
-            fontSize: '11px',
-            fontWeight: '700',
-            boxShadow: GLOW,
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: isMobileDrawerOpen ? GLOW : 'none',
             backdropFilter: 'blur(12px)',
+            cursor: 'pointer',
           }}
+          title="레이어 패널"
         >
-          {isMobileDrawerOpen ? '패널 닫기' : '레이어 패널'}
+          ⚙
         </button>
 
         {isMobileDrawerOpen && (
           <div style={{
             position: 'absolute',
-            top: 'max(158px, calc(env(safe-area-inset-top) + 148px))',
-            right: '12px',
+            top: 'calc(max(10px, env(safe-area-inset-top)) + 40px)',
+            right: 'calc(max(10px, env(safe-area-inset-right)) + 104px)',
             zIndex: 141,
-            width: 'min(320px, calc(100vw - 24px))',
-            maxHeight: '52vh',
+            width: '180px',
+            maxHeight: '44vh',
             overflowY: 'auto',
             background: 'rgba(6, 14, 22, 0.96)',
             border: `1px solid ${BORDER_ON}`,
-            borderRadius: '16px',
-            padding: '12px',
+            borderRadius: '12px',
+            padding: '8px',
             backdropFilter: 'blur(18px)',
-            boxShadow: '0 20px 45px rgba(0,0,0,0.45)',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
           }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '10px',
+              marginBottom: '7px',
             }}>
-              <div>
-                <div style={{ color: GOLD, fontSize: '13px', fontWeight: '700' }}>Mirror Layers</div>
-                <div style={{ color: '#8fb2ad', fontSize: '11px' }}>서울 거울세계 시각 설정</div>
-              </div>
+              <div style={{ color: GOLD, fontSize: '11px', fontWeight: '700' }}>Mirror Layers</div>
               <button
                 onClick={() => setIsMobileDrawerOpen(false)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#b7d8d2',
-                  fontSize: '18px',
-                  cursor: 'pointer'
-                }}
-              >
-                ×
-              </button>
+                style={{ border: 'none', background: 'transparent', color: '#b7d8d2', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}
+              >×</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
               {BUTTONS.map(({ key, label, icon, colorOn }) => {
                 const isOn = stateMap[key].value;
                 return (
@@ -250,13 +245,18 @@ const MapControlOverlay = ({
                         }
                         currentSetter(prev => !prev);
                       }}
-                      style={getBtnStyle(isOn, colorOn, true)}
+                      style={{
+                        ...getBtnStyle(isOn, colorOn, true),
+                        padding: '5px 7px',
+                        fontSize: '10px',
+                        borderRadius: '7px',
+                      }}
                     >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '13px' }}>{icon}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '11px' }}>{icon}</span>
                         <span>{label}</span>
                       </span>
-                      <span style={{ fontSize: '10px', color: isOn ? '#a7fff2' : '#6e6e76' }}>
+                      <span style={{ fontSize: '9px', color: isOn ? '#a7fff2' : '#6e6e76' }}>
                         {isOn ? 'ON' : 'OFF'}
                       </span>
                     </button>
@@ -266,26 +266,33 @@ const MapControlOverlay = ({
               })}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginTop: '7px' }}>
               <button
                 onClick={() => setCameraMode(prev => prev === 'isometric' ? '360' : 'isometric')}
-                style={getBtnStyle(true, cameraMode === 'isometric' ? 'rgba(140,50,50,0.7)' : 'rgba(50,50,140,0.7)', true)}
+                style={{
+                  ...getBtnStyle(true, cameraMode === 'isometric' ? 'rgba(140,50,50,0.7)' : 'rgba(50,50,140,0.7)', true),
+                  padding: '5px 7px', fontSize: '10px', borderRadius: '7px',
+                }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '13px' }}>🎥</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '11px' }}>🎥</span>
                   <span>{cameraMode === 'isometric' ? '쿼터뷰' : '360도'}</span>
                 </span>
               </button>
               <button
                 onClick={onPlayView}
-                style={getBtnStyle(true, 'rgba(212, 175, 55, 0.6)', true)}
+                style={{
+                  ...getBtnStyle(true, 'rgba(212, 175, 55, 0.6)', true),
+                  padding: '5px 7px', fontSize: '10px', borderRadius: '7px',
+                }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '13px' }}>🎮</span>
-                  <span>플레이 뷰</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '11px' }}>🎮</span>
+                  <span>플레이뷰</span>
                 </span>
               </button>
             </div>
+
           </div>
         )}
       </>
@@ -354,6 +361,7 @@ const MapControlOverlay = ({
         <span style={{ fontSize: '13px' }}>🎮</span>
         <span>플레이 뷰</span>
       </button>
+
     </div>
   );
 };

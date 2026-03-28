@@ -25,6 +25,20 @@
 - Keep the hierarchy as `city -> district -> dong -> partition`.
 - Roads are not only visual layers. They are traversal and adjacency data.
 - Primary partitions are generated from administrative boundary plus road split.
+- `world_level_partition` rows must stay at the smallest partition geometry level.
+- Do not mix larger grouped-region rows into `world_level_partition`.
+- If grouped play regions are needed, add grouping metadata to each smallest partition row:
+  - `group_key`
+  - `group_seq`
+  - `group_display_name`
+  - `group_theme_code`
+- Recommended gameplay hierarchy:
+  - `city -> district -> dong -> micro partition`
+  - `micro partition -> grouped play region` via grouping columns
+- Landuse remains a semantic input layer.
+- Final world rendering may use:
+  - micro partition for current-position detection
+  - grouped play region for UI naming and macro visual mood
 - Secondary partitions may be added later for landuse refinement or manual level design.
 
 ## Vector DB Policy
@@ -36,4 +50,3 @@
   - NPC dialogue memory
   - region flavor text retrieval
 - Structured world geography should stay in relational tables first.
-

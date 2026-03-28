@@ -14,7 +14,69 @@
 - The recommended hierarchy is `city -> district -> dong -> partition`.
 - Road data should remain part of traversal and adjacency logic, not just texture decoration.
 - Primary partitions come from road split and dong boundary.
+- `world_level_partition` must remain the micro-partition table.
+- Do not insert larger grouped-region rows into `world_level_partition`.
+- When larger playable regions are needed, keep one table and add grouping metadata to each micro partition row:
+  - `group_key`
+  - `group_seq`
+  - `group_display_name`
+  - `group_theme_code`
+- Use `group_*` fields for:
+  - grouped world-map naming
+  - grouped boundary rendering
+  - grouped visual mood / texture coordination
+- Use micro partitions for:
+  - deterministic current-position lookup
+  - adjacency
+  - fine-grained encounter placement
+- Landuse remains a semantic analysis layer, not the final partition ownership layer.
 - Secondary partitions may refine landuse or manual gameplay design later.
+
+## Monster Design Rules
+
+### DB 구조
+- 모든 몬스터(일반/엘리트/이벤트/보스)는 `monster_template` 단일 테이블로 관리한다.
+- `tier` 컬럼으로 구분: `normal` / `elite` / `event` / `boss`
+- 보스 전용 페이즈·스크립트는 `boss_phase_data JSONB` 컬럼으로 흡수한다.
+- 스폰 지역은 `world_level_partition`의 `theme_code` / `persona_tag`와 연결한다.
+
+### 3D 모델 파일 네이밍 컨벤션
+모델 파일명은 DB 레코드를 식별할 수 있도록 아래 규칙을 따른다.
+
+```
+{MonsterName}_{MonsterTier}_{OriginRegion}_{Property}_{PKey}.glb
+
+예시)
+Goblin_Normal_Noryangjin_Forest_001.glb
+Orc_Elite_Yongsan_Stone_042.glb
+DragonBoss_Boss_Gangnam_Fire_001.glb
+```
+
+- `MonsterName`: 몬스터 종류 이름 (PascalCase)
+- `MonsterTier`: `Normal` / `Elite` / `Event` / `Boss`
+- `OriginRegion`: 이 모델이 설계된 기원 지역 (실제 스폰 지역은 DB에서 관리)
+- `Property`: 속성/테마 (`Forest` / `Stone` / `Fire` / `Water` 등)
+- `PKey`: DB primary key (3자리 zero-padding, 예: `001`)
+
+### 파일 경로 구조
+```
+front/public/models/
+  monsters/    ← monster_template 테이블
+  characters/  ← character 테이블
+  items/       ← item 테이블
+  npcs/        ← npc 테이블
+```
+
+### DB model_path 컬럼 규칙
+- DB에는 `public/models/` 이후 상대경로만 저장한다.
+- 예: `monster_template.model_path = 'monsters/Goblin_Normal_Noryangjin_Forest_001.glb'`
+- 프론트에서 실제 URL 조합: `BASE_MODEL_URL + model_path`
+- `BASE_MODEL_URL`은 프론트 환경변수로 관리 (로컬: `/models/`, CDN: `https://cdn.../models/`)
+
+### 파일명 변경 규칙
+- MonsterName / Tier / Region / Property 변경은 파일 rename + DB `model_path` 업데이트로 처리한다.
+- PKey는 변경하지 않는다 (DB primary key와 동기화 유지).
+- 경로(`public/models/monsters/`) 자체는 변경하지 않는다.
 
 ## AI and Metadata
 

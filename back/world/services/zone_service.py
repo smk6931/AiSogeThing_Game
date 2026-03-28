@@ -165,26 +165,7 @@ def _generate_sector_blocks(zones, area_poly_coords):
         # 선들로 이루어진 면(Blocks) 추출
         blocks = list(polygonize(all_lines))
 
-        # 2. 이미 정의된 구역(water, park, resi 등)의 합집합 생성 (오려낼 영역)
-        filled_polys = []
-        for cat, features in zones.items():
-            if cat in ["road_major", "road_minor", "sectors"]: continue
-            for f in features:
-                if f["type"] == "polygon" and len(f["coords"]) >= 3:
-                    holes = f.get("holes") or []
-                    p = Polygon(f["coords"], holes)
-                    if not p.is_valid:
-                        p = p.buffer(0)
-                    if isinstance(p, Polygon) and p.is_valid:
-                        filled_polys.append(p)
-                    elif hasattr(p, 'geoms'):
-                        for geom in p.geoms:
-                            if isinstance(geom, Polygon) and geom.is_valid:
-                                filled_polys.append(geom)
-        
-        filled_union = unary_union(filled_polys) if filled_polys else None
-
-        # 3. 각 도로 블록에서 기존 구역을 뺀 '순수 섹터' 생성
+        # 2. Keep the full polygonized road block as the final sector.
         sector_features = []
         for block in blocks:
             if not block.is_valid: block = block.buffer(0)
@@ -194,11 +175,7 @@ def _generate_sector_blocks(zones, area_poly_coords):
             target_part = block.intersection(dong_poly)
             if target_part.is_empty: continue
 
-            # 기존 구역(공원 등) 오려내기
-            if filled_union and target_part.intersects(filled_union):
-                diff = target_part.difference(filled_union)
-            else:
-                diff = target_part
+            diff = target_part
 
             # 결과 처리 (Polygon 또는 MultiPolygon)
             final_polys = []

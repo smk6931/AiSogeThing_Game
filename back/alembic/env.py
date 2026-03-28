@@ -1,4 +1,4 @@
-from logging.config import fileConfig
+﻿from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -9,22 +9,22 @@ import sys
 import os
 
 # ===========================================================================
-# [경로 설정 & 모델 Import & Dotenv Load]
+# [寃쎈줈 ?ㅼ젙 & 紐⑤뜽 Import & Dotenv Load]
 # ===========================================================================
 from dotenv import load_dotenv
 
-# 1. 루트 경로의 .env 로드 (절대 경로)
+# 1. 猷⑦듃 寃쎈줈??.env 濡쒕뱶 (?덈? 寃쎈줈)
 env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
-print(f"📄 Loading .env from: {env_path}")
+print(f"Loading .env from: {env_path}")
 load_dotenv(env_path)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# 이제 models.py 대신 core.database를 불러옵니다.
-# (이 안에 모델들이 다 들어있음)
+# ?댁젣 models.py ???core.database瑜?遺덈윭?듬땲??
+# (???덉뿉 紐⑤뜽?ㅼ씠 ???ㅼ뼱?덉쓬)
 from core.database import Base 
 
-# Alembic이 바라볼 MetaData 설정
+# Alembic??諛붾씪蹂?MetaData ?ㅼ젙
 target_metadata = Base.metadata
 
 # ===========================================================================
@@ -50,7 +50,7 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     
-    # [Patch] 환경변수 우선 (서버: 5432, 로컬: 5433)
+    # [Patch] ?섍꼍蹂???곗꽑 (?쒕쾭: 5432, 濡쒖뺄: 5433)
     db_user = os.getenv("DB_USER", "game_sogething")
     db_password = os.getenv("DB_PASSWORD", "0000")
     db_host = os.getenv("DB_HOST", "127.0.0.1")
@@ -58,7 +58,7 @@ def run_migrations_online() -> None:
     db_name = os.getenv("DB_NAME", "game_sogething")
     
     sqlalchemy_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    print(f"🔗 Alembic Connecting to: {sqlalchemy_url}")
+    print(f"Alembic connecting to: {sqlalchemy_url}")
 
     section = config.get_section(config.config_ini_section, {})
     section["sqlalchemy.url"] = sqlalchemy_url

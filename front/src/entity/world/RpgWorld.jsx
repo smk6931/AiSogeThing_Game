@@ -20,6 +20,7 @@ import SeoulSubwayLines from '@entity/world/SeoulSubwayLines';
 import ZoneOverlay from '@entity/world/ZoneOverlay';
 import CityBlockOverlay from '@entity/world/CityBlockOverlay';
 import SeoulDistrictOverlay from '@entity/world/SeoulDistrictOverlay';
+import PartitionBoundaryOverlay from '@entity/world/PartitionBoundaryOverlay';
 import SeoulTerrain from '@entity/world/SeoulTerrain';
 import DongGroundMesh from '@entity/world/DongGroundMesh';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
@@ -520,6 +521,13 @@ const RpgWorld = ({
         currentDong={currentDong}
         visible={showDistrictBoundaries}
         elevation={debugConfig.mapElevation + 0.3}
+      />
+
+      <PartitionBoundaryOverlay
+        currentDong={currentDong}
+        playerPositionRef={playerRef}
+        visible={showDistrictBoundaries}
+        elevation={debugConfig.mapElevation + 0.34}
       />
 
       {/* 2. Remote Players (지면보다 높게 렌더링) */}
