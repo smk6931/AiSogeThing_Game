@@ -613,14 +613,16 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
       <div
         style={{
           position: 'absolute',
-          bottom: isMobile ? 'max(88px, env(safe-area-inset-bottom, 0px) + 88px)' : '28px',
+          bottom: '88px',
           right: '18px',
           display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
+          flexDirection: 'column',
           alignItems: 'center',
-          gap: isMobile ? '4px' : '6px',
+          gap: '4px',
           pointerEvents: 'auto',
           zIndex: 100,
+          transformOrigin: 'bottom right',
+          transform: `scale(${uiScale})`,
         }}
       >
         <button
@@ -696,6 +698,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
               boxShadow: '0 10px 24px rgba(220,38,38,0.35)',
               display: 'flex',
               alignItems: 'center',
+              transformOrigin: 'bottom right',
+              transform: `scale(${uiScale})`,
               justifyContent: 'center',
               fontSize: '22px',
               pointerEvents: 'auto',
