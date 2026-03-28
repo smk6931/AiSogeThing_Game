@@ -1,129 +1,259 @@
 # ========================================================
-#  AiSogeThing 통합 배포 스크립트 (개선 버전)
+#  AiSogeThing deployment script
+#  local git push -> local DB dump -> upload -> remote restore
 # ========================================================
 
-param ([string]$CommitMessage = "Update: Auto-deploy via script")
+param(
+    [string]$CommitMessage = "Update: Auto-deploy via script"
+)
 
-# Set Location
-Set-Location "C:\GitHub\AiSogeThing_Game"
-Write-Host "Working Directory: C:\GitHub\AiSogeThing_Game"
+$ErrorActionPreference = "Stop"
 
-# 로컬 .env 직접 읽기
-$EnvPath = Join-Path (Get-Location) ".env"
-if (Test-Path $EnvPath) {
-    Get-Content $EnvPath | ForEach-Object {
-        $line = $_.Trim()
-        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
-            $parts = $line.Split("=", 2)
-            $key = $parts[0].Trim()
-            $value = $parts[1].Trim().Trim('"').Trim("'")
-            if ($key -eq "SSH_KEY_PATH") { $SshKey = $value }
-            if ($key -eq "SSH_HOST") { $SshHost = $value }
-            if ($key -eq "REMOTE_DIR") { $RemoteDir = $value }
-        }
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $ProjectRoot
+Write-Host "Working Directory: $ProjectRoot"
+
+$EnvPath = Join-Path $ProjectRoot ".env"
+$ComposePath = Join-Path $ProjectRoot "docker-compose.server.yml"
+$DeployDir = Join-Path $ProjectRoot "backups\deploy"
+$LocalBackupScript = Join-Path $PSScriptRoot "local_backup_db.ps1"
+
+function Get-EnvMap([string]$Path) {
+    $map = @{}
+    if (-not (Test-Path $Path)) {
+        return $map
     }
+
+    Get-Content -Encoding UTF8 $Path | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith("#") -or -not $line.Contains("=")) {
+            return
+        }
+
+        $parts = $line.Split("=", 2)
+        $key = $parts[0].Trim()
+        $value = $parts[1].Trim().Trim('"').Trim("'")
+        $map[$key] = $value
+    }
+
+    return $map
 }
 
-# 기본값 설정
-if (-not $SshKey) { $SshKey = "C:\Users\ssh\ssh-key-oracle.key" }
-if (-not $SshHost) { $SshHost = "ubuntu@168.107.52.201" }
-if (-not $RemoteDir) { $RemoteDir = "~/game.sogething" }
+function Get-RequiredValue($Map, [string]$Key, [string]$Default = "") {
+    if ($Map.ContainsKey($Key) -and $Map[$Key]) {
+        return $Map[$Key]
+    }
+    return $Default
+}
 
-Write-Host "🚀 [1/5] Git Push in progress..." -ForegroundColor Cyan
+if (-not (Test-Path $EnvPath)) {
+    throw ".env not found: $EnvPath"
+}
 
-# Git 작업
+if (-not (Test-Path $ComposePath)) {
+    throw "docker-compose.server.yml not found: $ComposePath"
+}
+
+$localBackupExists = Test-Path $LocalBackupScript
+if (-not $localBackupExists) {
+    throw "local_backup_db.ps1 not found: $LocalBackupScript"
+}
+
+$envMap = Get-EnvMap $EnvPath
+
+$SshKey = Get-RequiredValue $envMap "SSH_KEY_PATH" "C:\Users\ssh\ssh-key-oracle.key"
+$SshHost = Get-RequiredValue $envMap "SSH_HOST" "ubuntu@168.107.52.201"
+$RemoteDir = Get-RequiredValue $envMap "REMOTE_DIR" "~/game.sogething"
+$RemoteDirShell = if ($RemoteDir.StartsWith("~/")) { '$HOME/' + $RemoteDir.Substring(2) } else { $RemoteDir }
+
+$DbUser = Get-RequiredValue $envMap "DB_USER" "game_sogething"
+$DbPassword = Get-RequiredValue $envMap "DB_PASSWORD" "0000"
+$DbHost = Get-RequiredValue $envMap "DB_HOST" "127.0.0.1"
+$DbPort = Get-RequiredValue $envMap "DB_PORT" "5100"
+$DbName = Get-RequiredValue $envMap "DB_NAME" "game_sogething"
+
+New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$DumpFile = ""
+$RemoteDeployDir = "$RemoteDirShell/.deploy"
+$RemoteDumpName = [System.IO.Path]::GetFileName($DumpFile)
+
+Write-Host "[1/7] Git push..." -ForegroundColor Cyan
 git add .
 git commit -m "$CommitMessage"
-git push origin main
-
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Git Push failed! Stopping deployment." -ForegroundColor Red
-    exit
+    Write-Host "No new commit created or commit failed. Continuing to push current branch state." -ForegroundColor Yellow
+}
+git push origin main
+if ($LASTEXITCODE -ne 0) {
+    throw "Git push failed."
+}
+Write-Host "Git push completed." -ForegroundColor Green
+
+Write-Host "[2/7] Create local PostgreSQL dump..." -ForegroundColor Cyan
+$DumpFile = (& $LocalBackupScript -OutputDir $DeployDir -Quiet | Select-Object -Last 1).Trim()
+if (-not $DumpFile -or -not (Test-Path $DumpFile)) {
+    throw "Local backup script did not produce a valid dump file."
+}
+$RemoteDumpName = [System.IO.Path]::GetFileName($DumpFile)
+Write-Host "Local dump created: $DumpFile" -ForegroundColor Green
+
+Write-Host "[3/7] Prepare remote deploy directory..." -ForegroundColor Cyan
+ssh -i "$SshKey" "$SshHost" "mkdir -p $RemoteDeployDir"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to prepare remote deploy directory."
 }
 
-Write-Host "✅ Git Push completed!" -ForegroundColor Green
-Write-Host "🚀 [2/5] Connecting to server and running deployment..." -ForegroundColor Cyan
+Write-Host "[4/7] Upload .env, compose, and SQL dump..." -ForegroundColor Cyan
+scp -i "$SshKey" "$EnvPath" "$SshHost`:$RemoteDirShell/.env"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload .env."
+}
+scp -i "$SshKey" "$ComposePath" "$SshHost`:$RemoteDirShell/docker-compose.server.yml"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload docker-compose.server.yml."
+}
+scp -i "$SshKey" "$DumpFile" "$SshHost`:$RemoteDeployDir/$RemoteDumpName"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload SQL dump."
+}
 
-# 서버에서 실행할 전체 명령 (bash stdin으로 전달)
-$RemoteCommand = @'
-    # 프로젝트 폴더가 없으면 초기 설정
-    if [ ! -d ~/game.sogething ]; then
-        echo "[Initial Setup] Clone project..."
-        cd ~
-        git clone https://github.com/smk6931/AiSogeThing_Game.git game.sogething
-        cd game.sogething
-        python3 -m venv venv
-        source venv/bin/activate
-        pip install -r requirements.txt
-        cd front && npm install && cd ..
-    else
-        cd ~/game.sogething
+Write-Host "[5/7] Run remote deploy..." -ForegroundColor Cyan
+$RemoteCommand = @"
+set -e
+
+RESTORE_REQUESTED=0
+REMOTE_DB_BACKUP=''
+
+rollback_db() {
+    if [ "\$RESTORE_REQUESTED" != "1" ]; then
+        exit 1
     fi
-    
-    echo "[Step 1] Download latest code..."
-    git fetch --all
-    git reset --hard origin/main
 
-    echo "[Step 2] Update backend..."
+    if [ -n "\$REMOTE_DB_BACKUP" ] && [ -f "\$REMOTE_DB_BACKUP" ]; then
+        echo '[Rollback] Restoring previous server DB backup...'
+        docker exec -e PGPASSWORD="\$DB_PASSWORD" -i game-sogething-db psql -U "\$DB_USER" -d "\$DB_NAME" < "\$REMOTE_DB_BACKUP" || true
+        echo '[Rollback] Previous DB restore attempted.'
+    else
+        echo '[Rollback] No previous DB backup found. Nothing to restore.'
+    fi
+}
+
+trap 'rollback_db' ERR
+
+if [ ! -d $RemoteDirShell/.git ]; then
+    echo '[Initial Setup] Clone project...'
+    mkdir -p $RemoteDirShell
+    rm -rf $RemoteDirShell/repo_bootstrap
+    git clone https://github.com/smk6931/AiSogeThing_Game.git $RemoteDirShell/repo_bootstrap
+    cp -a $RemoteDirShell/repo_bootstrap/. $RemoteDirShell/
+    rm -rf $RemoteDirShell/repo_bootstrap
+fi
+
+cd $RemoteDirShell
+
+if [ ! -f .env ]; then
+    echo '.env is missing on remote server'
+    exit 1
+fi
+
+set -a
+. ./.env
+set +a
+
+if [ ! -f docker-compose.server.yml ]; then
+    echo 'docker-compose.server.yml is missing on remote server'
+    exit 1
+fi
+
+if [ ! -f '.deploy/$RemoteDumpName' ]; then
+    echo 'SQL dump file is missing on remote server'
+    exit 1
+fi
+
+echo '[Remote 1/6] Pull latest code...'
+git fetch --all
+git reset --hard origin/main
+
+echo '[Remote 2/6] Ensure runtime dependencies...'
+if [ ! -d venv ]; then
+    python3 -m venv venv
+fi
+source venv/bin/activate
+pip install -r requirements.txt
+
+echo '[Remote 3/6] Start PostgreSQL container...'
+docker compose -f docker-compose.server.yml up -d db
+
+echo '[Remote 4/6] Wait for PostgreSQL health...'
+for i in {1..30}; do
+    if docker exec game-sogething-db pg_isready -U "$DB_USER" -d "$DB_NAME" > /dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
+
+if ! docker exec game-sogething-db pg_isready -U "$DB_USER" -d "$DB_NAME" > /dev/null 2>&1; then
+    echo 'PostgreSQL did not become ready in time'
+    exit 1
+fi
+
+echo '[Remote 5/6] Backup current server DB before restore...'
+mkdir -p .deploy/server-pre-restore
+REMOTE_DB_BACKUP=".deploy/server-pre-restore/$DbName-pre-$timestamp.sql"
+docker exec -e PGPASSWORD="$DB_PASSWORD" game-sogething-db pg_dump -U "$DB_USER" -d "$DB_NAME" --clean --if-exists --no-owner --no-privileges > "$REMOTE_DB_BACKUP"
+
+echo '[Remote 5.1/6] Restore SQL dump into PostgreSQL...'
+RESTORE_REQUESTED=1
+docker exec -e PGPASSWORD="$DB_PASSWORD" -i game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" < '.deploy/$RemoteDumpName'
+
+echo '[Remote 5.5/6] Run Alembic migration after restore...'
+cd back
+source ../venv/bin/activate
+alembic upgrade head
+cd ..
+
+echo '[Remote 6/6] Build frontend and restart PM2...'
+cd front
+npm install
+rm -rf node_modules/.vite dist
+npm run build
+cd ..
+
+pm2 delete backend > /dev/null 2>&1 || true
+pm2 delete frontend > /dev/null 2>&1 || true
+
+if pm2 list | grep -q 'game-back'; then
+    pm2 reload game-back --update-env
+else
     cd back
-    source ../venv/bin/activate
-    pip install -r ../requirements.txt
-    # alembic upgrade head (DB 연결 전까지 주석)
+    pm2 start 'uvicorn main:app --host 0.0.0.0 --port 8100' --name game-back --update-env
     cd ..
+fi
 
-    echo "[Step 3] Build frontend..."
-    cd front
-    npm install
-    rm -rf node_modules/.vite dist
-    npm run build
-    cd ..
+if pm2 list | grep -q 'game-front'; then
+    pm2 reload game-front --update-env
+else
+    pm2 serve front/dist 3100 --name game-front --spa
+fi
 
-    echo "[Step 4] Restart PM2 processes..."
-    # Legacy Cleanup (기존 이름 삭제)
-    pm2 delete backend > /dev/null 2>&1 || true
-    pm2 delete frontend > /dev/null 2>&1 || true
+if [ -f nginx_game_sogething.conf ]; then
+    sudo cp nginx_game_sogething.conf /etc/nginx/sites-available/game.sogething
+    sudo rm -f /etc/nginx/sites-enabled/game.sogething
+    sudo ln -s /etc/nginx/sites-available/game.sogething /etc/nginx/sites-enabled/game.sogething
+    sudo nginx -t && sudo systemctl reload nginx
+fi
 
-    # Back-end: game-back
-    if pm2 list | grep -q "game-back"; then
-        echo "[PM2] Reloading game-back..."
-        pm2 reload game-back --update-env
-    else
-        echo "[PM2] Starting game-back..."
-        cd back
-        pm2 start "uvicorn main:app --host 0.0.0.0 --port 8100" --name game-back --update-env
-        cd ..
-    fi
+RESTORE_REQUESTED=0
+pm2 status
+echo 'Deployment completed.'
+"@
 
-    # Front-end: game-front (PM2 serve 방식으로 목록 유지)
-    if pm2 list | grep -q "game-front"; then
-        echo "[PM2] Reloading game-front..."
-        pm2 reload game-front --update-env
-    else
-        echo "[PM2] Starting game-front..."
-        pm2 serve front/dist 3100 --name game-front --spa
-    fi
-    
-    echo "[Step 5] Update Nginx config..."
-    if [ -f ~/game.sogething/nginx_game_sogething.conf ]; then
-        sudo cp ~/game.sogething/nginx_game_sogething.conf /etc/nginx/sites-available/game.sogething
-        sudo rm -f /etc/nginx/sites-enabled/game.sogething
-        sudo ln -s /etc/nginx/sites-available/game.sogething /etc/nginx/sites-enabled/game.sogething
-        
-        # SSL 인증서 (실패 시 무시)
-        if [ ! -d /etc/letsencrypt/live/game.sogething.com ]; then
-            echo "[SSL] Attempting certificate issue..."
-            sudo certbot --nginx -d game.sogething.com -d www.game.sogething.com --non-interactive --agree-tos --email admin@sogething.com || echo "SSL Skip"
-        fi
-        
-        sudo nginx -t && sudo systemctl reload nginx
-        echo "SUCCESS: Nginx config completed"
-    fi
-    echo "Deployment completed!"
-    pm2 status
-'@
-
-# SSH로 서버에서 전체 배포 실행
 $RemoteCommand | ssh -i "$SshKey" "$SshHost" "bash"
+if ($LASTEXITCODE -ne 0) {
+    throw "Remote deployment failed."
+}
 
-Write-Host "🎉 Deployment completed! (Deployment Completed)" -ForegroundColor Green
-Write-Host "🌐 Access URL: https://game.sogething.com" -ForegroundColor Cyan
+Write-Host "[6/7] Remote deployment completed." -ForegroundColor Green
+Write-Host "[7/7] SQL backup kept locally: $DumpFile" -ForegroundColor Green
+Write-Host "Access URL: https://game.sogething.com" -ForegroundColor Cyan

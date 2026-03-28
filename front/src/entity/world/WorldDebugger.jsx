@@ -16,10 +16,10 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
       width: 300
     });
 
-    // [개선] 게임 접속 시 World Editor를 접어놓기 (클릭 시 펼침)
     gui.close();
-
+    gui.hide();
     gui.domElement.style.zIndex = '1000';
+    window.__worldGui = gui;
 
     // 1. 환경 설정 (안개, 조명)
     const envFolder = gui.addFolder('Environment & Sky').close();
@@ -120,7 +120,7 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
     gui.add(utils, 'saveConfig').name('💾 Save All Settings');
     gui.add(utils, 'hideGui').name('❌ Hide Editor');
 
-    return () => gui.destroy();
+    return () => { gui.destroy(); window.__worldGui = null; };
   }, [controls]);
 
   return null;

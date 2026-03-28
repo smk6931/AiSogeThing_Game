@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame } from 'lucide-react';
+import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarChart2, Package, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import worldApi from '@api/world';
@@ -34,8 +34,10 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   const navigate = useNavigate();
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState(null);
+  const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
   const [gpsCoords, setGpsCoords] = useState({ lat: GIS_ORIGIN.lat, lng: GIS_ORIGIN.lng });
   const [currentDistrict, setCurrentDistrict] = useState(null);
@@ -152,6 +154,13 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
       clearTimeout(timer);
     };
   }, [currentDong?.id, gpsCoords.lat, gpsCoords.lng]);
+
+  useEffect(() => {
+    if (window.__worldGui) {
+      if (worldEditorOpen) window.__worldGui.show();
+      else window.__worldGui.hide();
+    }
+  }, [worldEditorOpen]);
 
   const playerStats = {
     hp: myStats?.hp || 100,
@@ -291,22 +300,6 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
             />
           </div>
 
-          {/* 플레이어 위치 마커 */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: isMobile ? '7px' : '8px',
-              height: isMobile ? '7px' : '8px',
-              background: ACCENT,
-              borderRadius: '50%',
-              boxShadow: `0 0 10px ${ACCENT}`,
-              zIndex: 10,
-              pointerEvents: 'none',
-            }}
-          />
 
           {/* 줌 버튼 — 미니맵 내부 우상단 */}
           <div
@@ -529,20 +522,6 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
               </div>
             </div>
 
-            <div
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '12px',
-                height: '12px',
-                background: '#4ade80',
-                borderRadius: '50%',
-                boxShadow: '0 0 15px #4ade80',
-                zIndex: 10,
-              }}
-            />
           </div>
         </div>
       )}
@@ -769,49 +748,157 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
         </div>
       )}
 
+      {/* ===== 사이드바 토글 버튼 ===== */}
       <div
-        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        onClick={() => { setSidebarOpen(v => !v); if (sidebarOpen) setSidebarTab(null); }}
         style={{
           position: 'absolute',
           top: isMobile ? '116px' : '170px',
           right: isMobile ? '10px' : '20px',
           width: '32px',
           height: '32px',
-          background: 'rgba(8,14,22,0.88)',
-          border: `1px solid ${BORDER_COLOR}`,
-          borderRadius: '50%',
+          background: sidebarOpen ? `rgba(19,50,60,0.95)` : 'rgba(8,14,22,0.88)',
+          border: `1px solid ${sidebarOpen ? ACCENT : BORDER_COLOR}`,
+          borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
           pointerEvents: 'auto',
           boxShadow: GLOW,
+          transition: 'all 0.15s',
         }}
       >
-        <Settings size={16} color={GOLD} />
+        {sidebarOpen ? <X size={16} color={ACCENT} /> : <Menu size={16} color={GOLD} />}
       </div>
 
-      {isMenuOpen && (
+      {/* ===== 사이드바 패널 ===== */}
+      {sidebarOpen && (
         <div
           style={{
             position: 'absolute',
-            top: isMobile ? '190px' : '210px',
+            top: isMobile ? '154px' : '208px',
             right: isMobile ? '10px' : '20px',
-            background: 'rgba(8,14,22,0.94)',
+            width: isMobile ? '180px' : '220px',
+            background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
             border: `1px solid ${BORDER_COLOR}`,
             borderRadius: '12px',
             padding: '8px',
             zIndex: 100,
             pointerEvents: 'auto',
-            minWidth: '120px',
             boxShadow: GLOW,
           }}
         >
-          <div onClick={() => navigate('/')} style={{ color: GOLD, padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Home size={14} /> Home
+          {/* 헤더 */}
+          <div style={{ fontSize: '10px', color: GOLD, letterSpacing: '2px', fontWeight: '700', padding: '4px 8px 8px', borderBottom: `1px solid ${BORDER_COLOR}` }}>
+            MENU
           </div>
-          <div onClick={() => navigate('/')} style={{ color: '#ef4444', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <LogOut size={14} /> Leave
+
+          {/* 메뉴 항목들 */}
+          {[
+            { id: 'editor', Icon: Wrench, label: 'World Editor', color: ACCENT },
+            { id: 'stats', Icon: BarChart2, label: 'Stats', color: '#60a5fa' },
+            { id: 'items', Icon: Package, label: 'Items', color: '#a78bfa' },
+          ].map(({ id, Icon, label, color }) => (
+            <div
+              key={id}
+              onClick={() => setSidebarTab(sidebarTab === id ? null : id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '9px 10px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background: sidebarTab === id ? 'rgba(103,232,214,0.08)' : 'transparent',
+                border: `1px solid ${sidebarTab === id ? ACCENT : 'transparent'}`,
+                marginTop: '4px',
+                transition: 'all 0.12s',
+              }}
+            >
+              <Icon size={15} color={sidebarTab === id ? ACCENT : color} />
+              <span style={{ fontSize: '13px', color: sidebarTab === id ? ACCENT : '#c8e8e2', fontWeight: sidebarTab === id ? '700' : '400' }}>
+                {label}
+              </span>
+            </div>
+          ))}
+
+          {/* 서브 패널: World Editor */}
+          {sidebarTab === 'editor' && (
+            <div style={{ padding: '8px 10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+              <div style={{ fontSize: '10px', color: '#8ca6a0', marginBottom: '8px' }}>lil-gui 기반 실시간 편집기</div>
+              <button
+                onClick={() => setWorldEditorOpen(v => !v)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  background: worldEditorOpen ? 'rgba(103,232,214,0.15)' : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${worldEditorOpen ? ACCENT : BORDER_COLOR}`,
+                  borderRadius: '7px',
+                  color: worldEditorOpen ? ACCENT : '#c8e8e2',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  fontFamily: GAME_FONT,
+                }}
+              >
+                <Wrench size={13} /> {worldEditorOpen ? 'Hide Editor' : 'Open Editor'}
+              </button>
+            </div>
+          )}
+
+          {/* 서브 패널: Stats */}
+          {sidebarTab === 'stats' && (
+            <div style={{ padding: '8px 10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+              {[
+                { label: 'Level', value: playerStats.level, color: GOLD },
+                { label: 'HP', value: `${playerStats.hp} / ${playerStats.maxHp}`, color: '#ff6b6b' },
+                { label: 'MP', value: `${playerStats.mp} / ${playerStats.maxMp}`, color: '#60a5fa' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '4px 0', borderBottom: `1px solid rgba(124,171,166,0.1)` }}>
+                  <span style={{ color: '#8ca6a0' }}>{label}</span>
+                  <span style={{ color, fontWeight: '700' }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 서브 패널: Items */}
+          {sidebarTab === 'items' && (
+            <div style={{ padding: '8px 10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                {items.map((item) => (
+                  <div
+                    key={item.key}
+                    style={{
+                      padding: '8px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${BORDER_COLOR}`,
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '11px',
+                      color: item.name ? '#c8e8e2' : '#444',
+                    }}
+                  >
+                    <span style={{ fontSize: '16px' }}>{item.icon || '▫'}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || 'Empty'}</div>
+                      {item.count > 0 && <div style={{ color: GOLD, fontSize: '10px' }}>×{item.count}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 구분선 + Home/Leave */}
+          <div style={{ borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '8px', paddingTop: '4px' }}>
+            <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', cursor: 'pointer', color: GOLD, fontSize: '13px' }}>
+              <Home size={14} color={GOLD} /> Home
+            </div>
+            <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', fontSize: '13px' }}>
+              <LogOut size={14} color='#ef4444' /> Leave
+            </div>
           </div>
         </div>
       )}

@@ -40,8 +40,9 @@ const LeafletMapBackground = ({
   const LNG_PER_M = 1 / LNG_TO_M;
 
   const [mapCenter, setMapCenter] = useState([GIS_ORIGIN.lat, GIS_ORIGIN.lng]);
+  const [playerLatLng, setPlayerLatLng] = useState([GIS_ORIGIN.lat, GIS_ORIGIN.lng]);
 
-  // 실시간 지도 중심 동기화 (성능 최적화를 위해 500ms 주기로 업데이트)
+  // 실시간 지도 중심 + 플레이어 마커 동기화
   useEffect(() => {
     let lastMappedCenter = [GIS_ORIGIN.lat, GIS_ORIGIN.lng];
 
@@ -52,8 +53,9 @@ const LeafletMapBackground = ({
         const lng = GIS_ORIGIN.lng + (x * LNG_PER_M);
 
         const distSq = Math.pow(lat - lastMappedCenter[0], 2) + Math.pow(lng - lastMappedCenter[1], 2);
-        if (distSq > 0.00000001) { // 정밀도 조정: 충분히 움직였을 때만
+        if (distSq > 0.00000001) {
           setMapCenter([lat, lng]);
+          setPlayerLatLng([lat, lng]);
           lastMappedCenter = [lat, lng];
         }
       }
@@ -128,6 +130,13 @@ const LeafletMapBackground = ({
         })}
 
 
+        {/* 플레이어 위치 마커 — 지도 드래그해도 실제 좌표에 고정 */}
+        <CircleMarker
+          center={playerLatLng}
+          radius={6}
+          pathOptions={{ color: '#67e8d6', fillColor: '#67e8d6', fillOpacity: 1, weight: 2 }}
+        />
+
         {/* 몬스터 마커 — 플레이어 1km(1000 game units) 이내만 표시 */}
         {Object.values(monsters).map((m) => {
           if (!m?.position || m.state === 'dead') return null;
@@ -138,9 +147,10 @@ const LeafletMapBackground = ({
 
           const mLat = GIS_ORIGIN.lat - (m.position.z / LAT_TO_M);
           const mLng = GIS_ORIGIN.lng + (m.position.x / LNG_TO_M);
-          const isBoss = !!m.modelPath;
-          const color = isBoss ? '#ff4444' : '#ffaa00';
-          const radius = isBoss ? 6 : 4;
+          const isBoss = m.tier === 'boss';
+          const isElite = m.tier === 'elite';
+          const color = isBoss ? '#ff4444' : isElite ? '#ff9900' : '#ffcc44';
+          const radius = isBoss ? 7 : isElite ? 5 : 4;
 
           return (
             <CircleMarker

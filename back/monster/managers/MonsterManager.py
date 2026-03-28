@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 
 class Monster:
-    def __init__(self, id: int, x: float, z: float, hp: int = 100, model_path: Optional[str] = None):
+    def __init__(self, id: int, x: float, z: float, hp: int = 100, model_path: Optional[str] = None, tier: str = "normal"):
         self.id = id
         self.x = x
         self.z = z
@@ -15,7 +15,8 @@ class Monster:
         self.target_user_id = None
         self.state = "idle"
         self.monster_type = random.randint(0, 13)
-        self.model_path = model_path  # GLB 경로 (없으면 프론트에서 스프라이트 사용)
+        self.model_path = model_path
+        self.tier = tier  # normal / elite / boss
 
     def to_dict(self):
         data = {
@@ -25,6 +26,7 @@ class Monster:
             "maxHp": self.max_hp,
             "state": self.state,
             "monsterType": self.monster_type,
+            "tier": self.tier,
         }
         if self.model_path:
             data["modelPath"] = self.model_path
@@ -46,6 +48,7 @@ class MonsterManager:
             z=8.0,
             hp=5000,
             model_path="monsters/Gangnam_Boss_Fire_001_Dragon.glb",
+            tier="boss",
         )
         dragon.monster_type = 0
         dragon.speed = 0.5
@@ -69,7 +72,10 @@ class MonsterManager:
             z = center_z + math.sin(angle) * dist
             is_elite = random.random() < 0.1
             hp = 500 if is_elite else 100
-            monster = Monster(start_id + i, x, z, hp=hp)
+            tier = "elite" if is_elite else "normal"
+            monster = Monster(start_id + i, x, z, hp=hp,
+                              model_path="monsters/Seoul_Normal_Water_001_Slime.glb",
+                              tier=tier)
             monster.is_elite = is_elite
             self.monsters[monster.id] = monster
 

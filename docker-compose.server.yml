@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: game-sogething-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-game_sogething}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-0000}
+      POSTGRES_DB: ${DB_NAME:-game_sogething}
+    ports:
+      - "${DB_PORT:-5100}:5432"
+    volumes:
+      - game_sogething_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-game_sogething} -d ${DB_NAME:-game_sogething}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  game_sogething_pgdata:
