@@ -199,6 +199,7 @@ const GameEntry = () => {
         onSimulateKey={simulateKey}
         onlineCount={otherPlayers ? Object.keys(otherPlayers).length + 1 : 1}
         myStats={myStats}
+        monsters={monsters}
       />
 
 

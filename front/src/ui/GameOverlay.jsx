@@ -28,7 +28,7 @@ const injectFont = () => {
   document.head.appendChild(link);
 };
 
-const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats }) => {
+const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, monsters = {} }) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();
   const navigate = useNavigate();
@@ -287,6 +287,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
               dongs={dongs}
               currentDistrictId={currentDistrict?.id || null}
               currentDongId={currentDong?.id || null}
+              monsters={monsters}
             />
           </div>
 
@@ -499,6 +500,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
                 interactive
                 showSeoulMask
                 onZoomChange={(newZoom) => setMapZoom(newZoom - 1)}
+                monsters={monsters}
               />
             </div>
 
@@ -618,67 +620,76 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
         </div>
       </div>
 
+      <div
+        style={{
+          position: 'absolute',
+          bottom: isMobile ? '128px' : '28px',
+          right: isMobile ? '18px' : '104px',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: 'center',
+          gap: isMobile ? '4px' : '6px',
+          pointerEvents: 'auto',
+          zIndex: 100,
+        }}
+      >
+        <button
+          onClick={() => setMoveSpeed(prev => prev <= 5 ? Math.max(1, prev - 1) : Math.max(5, prev - 5))}
+          style={{
+            width: isMobile ? '28px' : '30px',
+            height: isMobile ? '20px' : '30px',
+            background: 'rgba(8,14,22,0.86)',
+            border: `1px solid ${BORDER_COLOR}`,
+            borderRadius: '6px',
+            color: ACCENT,
+            fontSize: isMobile ? '13px' : '16px',
+            lineHeight: 1,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >-</button>
+
+        <div
+          style={{
+            minWidth: isMobile ? '32px' : '52px',
+            textAlign: 'center',
+            background: 'rgba(8,14,22,0.88)',
+            border: `1px solid ${BORDER_COLOR}`,
+            borderRadius: '7px',
+            padding: isMobile ? '3px 4px' : '6px 8px',
+            fontFamily: GAME_FONT,
+            boxShadow: GLOW,
+          }}
+        >
+          <div style={{ fontSize: isMobile ? '8px' : '9px', color: GOLD, letterSpacing: '0.8px' }}>SPD</div>
+          <div style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '700', color: moveSpeed >= 40 ? '#ff7a7a' : ACCENT }}>
+            {Math.round(moveSpeed)}
+          </div>
+        </div>
+
+        <button
+          onClick={() => setMoveSpeed(prev => prev < 5 ? prev + 1 : Math.min(50, prev + 5))}
+          style={{
+            width: isMobile ? '28px' : '30px',
+            height: isMobile ? '20px' : '30px',
+            background: 'rgba(8,14,22,0.86)',
+            border: `1px solid ${BORDER_COLOR}`,
+            borderRadius: '6px',
+            color: ACCENT,
+            fontSize: isMobile ? '13px' : '16px',
+            lineHeight: 1,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >+</button>
+      </div>
+
       {isMobile && (
         <>
-          {/* 이동 속도 조절 — 공격 버튼 왼쪽 */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '34px',
-              right: '86px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '3px',
-              pointerEvents: 'auto',
-              zIndex: 100,
-            }}
-          >
-            <button
-              onClick={() => setMoveSpeed(prev => prev < 5 ? prev + 1 : Math.min(50, prev + 5))}
-              style={{
-                width: '28px', height: '20px',
-                background: 'rgba(8,14,22,0.82)',
-                border: `1px solid ${BORDER_COLOR}`,
-                borderRadius: '5px',
-                color: ACCENT,
-                fontSize: '13px',
-                lineHeight: 1,
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >+</button>
-
-            <div style={{
-              fontSize: '13px',
-              fontWeight: '700',
-              color: moveSpeed >= 40 ? '#ff7a7a' : ACCENT,
-              background: 'rgba(8,14,22,0.82)',
-              border: `1px solid ${BORDER_COLOR}`,
-              borderRadius: '5px',
-              width: '28px',
-              textAlign: 'center',
-              padding: '2px 0',
-              fontFamily: GAME_FONT,
-            }}>
-              {Math.round(moveSpeed)}
-            </div>
-
-            <button
-              onClick={() => setMoveSpeed(prev => prev <= 5 ? Math.max(1, prev - 1) : Math.max(5, prev - 5))}
-              style={{
-                width: '28px', height: '20px',
-                background: 'rgba(8,14,22,0.82)',
-                border: `1px solid ${BORDER_COLOR}`,
-                borderRadius: '5px',
-                color: ACCENT,
-                fontSize: '13px',
-                lineHeight: 1,
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >−</button>
-          </div>
 
           {/* 공격 버튼 */}
           <div

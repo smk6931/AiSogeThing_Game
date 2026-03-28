@@ -178,24 +178,24 @@ def choose_bucket(dominant_landuse: str, area_m2: float, mix_score: float) -> tu
 
 def choose_texture_profile(bucket: str, dominant_landuse: str, seq: int, area_m2: float) -> str:
     if bucket == "river_edge":
-        return ["frozen_bank_a", "frozen_bank_b", "frozen_bank_c"][(seq - 1) % 3]
+        return ["glacier_rift_01", "glacier_rift_02", "glacier_rift_03"][(seq - 1) % 3]
     if bucket == "green_buffer":
         if dominant_landuse == "forest":
-            return "forest_canopy_a" if seq % 2 else "forest_canopy_b"
-        return "green_courtyard_a" if area_m2 < 2500 else "green_courtyard_b"
+            return "forest_path_01" if seq % 2 else "forest_path_02"
+        return "pond_meadow_01" if area_m2 < 2500 else "cliff_meadow_01"
     if bucket == "campus_buffer":
-        return "academy_courtyard_a" if seq % 2 else "academy_courtyard_b"
+        return "sanctuary_trail_01" if seq % 2 else "academy_ruin_yard_01"
     if bucket == "route_node":
         if area_m2 < 600:
             return "stone_route_trim"
-        return "stone_route_a" if seq % 2 else "stone_route_b"
+        return "sunlit_stone_route_01" if seq % 2 else "sunlit_stone_route_02"
     if bucket == "special_poi":
-        return "event_surface_a" if seq % 2 else "event_surface_b"
+        return "arcane_floor_01" if seq % 2 else "arcane_floor_02"
     if dominant_landuse == "residential":
         if area_m2 > 3500:
-            return "dense_block_ground_c"
-        return "dense_block_ground_a" if seq % 2 else "dense_block_ground_b"
-    return "dense_block_ground_b"
+            return "village_square_01"
+        return "village_square_01" if seq % 2 else "cliff_meadow_01"
+    return "forest_path_02"
 
 
 def choose_copy(bucket: str, seq: int) -> tuple[str, str, str]:

@@ -1,22 +1,9 @@
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
-# from sqlalchemy.ext.asyncio import AsyncSession  # [임시 비활성]
-from typing import Annotated, List, Dict
-# from core.database import get_db  # [임시 비활성]
-import asyncio
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from player.managers.PlayerManager import player_manager
 from monster.managers.MonsterManager import monster_manager
 
 router = APIRouter(prefix="/api/game", tags=["Game Player & WebSocket"])
-
-@router.on_event("startup")
-async def start_monster_ai():
-    # 서버 시작 시 몬스터 스폰 및 AI 가동
-    if not monster_manager.monsters:
-        monster_manager.spawn_random(count=5)
-    
-    # AI 루프를 백그라운드 태스크로 실행
-    asyncio.create_task(monster_manager.game_loop(player_manager.broadcast))
 
 @router.get("/status")
 async def get_game_status():

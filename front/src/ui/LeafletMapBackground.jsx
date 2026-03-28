@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polyline, Polygon, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Polygon, Tooltip, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
@@ -33,8 +33,8 @@ const LeafletMapBackground = ({
   currentDongId = null,
   interactive = false,
   showSeoulMask = true,
-  onZoomChange = null
-
+  onZoomChange = null,
+  monsters = {}
 }) => {
   const LAT_PER_M = 1 / LAT_TO_M;
   const LNG_PER_M = 1 / LNG_TO_M;
@@ -127,6 +127,30 @@ const LeafletMapBackground = ({
           );
         })}
 
+
+        {/* 몬스터 마커 — 플레이어 1km(1000 game units) 이내만 표시 */}
+        {Object.values(monsters).map((m) => {
+          if (!m?.position || m.state === 'dead') return null;
+          const px = playerPositionRef?.current?.x ?? 0;
+          const pz = playerPositionRef?.current?.z ?? 0;
+          const dist = Math.sqrt((m.position.x - px) ** 2 + (m.position.z - pz) ** 2);
+          if (dist > 1000) return null;
+
+          const mLat = GIS_ORIGIN.lat - (m.position.z / LAT_TO_M);
+          const mLng = GIS_ORIGIN.lng + (m.position.x / LNG_TO_M);
+          const isBoss = !!m.modelPath;
+          const color = isBoss ? '#ff4444' : '#ffaa00';
+          const radius = isBoss ? 6 : 4;
+
+          return (
+            <CircleMarker
+              key={m.id}
+              center={[mLat, mLng]}
+              radius={radius}
+              pathOptions={{ color, fillColor: color, fillOpacity: 0.85, weight: 1.5 }}
+            />
+          );
+        })}
 
         <MapController center={mapCenter} zoom={zoomLevel} />
       </MapContainer>

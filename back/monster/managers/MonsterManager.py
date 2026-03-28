@@ -39,11 +39,11 @@ class MonsterManager:
         self._spawn_dragon_at_start()
 
     def _spawn_dragon_at_start(self):
-        """서버 시작 시 드래곤을 스폰 위치(0,0) 근처에 배치"""
+        """서버 시작 시 드래곤을 플레이어 스폰 지점(0,0) 근처에 배치"""
         dragon = Monster(
             id=self.next_id,
-            x=15.0,
-            z=15.0,
+            x=8.0,
+            z=8.0,
             hp=5000,
             model_path="monsters/Gangnam_Boss_Fire_001_Dragon.glb",
         )
@@ -52,8 +52,8 @@ class MonsterManager:
         self.monsters[dragon.id] = dragon
         self.next_id += 1
 
-    def spawn_random(self, count: int = 5):
-        """플레이어 스폰 지점(0,0) 반경 40 내 랜덤 스폰 (일반 몬스터)"""
+    def spawn_random(self, count: int = 5, center_x: float = 0.0, center_z: float = 0.0):
+        """플레이어 근처 반경 20m 이내 랜덤 스폰 (일반 몬스터)"""
         current_count = len(self.monsters)
         max_monsters = 6  # 드래곤 1 + 일반 5
         if current_count >= max_monsters:
@@ -63,8 +63,10 @@ class MonsterManager:
         start_id = max(self.monsters.keys()) + 1 if self.monsters else self.next_id
 
         for i in range(to_spawn):
-            x = random.uniform(-40, 40)
-            z = random.uniform(-40, 40)
+            angle = random.uniform(0, math.pi * 2)
+            dist = random.uniform(5, 20)
+            x = center_x + math.cos(angle) * dist
+            z = center_z + math.sin(angle) * dist
             is_elite = random.random() < 0.1
             hp = 500 if is_elite else 100
             monster = Monster(start_id + i, x, z, hp=hp)

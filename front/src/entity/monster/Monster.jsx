@@ -1,16 +1,66 @@
-import React, { useRef } from 'react';
-import { Billboard, Text, useTexture, useGLTF } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import React, { useRef, useMemo, useEffect } from 'react';
+import * as THREE from 'three';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { Billboard, Text, useTexture, useGLTF, useAnimations } from '@react-three/drei';
 
 const BASE_MODEL_URL = '/models/';
 
-/** GLB 3D 모델 몬스터 */
-const MonsterGLB = ({ modelPath, scale }) => {
-  const { scene } = useGLTF(BASE_MODEL_URL + modelPath);
-  const cloned = React.useMemo(() => scene.clone(), [scene]);
-  // scale * 0.5 → playerScale(0.625) 기준 약 0.31 → 네이티브 크기에 따라 조절 필요
-  const s = scale * 0.5;
-  return <primitive object={cloned} scale={[s, s, s]} />;
+/** GLB 3D 몬스터 — SkeletonUtils.clone + 자동 정규화 + 애니메이션 */
+const MonsterGLB = ({ modelPath, scale, state }) => {
+  const { scene, animations } = useGLTF(BASE_MODEL_URL + modelPath);
+  const cloned = useMemo(() => cloneSkeleton(scene), [scene]);
+  const groupRef = useRef();
+  const { actions } = useAnimations(animations, groupRef);
+
+  const { modelScale, yOffset } = useMemo(() => {
+    cloned.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(cloned);
+    const nativeH = box.max.y - box.min.y;
+    const isBoss = modelPath.toLowerCase().includes('boss');
+    const targetH = isBoss ? scale * 8 : scale * 3.2;
+    const ms = nativeH > 0.001 ? targetH / nativeH : scale;
+    const yOff = -box.min.y * ms;
+    return { modelScale: ms, yOffset: yOff };
+  }, [cloned, modelPath, scale]);
+
+  // 애니메이션 이름 매핑 (모델별 규칙)
+  const idleAnim = useMemo(() => {
+    const names = animations.map(a => a.name);
+    return names.find(n => /stand|idle/i.test(n)) || names[0];
+  }, [animations]);
+
+  const hitAnim = useMemo(() => {
+    const names = animations.map(a => a.name);
+    return names.find(n => /hit|down|damage/i.test(n));
+  }, [animations]);
+
+  const dieAnim = useMemo(() => {
+    const names = animations.map(a => a.name);
+    return names.find(n => /die|dead/i.test(n));
+  }, [animations]);
+
+  useEffect(() => {
+    if (!actions || !idleAnim) return;
+    actions[idleAnim]?.reset().fadeIn(0.2).play();
+  }, [actions, idleAnim]);
+
+  useEffect(() => {
+    if (!actions) return;
+    if (state === 'hit' && hitAnim) {
+      actions[hitAnim]?.reset().fadeIn(0.1).play();
+      const t = setTimeout(() => {
+        actions[idleAnim]?.reset().fadeIn(0.2).play();
+        actions[hitAnim]?.fadeOut(0.2);
+      }, 600);
+      return () => clearTimeout(t);
+    }
+  }, [state, actions, hitAnim, idleAnim]);
+
+  return (
+    <group ref={groupRef} position={[0, yOffset, 0]} scale={modelScale}>
+      <primitive object={cloned} />
+    </group>
+  );
 };
 
 /** 스프라이트(이미지) 몬스터 — 기존 방식 */
@@ -74,7 +124,7 @@ const Monster = ({ id, position, hp, maxHp, state, textureUrl, modelPath, scale 
     <group position={pos}>
       {modelPath ? (
         <>
-          <MonsterGLB modelPath={modelPath} scale={scale} />
+          <MonsterGLB modelPath={modelPath} scale={scale} state={state} />
           <HpBar hp={hp} maxHp={maxHp} name={modelPath.split('_').pop()?.replace('.glb', '') || `#${id}`} scale={scale} />
         </>
       ) : (
