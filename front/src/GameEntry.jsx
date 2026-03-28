@@ -97,9 +97,10 @@ const GameEntry = () => {
   // 마우스 휠 줌 핸들러
   useEffect(() => {
     const handleWheel = (e) => {
-      // 입력창(Chat)이나 UI 요소 위에서는 줌 방지
       if (e.target.closest('input, textarea, button')) return;
-
+      // canvas 위에서 스크롤은 OrbitControls(3D zoom)에 맡김 — 2D 지도는 미니맵 영역만
+      const onCanvas = e.target.tagName === 'CANVAS';
+      if (onCanvas) return;
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       setZoomLevel(prev => Math.max(4, Math.min(22, prev + delta)));
@@ -107,7 +108,7 @@ const GameEntry = () => {
 
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
-  }, []); // [] 이므로 한 번만 등록됨
+  }, []);
 
   const checkMobile = () => true; // 전기기 통일 클린 모바일 HUD
   const [isMobile, setIsMobile] = useState(true);

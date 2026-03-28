@@ -58,74 +58,42 @@ const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => 
       lastTargetPos.current = null; // 재초기화 유도
     }
 
-    // 1. 첫 프레임 또는 모드 변경 시 초기화
+    // 1. 첫 프레임 또는 모드 변경 시 카메라 초기 위치 설정
     if (!lastTargetPos.current) {
       lastTargetPos.current = targetPos.clone();
 
-      let cx, cz, baseHeight;
-
-      // 카메라 FOV 초기 동기화
       if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
         state.camera.fov = debugConfig.cameraFov;
         state.camera.updateProjectionMatrix();
       }
 
+      let height, zOffset;
       if (cameraMode === 'isometric') {
-        const isoDistMult = debugConfig?.camIsoDistMult || 50;
-        const dist = state.camera.isOrthographicCamera ? 10000 : isoDistMult * Math.pow(2, 16.5 - zoomLevel);
-        const pitch = ((debugConfig?.camIsoPitch || 25) * Math.PI) / 180;
-
-        // 무원근 모드일 때 캐릭터 크기 조절 (줌 연동)
-        if (state.camera.isOrthographicCamera) {
-          state.camera.zoom = 50 / isoDistMult; 
-          state.camera.updateProjectionMatrix();
-        }
-
-        cx = targetPos.x;
-        cz = targetPos.z + dist * Math.sin(pitch);
-        baseHeight = dist * Math.cos(pitch);
+        // 쿼터뷰: 실제 RPG처럼 20m 높이, 18m 뒤 고정 시작
+        height = 22;
+        zOffset = 18;
       } else {
-        // 플레이 뷰(Play View) 설정 실시간 적용
-        const playDistMult = debugConfig?.playCamDistMult || 20;
-        const playPitch = ((debugConfig?.playCamPitch || 60) * Math.PI) / 180;
-        
-        const dist = state.camera.isOrthographicCamera ? 10000 : playDistMult * Math.pow(2, 16.5 - zoomLevel);
-
-
-        if (state.camera.isOrthographicCamera) {
-          state.camera.zoom = 50 / playDistMult;
-          state.camera.updateProjectionMatrix();
-        }
-
-        const radius = dist * Math.cos(playPitch);
-        cx = targetPos.x;
-        cz = targetPos.z + radius;
-        baseHeight = dist * Math.sin(playPitch);
+        // 360도 자유뷰: 15m 높이, 25m 뒤에서 시작 (낮은 RPG 시점)
+        height = 15;
+        zOffset = 25;
       }
 
-      state.camera.position.set(cx, targetPos.y + baseHeight, cz);
+      state.camera.position.set(targetPos.x, targetPos.y + height, targetPos.z + zOffset);
       orbitRef.current.target.copy(targetPos);
       orbitRef.current.update();
       return;
     }
 
-    // 2. 캐릭터 이동량 만큼 카메라도 이동
+    // 2. 캐릭터 이동량만큼 카메라도 이동 (현재 zoom/angle 유지)
     const currentOffset = new THREE.Vector3().subVectors(state.camera.position, lastTargetPos.current);
     state.camera.position.copy(targetPos).add(currentOffset);
 
-    // 3. OrbitControls 갱신
+    // 3. OrbitControls target 갱신 (angle/zoom은 OrbitControls에 위임)
     orbitRef.current.target.copy(targetPos);
 
     if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
       state.camera.fov = debugConfig.cameraFov;
       state.camera.updateProjectionMatrix();
-    }
-
-    if (cameraMode === 'isometric') {
-      const az = (debugConfig?.camIsoAzimuth || 0) * (Math.PI / 180);
-      const pitch = ((debugConfig?.camIsoPitch || 15) * Math.PI) / 180;
-      orbitRef.current.setAzimuthalAngle(az);
-      orbitRef.current.setPolarAngle(pitch);
     }
 
     orbitRef.current.update();

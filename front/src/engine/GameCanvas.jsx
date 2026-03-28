@@ -99,8 +99,11 @@ const GameCanvas = ({
         ref={orbitRef}
         enablePan={false}
         enableRotate={cameraMode === '360'}
-        enableDamping={false} // 캐릭터가 화면 중앙에서 벗어나지 않도록 모든 시점 모드에서 지연 효과 비활성화
-        enableZoom={false}
+        enableDamping={false}
+        enableZoom={true}
+        zoomSpeed={0.6}
+        minDistance={5}
+        maxDistance={200}
         makeDefault
       />
     </Canvas>
