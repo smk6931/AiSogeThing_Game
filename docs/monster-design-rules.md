@@ -16,9 +16,9 @@ DB 이름: `game-sogethingdb`
 ┌─────┬─────────────┬────────┬────────────┬──────────┬─────────────────────────────────────────────────┐
 │ id  │    name     │  tier  │   region   │ property │                   model_path                    │
 ├─────┼─────────────┼────────┼────────────┼──────────┼─────────────────────────────────────────────────┤
-│  1  │   Goblin    │ normal │ noryangjin │  forest  │ monsters/Goblin_Normal_Noryangjin_Forest_001.glb │
-│  2  │    Orc      │ elite  │   yongsan  │  stone   │ monsters/Orc_Elite_Yongsan_Stone_002.glb         │
-│  3  │ DragonBoss  │  boss  │   gangnam  │   fire   │ monsters/DragonBoss_Boss_Gangnam_Fire_003.glb    │
+│  1  │   Goblin    │ normal │ noryangjin │  forest  │ monsters/Normal_Noryangjin_Forest_001_Goblin.glb │
+│  2  │    Orc      │ elite  │   yongsan  │  stone   │ monsters/Elite_Yongsan_Stone_002_Orc.glb         │
+│  3  │   Dragon    │  boss  │   gangnam  │   fire   │ monsters/Boss_Gangnam_Fire_001_Dragon.glb        │
 └─────┴─────────────┴────────┴────────────┴──────────┴─────────────────────────────────────────────────┘
 ```
 
@@ -26,24 +26,31 @@ DB 이름: `game-sogethingdb`
 
 ## 3D 모델 파일 네이밍 규칙
 
+분류 기준(Tier/Region/Property/PKey)이 앞에 오고, 이름(Name)이 맨 뒤에 온다.
+파일 정렬 시 분류 기준으로 먼저 그룹핑되어 한눈에 파악하기 쉽다.
+
 ```
-{Name}_{Tier}_{Region}_{Property}_{PKey}.glb
+{Tier}_{Region}_{Property}_{PKey}_{Name}.glb
 ```
 
 | 자리 | 설명 | 예시 |
 |------|------|------|
-| Name | 몬스터 이름 (PascalCase) | `Goblin`, `Orc`, `DragonBoss` |
 | Tier | 등급 | `Normal` / `Elite` / `Event` / `Boss` |
 | Region | 이 모델이 설계된 기원 지역 | `Noryangjin`, `Yongsan`, `Gangnam` |
 | Property | 속성/테마 | `Forest` / `Stone` / `Fire` / `Water` / `Dark` |
 | PKey | DB의 id (3자리, 001~999) | `001`, `042` |
+| Name | 몬스터 이름 (PascalCase) | `Goblin`, `Orc`, `Dragon` |
 
 ### 실제 파일명 예시
 ```
-Goblin_Normal_Noryangjin_Forest_001.glb
-Orc_Elite_Yongsan_Stone_002.glb
-DragonBoss_Boss_Gangnam_Fire_003.glb
-EventSlime_Event_Mapo_Water_077.glb
+Normal_Noryangjin_Forest_001_Goblin.glb
+Elite_Yongsan_Stone_002_Orc.glb
+Boss_Gangnam_Fire_001_Dragon.glb
+Event_Mapo_Water_077_Slime.glb
+
+# 현재 프로젝트에 있는 파일
+Normal_Seoul_Water_001_Slime.glb
+Boss_Gangnam_Fire_001_Dragon.glb
 ```
 
 ---

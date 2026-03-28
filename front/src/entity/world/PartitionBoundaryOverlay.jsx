@@ -10,48 +10,83 @@ const gpsToXZ = (lat, lng) => ({
   z: (GIS_ORIGIN.lat - lat) * LAT_TO_M,
 });
 
+const toEdgeKey = (a, b) => {
+  const p1 = `${Math.round(a[0] * 1e6)},${Math.round(a[1] * 1e6)}`;
+  const p2 = `${Math.round(b[0] * 1e6)},${Math.round(b[1] * 1e6)}`;
+  return p1 < p2 ? `${p1}|${p2}` : `${p2}|${p1}`;
+};
+
+const buildWallFromSegment = (startLngLat, endLngLat, height, thickness) => {
+  const p1 = gpsToXZ(startLngLat[1], startLngLat[0]);
+  const p2 = gpsToXZ(endLngLat[1], endLngLat[0]);
+  const dx = p2.x - p1.x;
+  const dz = p2.z - p1.z;
+  const len = Math.sqrt(dx * dx + dz * dz);
+  if (len < 0.05) return null;
+
+  const angle = Math.atan2(dz, dx);
+  const boxGeo = new THREE.BoxGeometry(len, height, thickness);
+  boxGeo.translate(len / 2, height / 2, 0);
+  boxGeo.rotateY(-angle);
+  boxGeo.translate(p1.x, 0, p1.z);
+  return boxGeo;
+};
+
 const buildWallsFromRing = (ring, height = 28, thickness = 7.5) => {
   if (!ring || ring.length < 2) return [];
-
   const geos = [];
   for (let i = 0; i < ring.length - 1; i += 1) {
-    const [lng1, lat1] = ring[i];
-    const [lng2, lat2] = ring[i + 1];
-    const p1 = gpsToXZ(lat1, lng1);
-    const p2 = gpsToXZ(lat2, lng2);
-
-    const dx = p2.x - p1.x;
-    const dz = p2.z - p1.z;
-    const len = Math.sqrt(dx * dx + dz * dz);
-    if (len < 0.05) continue;
-
-    const angle = Math.atan2(dz, dx);
-    const boxGeo = new THREE.BoxGeometry(len, height, thickness);
-    boxGeo.translate(len / 2, height / 2, 0);
-    boxGeo.rotateY(-angle);
-    boxGeo.translate(p1.x, 0, p1.z);
-    geos.push(boxGeo);
+    const geo = buildWallFromSegment(ring[i], ring[i + 1], height, thickness);
+    if (geo) geos.push(geo);
   }
-
   return geos;
 };
 
 const buildPartitionBoundaryGeometry = (boundaryGeoJson) => {
   if (!boundaryGeoJson?.coordinates?.length) return null;
-
   const geos = [];
   for (const ring of boundaryGeoJson.coordinates) {
     geos.push(...buildWallsFromRing(ring));
   }
+  return geos.length ? mergeGeometries(geos, false) : null;
+};
 
-  if (geos.length === 0) return null;
-  return mergeGeometries(geos, false);
+const buildGroupBoundaryGeometry = (partitions, height = 42, thickness = 12) => {
+  const edgeMap = new Map();
+
+  partitions.forEach((partition) => {
+    const boundary = partition.boundary_geojson;
+    if (!boundary?.coordinates?.length) return;
+    boundary.coordinates.forEach((ring) => {
+      for (let i = 0; i < ring.length - 1; i += 1) {
+        const start = ring[i];
+        const end = ring[i + 1];
+        const key = toEdgeKey(start, end);
+        if (!edgeMap.has(key)) {
+          edgeMap.set(key, { count: 1, start, end });
+        } else {
+          edgeMap.get(key).count += 1;
+        }
+      }
+    });
+  });
+
+  const geos = [];
+  edgeMap.forEach((edge) => {
+    if (edge.count !== 1) return;
+    const geo = buildWallFromSegment(edge.start, edge.end, height, thickness);
+    if (geo) geos.push(geo);
+  });
+
+  return geos.length ? mergeGeometries(geos, false) : null;
 };
 
 const PartitionBoundaryOverlay = ({
   currentDong,
   playerPositionRef,
-  visible = true,
+  visibleMicro = false,
+  visibleGroup = false,
+  highlightCurrentGroup = true,
   elevation = 0.42,
 }) => {
   const [partitions, setPartitions] = useState([]);
@@ -62,20 +97,16 @@ const PartitionBoundaryOverlay = ({
     let cancelled = false;
 
     const load = async () => {
-      if (!visible || !currentDong?.id) {
+      if ((!visibleMicro && !visibleGroup && !highlightCurrentGroup) || !currentDong?.id) {
         setPartitions([]);
         return;
       }
 
       try {
         const res = await worldApi.getDongPartitions(currentDong.id);
-        if (!cancelled) {
-          setPartitions(Array.isArray(res.data) ? res.data : []);
-        }
+        if (!cancelled) setPartitions(Array.isArray(res.data) ? res.data : []);
       } catch (_) {
-        if (!cancelled) {
-          setPartitions([]);
-        }
+        if (!cancelled) setPartitions([]);
       }
     };
 
@@ -83,13 +114,13 @@ const PartitionBoundaryOverlay = ({
     return () => {
       cancelled = true;
     };
-  }, [visible, currentDong?.id]);
+  }, [visibleMicro, visibleGroup, highlightCurrentGroup, currentDong?.id]);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadCurrentRegion = async () => {
-      if (!visible || !currentDong?.id || !playerPositionRef?.current?.position) {
+      if ((!visibleMicro && !visibleGroup && !highlightCurrentGroup) || !currentDong?.id || !playerPositionRef?.current?.position) {
         setCurrentGroupKey(null);
         setCurrentPartitionKey(null);
         return;
@@ -118,64 +149,79 @@ const PartitionBoundaryOverlay = ({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [visible, currentDong?.id, playerPositionRef]);
+  }, [visibleMicro, visibleGroup, highlightCurrentGroup, currentDong?.id, playerPositionRef]);
 
-  const boundaryMeshes = useMemo(() => {
-    return partitions
-      .map((partition) => ({
-        id: partition.id,
-        partitionKey: partition.partition_key,
-        groupKey: partition.group_key,
-        geometry: buildPartitionBoundaryGeometry(partition.boundary_geojson),
+  const microMeshes = useMemo(
+    () =>
+      partitions
+        .map((partition) => ({
+          id: partition.id,
+          partitionKey: partition.partition_key,
+          groupKey: partition.group_key,
+          geometry: buildPartitionBoundaryGeometry(partition.boundary_geojson),
+        }))
+        .filter((entry) => entry.geometry),
+    [partitions]
+  );
+
+  const groupMeshes = useMemo(() => {
+    const grouped = new Map();
+    partitions.forEach((partition) => {
+      if (!partition.group_key) return;
+      if (!grouped.has(partition.group_key)) grouped.set(partition.group_key, []);
+      grouped.get(partition.group_key).push(partition);
+    });
+
+    return Array.from(grouped.entries())
+      .map(([groupKey, groupPartitions]) => ({
+        groupKey,
+        geometry: buildGroupBoundaryGeometry(groupPartitions),
       }))
       .filter((entry) => entry.geometry);
   }, [partitions]);
 
-  if (!visible || boundaryMeshes.length === 0) return null;
+  if (!visibleMicro && !visibleGroup && !highlightCurrentGroup) return null;
 
-  const currentPartitionMeshes = boundaryMeshes.filter((entry) => entry.partitionKey === currentPartitionKey);
-  const currentGroupMeshes = boundaryMeshes.filter(
+  const currentMicroMeshes = microMeshes.filter((entry) => entry.partitionKey === currentPartitionKey);
+  const currentGroupMicroMeshes = microMeshes.filter(
     (entry) => entry.groupKey && entry.groupKey === currentGroupKey && entry.partitionKey !== currentPartitionKey
-  );
-  const otherMeshes = boundaryMeshes.filter(
-    (entry) => entry.partitionKey !== currentPartitionKey && entry.groupKey !== currentGroupKey
   );
 
   return (
     <group name="partition-boundaries" position={[0, elevation, 0]}>
-      {otherMeshes.map((entry) => (
-        <mesh key={`partition-boundary-${entry.id}`} geometry={entry.geometry} renderOrder={13}>
-          <meshBasicMaterial
-            color="#f7d56b"
-            transparent
-            opacity={0.28}
-            depthWrite={false}
-            depthTest={false}
-          />
-        </mesh>
-      ))}
-      {currentGroupMeshes.map((entry) => (
-        <mesh key={`partition-group-boundary-${entry.id}`} geometry={entry.geometry} renderOrder={14}>
-          <meshBasicMaterial
-            color="#67e8d6"
-            transparent
-            opacity={0.55}
-            depthWrite={false}
-            depthTest={false}
-          />
-        </mesh>
-      ))}
-      {currentPartitionMeshes.map((entry) => (
-        <mesh key={`partition-current-boundary-${entry.id}`} geometry={entry.geometry} renderOrder={15}>
-          <meshBasicMaterial
-            color="#ffffff"
-            transparent
-            opacity={0.95}
-            depthWrite={false}
-            depthTest={false}
-          />
-        </mesh>
-      ))}
+      {visibleMicro &&
+        microMeshes.map((entry) => (
+          <mesh key={`partition-boundary-${entry.id}`} geometry={entry.geometry} renderOrder={13}>
+            <meshBasicMaterial color="#f7d56b" transparent opacity={0.24} depthWrite={false} depthTest={false} />
+          </mesh>
+        ))}
+
+      {visibleGroup &&
+        groupMeshes.map((entry) => (
+          <mesh key={`partition-group-${entry.groupKey}`} geometry={entry.geometry} renderOrder={14}>
+            <meshBasicMaterial
+              color={entry.groupKey === currentGroupKey ? '#67e8d6' : '#8bd8ff'}
+              transparent
+              opacity={entry.groupKey === currentGroupKey ? 0.82 : 0.48}
+              depthWrite={false}
+              depthTest={false}
+            />
+          </mesh>
+        ))}
+
+      {highlightCurrentGroup &&
+        currentGroupMicroMeshes.map((entry) => (
+          <mesh key={`partition-current-group-${entry.id}`} geometry={entry.geometry} renderOrder={15}>
+            <meshBasicMaterial color="#67e8d6" transparent opacity={0.46} depthWrite={false} depthTest={false} />
+          </mesh>
+        ))}
+
+      {highlightCurrentGroup &&
+        currentMicroMeshes.map((entry) => (
+          <mesh key={`partition-current-micro-${entry.id}`} geometry={entry.geometry} renderOrder={16}>
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.96} depthWrite={false} depthTest={false} />
+          </mesh>
+        ))}
     </group>
   );
 };

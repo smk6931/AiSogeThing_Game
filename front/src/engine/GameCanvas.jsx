@@ -27,6 +27,9 @@ const GameCanvas = ({
   showHeightMap,
   showGroundMesh,
   showDistrictBoundaries,
+  showMicroBoundaries,
+  showGroupBoundaries,
+  highlightCurrentGroup,
   cameraMode
 }) => {
   const orbitRef = useRef();
@@ -82,6 +85,9 @@ const GameCanvas = ({
           showHeightMap={showHeightMap}
           showGroundMesh={showGroundMesh}
           showDistrictBoundaries={showDistrictBoundaries}
+          showMicroBoundaries={showMicroBoundaries}
+          showGroupBoundaries={showGroupBoundaries}
+          highlightCurrentGroup={highlightCurrentGroup}
           cameraMode={cameraMode}
           orbitRef={orbitRef}
         />

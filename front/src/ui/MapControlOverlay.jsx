@@ -35,6 +35,9 @@ const BUTTONS = [
   { key: 'showRoadSplitLayer', label: '분할', icon: '🧩', colorOn: 'rgba(150,90,200,0.7)' },
   { key: 'showLanduseZones', label: '용도구역', icon: '◆', colorOn: 'rgba(200,80,120,0.7)' },
   { key: 'showDistrictBoundaries', label: '경계', icon: '🏛', colorOn: 'rgba(0,180,200,0.7)' },
+  { key: 'showGroupBoundaries', label: '그룹선', icon: '⬒', colorOn: 'rgba(0,210,220,0.7)' },
+  { key: 'showMicroBoundaries', label: '미세선', icon: '┼', colorOn: 'rgba(240,190,90,0.7)' },
+  { key: 'highlightCurrentGroup', label: '현재강조', icon: '✦', colorOn: 'rgba(80,220,180,0.7)' },
 ];
 
 const MapControlOverlay = ({
@@ -47,6 +50,9 @@ const MapControlOverlay = ({
   landuseFilters, setLanduseFilters,
   showGroundMesh, setShowGroundMesh,
   showDistrictBoundaries, setShowDistrictBoundaries,
+  showMicroBoundaries, setShowMicroBoundaries,
+  showGroupBoundaries, setShowGroupBoundaries,
+  highlightCurrentGroup, setHighlightCurrentGroup,
   cameraMode, setCameraMode, onPlayView,
   moveSpeed = 20, setMoveSpeed,
   isMobile = false
@@ -69,6 +75,9 @@ const MapControlOverlay = ({
     showRoadSplitLayer: { value: showRoadSplitLayer, setter: setShowRoadSplitLayer },
     showLanduseZones: { value: showLanduseZones, setter: toggleLanduse },
     showDistrictBoundaries: { value: showDistrictBoundaries, setter: setShowDistrictBoundaries },
+    showMicroBoundaries: { value: showMicroBoundaries, setter: setShowMicroBoundaries },
+    showGroupBoundaries: { value: showGroupBoundaries, setter: setShowGroupBoundaries },
+    highlightCurrentGroup: { value: highlightCurrentGroup, setter: setHighlightCurrentGroup },
   };
 
   const getBtnStyle = (isOn, colorOn, mobile = false) => ({

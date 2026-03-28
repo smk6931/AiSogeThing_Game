@@ -155,6 +155,9 @@ const RpgWorld = ({
   showHeightMap,
   showGroundMesh,
   showDistrictBoundaries = false,
+  showMicroBoundaries = false,
+  showGroupBoundaries = true,
+  highlightCurrentGroup = true,
   orbitRef,
   cameraMode
 }) => {
@@ -526,7 +529,9 @@ const RpgWorld = ({
       <PartitionBoundaryOverlay
         currentDong={currentDong}
         playerPositionRef={playerRef}
-        visible={showDistrictBoundaries}
+        visibleMicro={showMicroBoundaries}
+        visibleGroup={showGroupBoundaries}
+        highlightCurrentGroup={highlightCurrentGroup}
         elevation={debugConfig.mapElevation + 0.34}
       />
 

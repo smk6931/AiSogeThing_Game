@@ -41,26 +41,27 @@
 - 스폰 지역은 `world_level_partition`의 `theme_code` / `persona_tag`와 연결한다.
 
 ### 3D 모델 파일 네이밍 컨벤션
-모델 파일명은 DB 레코드를 식별할 수 있도록 아래 규칙을 따른다.
+분류 기준이 앞에, 이름이 맨 뒤에 온다. 파일 정렬 시 분류 기준으로 그룹핑되어 한눈에 파악 가능.
 
 ```
-{MonsterName}_{MonsterTier}_{OriginRegion}_{Property}_{PKey}.glb
+{Tier}_{OriginRegion}_{Property}_{PKey}_{MonsterName}.glb
 
 예시)
-Goblin_Normal_Noryangjin_Forest_001.glb
-Orc_Elite_Yongsan_Stone_042.glb
-DragonBoss_Boss_Gangnam_Fire_001.glb
+Normal_Noryangjin_Forest_001_Goblin.glb
+Elite_Yongsan_Stone_002_Orc.glb
+Boss_Gangnam_Fire_001_Dragon.glb
+Event_Mapo_Water_077_Slime.glb
 ```
 
-- `MonsterName`: 몬스터 종류 이름 (PascalCase)
-- `MonsterTier`: `Normal` / `Elite` / `Event` / `Boss`
+- `Tier`: `Normal` / `Elite` / `Event` / `Boss`
 - `OriginRegion`: 이 모델이 설계된 기원 지역 (실제 스폰 지역은 DB에서 관리)
 - `Property`: 속성/테마 (`Forest` / `Stone` / `Fire` / `Water` 등)
-- `PKey`: DB primary key (3자리 zero-padding, 예: `001`)
+- `PKey`: DB primary key (3자리 zero-padding, 예: `001`). 절대 변경 금지.
+- `MonsterName`: 몬스터 종류 이름 (PascalCase). 변경 시 파일 rename + DB 업데이트.
 
 ### 파일 경로 구조
 ```
-front/public/models/
+front/public/models/      ← 브라우저가 직접 서빙 (백엔드 아님)
   monsters/    ← monster_template 테이블
   characters/  ← character 테이블
   items/       ← item 테이블
@@ -69,13 +70,13 @@ front/public/models/
 
 ### DB model_path 컬럼 규칙
 - DB에는 `public/models/` 이후 상대경로만 저장한다.
-- 예: `monster_template.model_path = 'monsters/Goblin_Normal_Noryangjin_Forest_001.glb'`
+- 예: `monster_template.model_path = 'monsters/Normal_Noryangjin_Forest_001_Goblin.glb'`
 - 프론트에서 실제 URL 조합: `BASE_MODEL_URL + model_path`
 - `BASE_MODEL_URL`은 프론트 환경변수로 관리 (로컬: `/models/`, CDN: `https://cdn.../models/`)
 
 ### 파일명 변경 규칙
-- MonsterName / Tier / Region / Property 변경은 파일 rename + DB `model_path` 업데이트로 처리한다.
-- PKey는 변경하지 않는다 (DB primary key와 동기화 유지).
+- Tier / Region / Property / Name 변경 시: 파일 rename + DB `model_path` 동시 업데이트.
+- PKey는 절대 변경하지 않는다 (DB primary key와 영구 동기화).
 - 경로(`public/models/monsters/`) 자체는 변경하지 않는다.
 
 ## AI and Metadata

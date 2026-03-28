@@ -78,6 +78,9 @@ const GameEntry = () => {
   const [showHeightMap, setShowHeightMap] = useState(false); // [OFF] 등고선 비활성화 (나중에 true로 복원 가능)
   const [showGroundMesh, setShowGroundMesh] = useState(true);
   const [showDistrictBoundaries, setShowDistrictBoundaries] = useState(false);
+  const [showMicroBoundaries, setShowMicroBoundaries] = useState(false);
+  const [showGroupBoundaries, setShowGroupBoundaries] = useState(true);
+  const [highlightCurrentGroup, setHighlightCurrentGroup] = useState(true);
   const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
 
 
@@ -172,6 +175,9 @@ const GameEntry = () => {
           showHeightMap={showHeightMap}
           showGroundMesh={showGroundMesh}
           showDistrictBoundaries={showDistrictBoundaries}
+          showMicroBoundaries={showMicroBoundaries}
+          showGroupBoundaries={showGroupBoundaries}
+          highlightCurrentGroup={highlightCurrentGroup}
           cameraMode={cameraMode}
         />
       </div>
@@ -210,6 +216,9 @@ const GameEntry = () => {
         landuseFilters={landuseFilters} setLanduseFilters={setLanduseFilters}
         showGroundMesh={showGroundMesh} setShowGroundMesh={setShowGroundMesh}
         showDistrictBoundaries={showDistrictBoundaries} setShowDistrictBoundaries={setShowDistrictBoundaries}
+        showMicroBoundaries={showMicroBoundaries} setShowMicroBoundaries={setShowMicroBoundaries}
+        showGroupBoundaries={showGroupBoundaries} setShowGroupBoundaries={setShowGroupBoundaries}
+        highlightCurrentGroup={highlightCurrentGroup} setHighlightCurrentGroup={setHighlightCurrentGroup}
         cameraMode={cameraMode} setCameraMode={setCameraMode}
         moveSpeed={moveSpeed} setMoveSpeed={setMoveSpeed}
         isMobile={isMobile}
