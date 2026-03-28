@@ -30,7 +30,8 @@ const GameCanvas = ({
   showMicroBoundaries,
   showGroupBoundaries,
   highlightCurrentGroup,
-  cameraMode
+  cameraMode,
+  onMonsterClick,
 }) => {
   const orbitRef = useRef();
 
@@ -89,6 +90,7 @@ const GameCanvas = ({
           showGroupBoundaries={showGroupBoundaries}
           highlightCurrentGroup={highlightCurrentGroup}
           cameraMode={cameraMode}
+          onMonsterClick={onMonsterClick}
           orbitRef={orbitRef}
         />
       </Suspense>

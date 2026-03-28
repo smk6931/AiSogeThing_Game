@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarChart2, Package, Wrench } from 'lucide-react';
+import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarChart2, Package, Wrench, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import GameCodex from './GameCodex';
 
 import worldApi from '@api/world';
 import { useAuth } from '@contexts/AuthContext';
@@ -38,6 +39,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState(null);
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
+  const [showCodex, setShowCodex] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
   const [gpsCoords, setGpsCoords] = useState({ lat: GIS_ORIGIN.lat, lng: GIS_ORIGIN.lng });
   const [currentDistrict, setCurrentDistrict] = useState(null);
@@ -796,13 +798,14 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
 
           {/* 메뉴 항목들 */}
           {[
-            { id: 'editor', Icon: Wrench, label: 'World Editor', color: ACCENT },
-            { id: 'stats', Icon: BarChart2, label: 'Stats', color: '#60a5fa' },
-            { id: 'items', Icon: Package, label: 'Items', color: '#a78bfa' },
-          ].map(({ id, Icon, label, color }) => (
+            { id: 'editor', Icon: Wrench,    label: 'World Editor', color: ACCENT },
+            { id: 'stats',  Icon: BarChart2, label: 'Stats',        color: '#60a5fa' },
+            { id: 'items',  Icon: Package,   label: 'Items',        color: '#a78bfa' },
+            { id: 'codex',  Icon: BookOpen,  label: '게임 도감',    color: '#fbbf24', action: () => { setShowCodex(true); setSidebarOpen(false); } },
+          ].map(({ id, Icon, label, color, action }) => (
             <div
               key={id}
-              onClick={() => setSidebarTab(sidebarTab === id ? null : id)}
+              onClick={() => action ? action() : setSidebarTab(sidebarTab === id ? null : id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '9px 10px',
@@ -902,6 +905,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
           </div>
         </div>
       )}
+      {/* ===== 게임 도감 오버레이 ===== */}
+      {showCodex && <GameCodex onClose={() => setShowCodex(false)} />}
     </div>
   );
 };

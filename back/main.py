@@ -10,6 +10,7 @@ from user.routers.router import router as auth_router
 from player.routers.router import router as player_router
 from world.routers.router import router as world_router
 from common.routers.router import router as common_router
+from monster.routers.router import router as monster_router
 from monster.managers.MonsterManager import monster_manager
 from player.managers.PlayerManager import player_manager
 
@@ -55,6 +56,7 @@ app.include_router(auth_router)
 app.include_router(player_router)
 app.include_router(world_router)
 app.include_router(common_router)
+app.include_router(monster_router)
 
 
 @app.get("/")

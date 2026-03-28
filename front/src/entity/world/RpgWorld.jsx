@@ -159,7 +159,8 @@ const RpgWorld = ({
   showGroupBoundaries = true,
   highlightCurrentGroup = true,
   orbitRef,
-  cameraMode
+  cameraMode,
+  onMonsterClick,
 }) => {
   const [debugConfig, setDebugConfig] = useState(() => {
     // 1. 브라우저 저장소(localStorage)에서 기존 설정 불러오기 프리뷰
@@ -590,17 +591,18 @@ const RpgWorld = ({
         }
 
         return (
-          <Monster
-            key={m.id}
-            id={m.id}
-            position={m.position}
-            hp={m.hp}
-            maxHp={m.maxHp}
-            state={m.state}
-            modelPath={m.modelPath || null}
-            tier={m.tier || 'normal'}
-            scale={debugConfig.playerScale}
-          />
+          <group key={m.id} onClick={(e) => { e.stopPropagation(); onMonsterClick && onMonsterClick(m); }}>
+            <Monster
+              id={m.id}
+              position={m.position}
+              hp={m.hp}
+              maxHp={m.maxHp}
+              state={m.state}
+              modelPath={m.modelPath || null}
+              tier={m.tier || 'normal'}
+              scale={debugConfig.playerScale}
+            />
+          </group>
         );
       })}
 

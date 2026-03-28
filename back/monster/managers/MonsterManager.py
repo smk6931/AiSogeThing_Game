@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 
 class Monster:
-    def __init__(self, id: int, x: float, z: float, hp: int = 100, model_path: Optional[str] = None, tier: str = "normal"):
+    def __init__(self, id: int, x: float, z: float, hp: int = 100, model_path: Optional[str] = None, tier: str = "normal", template_id: Optional[int] = None):
         self.id = id
         self.x = x
         self.z = z
@@ -17,6 +17,7 @@ class Monster:
         self.monster_type = random.randint(0, 13)
         self.model_path = model_path
         self.tier = tier  # normal / elite / boss
+        self.template_id = template_id
 
     def to_dict(self):
         data = {
@@ -30,6 +31,8 @@ class Monster:
         }
         if self.model_path:
             data["modelPath"] = self.model_path
+        if self.template_id:
+            data["templateId"] = self.template_id
         return data
 
 
@@ -49,6 +52,7 @@ class MonsterManager:
             hp=5000,
             model_path="monsters/Gangnam_Boss_Fire_001_Dragon.glb",
             tier="boss",
+            template_id=1,
         )
         dragon.monster_type = 0
         dragon.speed = 0.5
@@ -75,7 +79,8 @@ class MonsterManager:
             tier = "elite" if is_elite else "normal"
             monster = Monster(start_id + i, x, z, hp=hp,
                               model_path="monsters/Seoul_Normal_Water_001_Slime.glb",
-                              tier=tier)
+                              tier=tier,
+                              template_id=2)
             monster.is_elite = is_elite
             self.monsters[monster.id] = monster
 

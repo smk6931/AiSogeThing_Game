@@ -14,12 +14,15 @@ import { loadHeightMap } from '@entity/world/terrainHandler';
 import MapControlOverlay from '@ui/MapControlOverlay';
 import { useGameConfig } from '@contexts/GameConfigContext';
 import GameCanvas from '@engine/GameCanvas';
+import MonsterInfoPanel from '@entity/monster/MonsterInfoPanel';
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();
 
   // Website online count (optional, can be removed if not used)
   const [websiteOnlineCount, setWebsiteOnlineCount] = useState(0);
+
+  const [selectedMonster, setSelectedMonster] = useState(null);
 
   // Map & Spawn State
   const [currentMapId, setCurrentMapId] = useState('map_0');
@@ -179,6 +182,7 @@ const GameEntry = () => {
           showGroupBoundaries={showGroupBoundaries}
           highlightCurrentGroup={highlightCurrentGroup}
           cameraMode={cameraMode}
+          onMonsterClick={setSelectedMonster}
         />
       </div>
 
@@ -201,6 +205,14 @@ const GameEntry = () => {
         myStats={myStats}
         monsters={monsters}
       />
+
+      {/* ================= Monster Info Panel ================= */}
+      {selectedMonster && (
+        <MonsterInfoPanel
+          monster={selectedMonster}
+          onClose={() => setSelectedMonster(null)}
+        />
+      )}
 
 
       {/* ================= Chat Box ================= */}
