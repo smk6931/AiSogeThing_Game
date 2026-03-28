@@ -13,7 +13,6 @@ import { loadHeightMap } from '@entity/world/terrainHandler';
 import { useGameConfig } from '@contexts/GameConfigContext';
 import GameCanvas from '@engine/GameCanvas';
 import MonsterInfoPanel from '@entity/monster/MonsterInfoPanel';
-import MapControlOverlay from '@ui/MapControlOverlay';
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -233,26 +232,6 @@ const GameEntry = () => {
 
       {/* ================= Chat Box ================= */}
       <ChatBox messages={chatMessages} onSend={sendChatMessage} isMobile={isMobile} />
-
-      {/* ================= Map Layer Controls ================= */}
-      <MapControlOverlay
-        showOsmMap={showOsmMap} setShowOsmMap={setShowOsmMap}
-        showSeoulRoads={showSeoulRoads} setShowSeoulRoads={setShowSeoulRoads}
-        showSeoulNature={showSeoulNature} setShowSeoulNature={setShowSeoulNature}
-        showLanduseTextureLayer={showLanduseTextureLayer} setShowLanduseTextureLayer={setShowLanduseTextureLayer}
-        showRoadSplitLayer={showRoadSplitLayer} setShowRoadSplitLayer={setShowRoadSplitLayer}
-        showLanduseZones={showLanduseZones} setShowLanduseZones={setShowLanduseZones}
-        landuseFilters={landuseFilters} setLanduseFilters={setLanduseFilters}
-        showGroundMesh={showGroundMesh} setShowGroundMesh={setShowGroundMesh}
-        showDistrictBoundaries={showDistrictBoundaries} setShowDistrictBoundaries={setShowDistrictBoundaries}
-        showMicroBoundaries={showMicroBoundaries} setShowMicroBoundaries={setShowMicroBoundaries}
-        showGroupBoundaries={showGroupBoundaries} setShowGroupBoundaries={setShowGroupBoundaries}
-        highlightCurrentGroup={highlightCurrentGroup} setHighlightCurrentGroup={setHighlightCurrentGroup}
-        cameraMode={cameraMode} setCameraMode={setCameraMode}
-        moveSpeed={moveSpeed} setMoveSpeed={setMoveSpeed}
-        isMobile={isMobile}
-        onPlayView={() => { setZoomLevel(18.5); setCameraMode('isometric'); }}
-      />
 
       {/* ================= Joystick ================= */}
       <div style={{

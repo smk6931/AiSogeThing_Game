@@ -1,5 +1,18 @@
 # Project Agent Rules
 
+## Agents Context Loading Rule
+
+- Before coding, compare the user request, target files, and command purpose against files under [`agents/`](c:/GitHub/AiSogeThing_Game/agents/README.md).
+- Read only the files whose `Title`, `Description`, `When-To-Read`, and `Keywords` clearly match the task.
+- Do not load the entire `agents/` folder by default.
+- After selecting relevant files, follow those rules and reuse similar patterns already used in the codebase.
+- Core index:
+  - [`agents/README.md`](c:/GitHub/AiSogeThing_Game/agents/README.md)
+  - [`agents/development/core_rules.md`](c:/GitHub/AiSogeThing_Game/agents/development/core_rules.md)
+  - [`agents/frontend/ui_rules.md`](c:/GitHub/AiSogeThing_Game/agents/frontend/ui_rules.md)
+  - [`agents/game_design/world_partition_rules.md`](c:/GitHub/AiSogeThing_Game/agents/game_design/world_partition_rules.md)
+  - [`agents/game_design/road_design_rules.md`](c:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
+
 ## World DB Policy
 
 - `world_admin_area` is the source of truth for city, district, and dong hierarchy.

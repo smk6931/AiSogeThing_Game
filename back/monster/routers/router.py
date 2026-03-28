@@ -1,8 +1,15 @@
 # 몬스터 템플릿 API 라우터
 from fastapi import APIRouter, HTTPException
 from core.database import fetch_all, fetch_one
+from monster.managers.MonsterManager import monster_manager
 
 router = APIRouter(prefix="/api/monsters", tags=["Monster"])
+
+
+@router.get("/live")
+async def get_live_monsters():
+    """현재 인메모리 몬스터 상태 디버그 확인용"""
+    return monster_manager.get_all_monsters()
 
 
 @router.get("/templates")

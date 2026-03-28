@@ -1,5 +1,18 @@
 # Project Rules
 
+## Agents Context Loading Rule
+
+- 코드 실행이나 수정보다 먼저 `agents/` 폴더 안 문서의 상단 메타를 본다.
+- 유저 요청, 수정 대상 파일, 실행 명령 목적과 `Title`, `Description`, `When-To-Read`, `Keywords`를 대조한다.
+- 관련 있는 문서만 추가 컨텍스트로 읽고, 관련 없는 문서는 읽지 않는다.
+- 구현 시 `agents/` 안 규칙과 코드베이스 기존 패턴을 우선 따른다.
+- 시작점:
+  - [`agents/README.md`](c:/GitHub/AiSogeThing_Game/agents/README.md)
+  - [`agents/development/core_rules.md`](c:/GitHub/AiSogeThing_Game/agents/development/core_rules.md)
+  - [`agents/frontend/ui_rules.md`](c:/GitHub/AiSogeThing_Game/agents/frontend/ui_rules.md)
+  - [`agents/game_design/world_partition_rules.md`](c:/GitHub/AiSogeThing_Game/agents/game_design/world_partition_rules.md)
+  - [`agents/game_design/road_design_rules.md`](c:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
+
 ## Database
 
 - Use `world_admin_area` as the canonical parent table for Seoul, district, and dong hierarchy.

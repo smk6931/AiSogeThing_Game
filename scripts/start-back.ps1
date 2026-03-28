@@ -98,12 +98,16 @@ try {
     $ErrLog = Join-Path $LogDir "backend-$timestamp.err.log"
 }
 
-$process = Start-Process -FilePath "powershell.exe" `
+$process = Start-Process -FilePath $PythonExe `
     -ArgumentList @(
-        "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
-        "-Command", "Set-Location '$BackendDir'; `$env:PYTHONUTF8='1'; `$env:PYTHONIOENCODING='utf-8'; & '$PythonExe' -m uvicorn main:app --host 127.0.0.1 --port $backendPort"
+        "-m", "uvicorn",
+        "main:app",
+        "--host", "127.0.0.1",
+        "--port", "$backendPort"
     ) `
+    -WorkingDirectory $BackendDir `
+    -RedirectStandardOutput $OutLog `
+    -RedirectStandardError $ErrLog `
     -WindowStyle Hidden `
     -PassThru
 
