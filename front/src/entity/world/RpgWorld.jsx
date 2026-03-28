@@ -400,8 +400,8 @@ const RpgWorld = ({
         <gridHelper args={[2000, 100, '#444444', '#222222']} position={[0, debugConfig.gridElevation, 0]} />
       )}
 
-      {/* [NEW] Three.js Editor와 협업: public/scene.json 파일을 커스텀 배치용으로 사용 */}
-      <SceneLoader url="/scene.json" />
+      {/* SceneLoader: scene.json이 있을 때만 로드 (현재 미사용) */}
+      {/* <SceneLoader url="/scene.json" /> */}
 
       {/* [NEW] 3D 공간의 실제 바닥 지도로 렌더링 */}
       <MapTiles

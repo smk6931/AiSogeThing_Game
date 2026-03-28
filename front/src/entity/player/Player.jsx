@@ -1,5 +1,4 @@
-import React, { forwardRef, useMemo, useRef, useEffect } from 'react';
-import * as THREE from 'three';
+import React, { forwardRef, useRef, useEffect } from 'react';
 import { useGLTF, useAnimations } from '@react-three/drei';
 import PlayerChat from './logic/PlayerChat';
 import { usePlayerMovement } from './logic/usePlayerMovement';
@@ -7,7 +6,11 @@ import { usePlayerSkills } from './logic/usePlayerSkills';
 
 const PLAYER_MODEL = '/models/characters/Seoul_Normal_Knight_001_Warrior.glb';
 
-/** 로컬 플레이어 컴포넌트 — GLB 3D 모델, 애니메이션 포함 */
+// Warrior GLB: Z-up 모델, Z축 기준 높이 183cm → Three.js에서 Y축으로 변환됨
+// scale=0.625 기준 목표 높이 2m → 필요 배율: 2.0 / 1.83 ≈ 1.09
+const WARRIOR_SCALE_FACTOR = 1.09;
+
+/** 로컬 플레이어 컴포넌트 — GLB 3D 모델, Idle/Run 애니메이션 */
 const Player = forwardRef(({ input, actions: inputActions, onMove, onAction, chat, zoomLevel, nickname, scale = 0.625, ...props }, ref) => {
   usePlayerMovement(ref, input, onMove, zoomLevel);
   usePlayerSkills(ref, inputActions, onAction);
@@ -16,17 +19,8 @@ const Player = forwardRef(({ input, actions: inputActions, onMove, onAction, cha
   const modelGroupRef = useRef();
   const { actions } = useAnimations(animations, modelGroupRef);
 
-  const { modelScale, yOffset } = useMemo(() => {
-    scene.updateWorldMatrix(true, true);
-    const box = new THREE.Box3().setFromObject(scene);
-    const nativeH = box.max.y - box.min.y;
-    const targetH = scale * 3.2;
-    const ms = nativeH > 0.001 ? targetH / nativeH : scale;
-    const yOff = -box.min.y * ms;
-    return { modelScale: ms, yOffset: yOff };
-  }, [scene, scale]);
+  const finalScale = scale * WARRIOR_SCALE_FACTOR;
 
-  // 이동 상태에 따라 Idle ↔ Run 전환
   useEffect(() => {
     if (!actions) return;
     if (input?.isMoving) {
@@ -40,7 +34,7 @@ const Player = forwardRef(({ input, actions: inputActions, onMove, onAction, cha
 
   return (
     <group ref={ref} {...props}>
-      <group ref={modelGroupRef} position={[0, yOffset, 0]} scale={modelScale}>
+      <group ref={modelGroupRef} scale={finalScale} rotation={[0, Math.PI, 0]}>
         <primitive object={scene} />
       </group>
 

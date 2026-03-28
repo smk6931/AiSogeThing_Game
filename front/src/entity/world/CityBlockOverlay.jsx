@@ -4,24 +4,12 @@ import { useTexture } from '@react-three/drei';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 import worldApi from '@api/world';
 
-const TEXTURE_PROFILE_MAP = {
-  frozen_bank_a: '/grounds/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__0.jpg',
-  frozen_bank_b: '/grounds/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__1.jpg',
-  frozen_bank_c: '/grounds/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__2.jpg',
-  dense_block_ground_a: '/ground/dirt_atlas_4x4.png',
-  dense_block_ground_b: '/ground/mud_atlas_4x4.png',
-  dense_block_ground_c: '/ground/grass_atlas_4x4.png',
-  green_courtyard_a: '/ground/grass_atlas_4x4.png',
-  green_courtyard_b: '/ground/grass_atlas_4x4.png',
-  forest_canopy_a: '/ground/grass_atlas_4x4.png',
-  forest_canopy_b: '/ground/grass_atlas_4x4.png',
-  academy_courtyard_a: '/ground/grass_atlas_4x4.png',
-  academy_courtyard_b: '/ground/dirt_atlas_4x4.png',
-  stone_route_a: '/ground/stone_bricks_atlas_4x4.png',
-  stone_route_b: '/ground/stone_bricks_atlas_4x4.png',
-  stone_route_trim: '/ground/asphalt_atlas_4x4.png',
-  event_surface_a: '/ground/rock_atlas_4x4.png',
-  event_surface_b: '/ground/mud_atlas_4x4.png',
+const hashString = (value = '') => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
 };
 
 const gpsToGame = (lat, lng) => ({
@@ -173,10 +161,15 @@ const CityBlockContent = ({
         dbPartitions.forEach((partition, idx) => {
           const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson);
           if (!geo) return;
-          const texturePath = TEXTURE_PROFILE_MAP[partition.texture_profile] || '/grounds/image.png';
-          const texIdx = textureIndexByPath.has(texturePath)
-            ? textureIndexByPath.get(texturePath)
-            : idx % texCount;
+          const seed = hashString(
+            [
+              partition.group_key || '',
+              partition.group_theme_code || '',
+              partition.texture_profile || '',
+              partition.partition_seq || idx,
+            ].join('|'),
+          );
+          const texIdx = seed % texCount;
           result.push({ geo, texIdx, order: 5 });
         });
       } else if (zoneData?.zones?.sectors) {
@@ -237,16 +230,14 @@ const CityBlockOverlay = ({
 
     const fetchPaths = async () => {
       try {
-        const dbTexturePaths = [...Object.values(TEXTURE_PROFILE_MAP)];
         const res = await worldApi.getBlockTextures();
         const serverPaths = Array.isArray(res.data) ? res.data : [];
-        const merged = Array.from(new Set([...dbTexturePaths, ...serverPaths]));
         if (!cancelled) {
-          setTexturePaths(merged.length > 0 ? merged : ['/grounds/image.png']);
+          setTexturePaths(serverPaths);
         }
       } catch (_) {
         if (!cancelled) {
-          setTexturePaths(Array.from(new Set([...Object.values(TEXTURE_PROFILE_MAP)])));
+          setTexturePaths([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
