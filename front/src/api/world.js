@@ -46,6 +46,10 @@ const worldApi = {
     });
   },
 
+  getDongPartitions: async (dongId) => {
+    return await client.get(`/api/world/partitions/dong/${dongId}`);
+  },
+
   // 특정 동(Dong) 고유 지형 데이터 조회
   getDongTerrain: async (dongId) => {
     return await client.get(`/api/world/terrain/dong/${dongId}`);

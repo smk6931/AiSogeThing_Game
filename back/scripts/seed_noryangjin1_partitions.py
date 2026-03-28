@@ -111,6 +111,10 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
         "texture_profile": partition.get("texture_profile"),
         "is_road": partition.get("is_road", False),
         "is_walkable": partition.get("is_walkable", True),
+        "centroid_lat": partition.get("centroid_lat"),
+        "centroid_lng": partition.get("centroid_lng"),
+        "boundary_geojson": json.dumps(partition.get("boundary_geojson") or {}, ensure_ascii=False),
+        "source_feature": json.dumps(partition.get("source_feature") or {}, ensure_ascii=False),
         "gameplay_meta": json.dumps(partition.get("gameplay_meta") or {}, ensure_ascii=False),
     }
 
@@ -138,6 +142,10 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 texture_profile,
                 is_road,
                 is_walkable,
+                centroid_lat,
+                centroid_lng,
+                boundary_geojson,
+                source_feature,
                 gameplay_meta
             ) VALUES (
                 :id,
@@ -160,6 +168,10 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 :texture_profile,
                 :is_road,
                 :is_walkable,
+                :centroid_lat,
+                :centroid_lng,
+                CAST(:boundary_geojson AS JSON),
+                CAST(:source_feature AS JSON),
                 CAST(:gameplay_meta AS JSON)
             )
             ON CONFLICT (partition_key) DO UPDATE SET
@@ -181,6 +193,10 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 texture_profile = EXCLUDED.texture_profile,
                 is_road = EXCLUDED.is_road,
                 is_walkable = EXCLUDED.is_walkable,
+                centroid_lat = EXCLUDED.centroid_lat,
+                centroid_lng = EXCLUDED.centroid_lng,
+                boundary_geojson = EXCLUDED.boundary_geojson,
+                source_feature = EXCLUDED.source_feature,
                 gameplay_meta = EXCLUDED.gameplay_meta,
                 updated_at = now()
             """
@@ -197,8 +213,26 @@ async def main() -> None:
 
     district_id = district["id"]
     dong_id = int(meta["dong_osm_id"])
+    city_id = 110000
 
     async with async_session_factory() as session:
+        await upsert_admin_area(
+            session,
+            {
+                "id": city_id,
+                "osm_id": city_id,
+                "area_level": "city",
+                "area_code": "seoul",
+                "name": meta["city"],
+                "name_en": "Seoul",
+                "parent_id": None,
+                "center_lat": dong["center"][0],
+                "center_lng": dong["center"][1],
+                "boundary_geojson": json.dumps({"type": "FeatureCollection", "features": []}, ensure_ascii=False),
+                "area_meta": json.dumps({"scope": "root_city"}, ensure_ascii=False),
+            },
+        )
+
         await upsert_admin_area(
             session,
             {
@@ -208,7 +242,7 @@ async def main() -> None:
                 "area_code": "seoul.dongjak",
                 "name": meta["district"],
                 "name_en": district.get("name_en"),
-                "parent_id": None,
+                "parent_id": city_id,
                 "center_lat": district["center"][0],
                 "center_lng": district["center"][1],
                 "boundary_geojson": polygon_from_coords(district["coords"]),
@@ -243,6 +277,41 @@ async def main() -> None:
 
         for partition in seed_data["partitions"]:
             await upsert_partition(session, dong_id, partition, meta)
+
+        await session.execute(
+            text(
+                """
+                CREATE OR REPLACE VIEW world_partition_detail AS
+                SELECT
+                    p.id,
+                    p.partition_key,
+                    p.partition_stage,
+                    p.partition_seq,
+                    p.partition_type,
+                    p.map_name,
+                    p.display_name,
+                    p.summary,
+                    p.description,
+                    p.theme_code,
+                    p.landuse_code,
+                    p.texture_profile,
+                    p.is_road,
+                    p.is_walkable,
+                    p.centroid_lat,
+                    p.centroid_lng,
+                    p.city_name,
+                    p.district_name,
+                    p.dong_name,
+                    a.area_code AS admin_area_code,
+                    a.name_en AS dong_name_en,
+                    a.parent_id AS district_admin_id,
+                    p.gameplay_meta
+                FROM world_level_partition p
+                JOIN world_admin_area a
+                    ON a.id = p.admin_area_id
+                """
+            )
+        )
 
         await session.commit()
 

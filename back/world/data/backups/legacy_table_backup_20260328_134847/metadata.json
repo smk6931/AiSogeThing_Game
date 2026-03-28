@@ -1,0 +1,320 @@
+{
+  "created_at": "20260328_134847",
+  "tables": [
+    {
+      "table": "comments",
+      "row_count": 0,
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "username",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "content",
+          "data_type": "text",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "content_type",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "content_id",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "integer",
+          "is_nullable": "YES"
+        }
+      ],
+      "status": "backed_up"
+    },
+    {
+      "table": "novel_cuts",
+      "row_count": 0,
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "novel_id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "cut_order",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "scene_desc",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "image_path",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        }
+      ],
+      "status": "backed_up"
+    },
+    {
+      "table": "novels",
+      "row_count": 0,
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "title",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "genre",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "script",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES"
+        }
+      ],
+      "status": "backed_up"
+    },
+    {
+      "table": "user_logs",
+      "row_count": 0,
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "content_type",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "content_id",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "action",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "metadata_json",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES"
+        }
+      ],
+      "status": "backed_up"
+    },
+    {
+      "table": "user_youtube_logs",
+      "row_count": 0,
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "video_id",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "watched_seconds",
+          "data_type": "integer",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES"
+        }
+      ],
+      "status": "backed_up"
+    },
+    {
+      "table": "youtube_channels",
+      "row_count": 0,
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "channel_id",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "name",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "keywords",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "category",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "thumbnail_url",
+          "data_type": "text",
+          "is_nullable": "YES"
+        }
+      ],
+      "status": "backed_up"
+    },
+    {
+      "table": "youtube_list",
+      "row_count": 0,
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "video_id",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "title",
+          "data_type": "character varying",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "description",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "thumbnail_url",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "channel_title",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "tags",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "duration",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "view_count",
+          "data_type": "integer",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "published_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "is_short",
+          "data_type": "integer",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "channel_id",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "country_code",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "category_id",
+          "data_type": "character varying",
+          "is_nullable": "YES"
+        }
+      ],
+      "status": "backed_up"
+    }
+  ],
+  "execute_drop": true
+}

@@ -10,7 +10,7 @@ from world.services.district_service import (
 )
 from world.services.block_service import block_service
 from world.services.world_design_service import get_yongsan_world_profile
-from world.services.partition_service import get_current_region_info
+from world.services.partition_service import get_current_region_info, get_partitions_by_dong_osm_id
 
 router = APIRouter(prefix="/api/world", tags=["World"])
 
@@ -74,6 +74,11 @@ async def get_current_dong(lat: float, lng: float):
 @router.get("/region/current")
 async def get_current_region(lat: float, lng: float):
     return await get_current_region_info(lat, lng)
+
+
+@router.get("/partitions/dong/{dong_id}")
+async def get_dong_partitions(dong_id: int):
+    return await get_partitions_by_dong_osm_id(dong_id)
 
 
 @router.get("/terrain/district/{district_id}")

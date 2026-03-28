@@ -102,12 +102,9 @@ $process = Start-Process -FilePath "powershell.exe" `
     -ArgumentList @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
-        "-Command", "`$env:PYTHONUTF8='1'; `$env:PYTHONIOENCODING='utf-8'; & '$PythonExe' -m uvicorn main:app --host 0.0.0.0 --port $backendPort"
+        "-Command", "Set-Location '$BackendDir'; `$env:PYTHONUTF8='1'; `$env:PYTHONIOENCODING='utf-8'; & '$PythonExe' -m uvicorn main:app --host 127.0.0.1 --port $backendPort"
     ) `
-    -WorkingDirectory $BackendDir `
     -WindowStyle Hidden `
-    -RedirectStandardOutput $OutLog `
-    -RedirectStandardError $ErrLog `
     -PassThru
 
 Set-Content -Encoding UTF8 -Path $PidPath -Value $process.Id
