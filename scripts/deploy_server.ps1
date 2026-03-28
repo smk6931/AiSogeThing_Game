@@ -186,8 +186,17 @@ fi
 source venv/bin/activate
 pip install -r requirements.txt
 
+if docker compose version > /dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+elif command -v docker-compose > /dev/null 2>&1; then
+    COMPOSE_CMD="docker-compose"
+else
+    echo 'Neither docker compose nor docker-compose is available'
+    exit 1
+fi
+
 echo '[Remote 3/6] Start PostgreSQL container...'
-docker compose -f docker-compose.server.yml up -d db
+$COMPOSE_CMD -f docker-compose.server.yml up -d db
 
 echo '[Remote 4/6] Wait for PostgreSQL health...'
 for i in {1..30}; do
