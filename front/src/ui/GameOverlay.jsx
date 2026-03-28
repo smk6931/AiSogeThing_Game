@@ -34,7 +34,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   const { moveSpeed, setMoveSpeed } = useGameConfig();
   const navigate = useNavigate();
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const checkMobile = () => window.innerWidth <= 768 || (window.innerHeight <= 500 && window.innerWidth <= 1024);
+  const [isMobile, setIsMobile] = useState(checkMobile());
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState(null);
@@ -77,7 +78,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
       document.head.appendChild(style);
     }
 
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    const handleResize = () => setIsMobile(checkMobile());
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -604,7 +605,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
       <div
         style={{
           position: 'absolute',
-          bottom: isMobile ? '128px' : '28px',
+          bottom: isMobile ? 'max(88px, env(safe-area-inset-bottom, 0px) + 88px)' : '28px',
           right: isMobile ? '18px' : '104px',
           display: 'flex',
           flexDirection: isMobile ? 'column' : 'row',

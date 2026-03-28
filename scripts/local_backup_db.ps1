@@ -4,9 +4,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $EnvPath = Join-Path $ProjectRoot ".env"
+$DockerConfigDir = Join-Path $ProjectRoot ".docker"
 
 function Get-EnvMap([string]$Path) {
     $map = @{}
@@ -46,17 +48,15 @@ $DbPassword = Get-RequiredValue $envMap "DB_PASSWORD" "0000"
 $DbHost = Get-RequiredValue $envMap "DB_HOST" "127.0.0.1"
 $DbPort = Get-RequiredValue $envMap "DB_PORT" "5100"
 $DbName = Get-RequiredValue $envMap "DB_NAME" "game_sogething"
-
-$PgDump = Get-Command pg_dump -ErrorAction SilentlyContinue
-if (-not $PgDump) {
-    throw "pg_dump not found in PATH. Install PostgreSQL client tools first."
-}
+$DbContainerName = Get-RequiredValue $envMap "DB_CONTAINER_NAME" "game-sogething-db"
 
 if (-not $OutputDir) {
     $OutputDir = Join-Path $ProjectRoot "backups\deploy"
 }
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+New-Item -ItemType Directory -Force -Path $DockerConfigDir | Out-Null
+$env:DOCKER_CONFIG = $DockerConfigDir
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $DumpFile = Join-Path $OutputDir "$DbName-$timestamp.sql"
 
@@ -64,26 +64,52 @@ if (-not $Quiet) {
     Write-Host "Creating PostgreSQL dump..." -ForegroundColor Cyan
 }
 
-$previousPassword = $env:PGPASSWORD
-$env:PGPASSWORD = $DbPassword
-try {
-    & $PgDump.Source `
+$dockerContainerRunning = $false
+$dockerState = docker inspect -f "{{.State.Running}}" $DbContainerName 2>$null
+if ($LASTEXITCODE -eq 0 -and ($dockerState | Select-Object -First 1).Trim() -eq "true") {
+    $dockerContainerRunning = $true
+}
+
+if ($dockerContainerRunning) {
+    & docker exec -e "PGPASSWORD=$DbPassword" $DbContainerName pg_dump `
         --clean `
         --if-exists `
         --no-owner `
         --no-privileges `
-        -h $DbHost `
-        -p $DbPort `
         -U $DbUser `
         -d $DbName `
-        -f $DumpFile
+        | Out-File -FilePath $DumpFile -Encoding utf8
 
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $DumpFile)) {
-        throw "pg_dump failed."
+        throw "docker exec pg_dump failed."
     }
-}
-finally {
-    $env:PGPASSWORD = $previousPassword
+} else {
+    $PgDump = Get-Command pg_dump -ErrorAction SilentlyContinue
+    if (-not $PgDump) {
+        throw "Neither Docker DB container nor host pg_dump is available."
+    }
+
+    $previousPassword = $env:PGPASSWORD
+    $env:PGPASSWORD = $DbPassword
+    try {
+        & $PgDump.Source `
+            --clean `
+            --if-exists `
+            --no-owner `
+            --no-privileges `
+            -h $DbHost `
+            -p $DbPort `
+            -U $DbUser `
+            -d $DbName `
+            -f $DumpFile
+
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $DumpFile)) {
+            throw "pg_dump failed."
+        }
+    }
+    finally {
+        $env:PGPASSWORD = $previousPassword
+    }
 }
 
 if (-not $Quiet) {

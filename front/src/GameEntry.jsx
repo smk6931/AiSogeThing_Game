@@ -110,11 +110,12 @@ const GameEntry = () => {
     return () => window.removeEventListener('wheel', handleWheel);
   }, []); // [] 이므로 한 번만 등록됨
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const checkMobile = () => window.innerWidth <= 768 || (window.innerHeight <= 500 && window.innerWidth <= 1024);
+  const [isMobile, setIsMobile] = useState(checkMobile());
 
   // 화면 크기 감지
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    const handleResize = () => setIsMobile(checkMobile());
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
