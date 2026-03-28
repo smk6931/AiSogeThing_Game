@@ -65,6 +65,7 @@ $SshKey = Get-RequiredValue $envMap "SSH_KEY_PATH" "C:\Users\ssh\ssh-key-oracle.
 $SshHost = Get-RequiredValue $envMap "SSH_HOST" "ubuntu@168.107.52.201"
 $RemoteDir = Get-RequiredValue $envMap "REMOTE_DIR" "~/game.sogething"
 $RemoteDirShell = if ($RemoteDir.StartsWith("~/")) { '$HOME/' + $RemoteDir.Substring(2) } else { $RemoteDir }
+$RemoteDirScp = $RemoteDir
 
 $DbUser = Get-RequiredValue $envMap "DB_USER" "game_sogething"
 $DbPassword = Get-RequiredValue $envMap "DB_PASSWORD" "0000"
@@ -76,6 +77,7 @@ New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $DumpFile = ""
 $RemoteDeployDir = "$RemoteDirShell/.deploy"
+$RemoteDeployDirScp = "$RemoteDirScp/.deploy"
 $RemoteDumpName = [System.IO.Path]::GetFileName($DumpFile)
 
 Write-Host "[1/7] Git push..." -ForegroundColor Cyan
@@ -105,15 +107,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[4/7] Upload .env, compose, and SQL dump..." -ForegroundColor Cyan
-scp -i "$SshKey" "$EnvPath" "$SshHost`:$RemoteDirShell/.env"
+scp -i "$SshKey" "$EnvPath" "$SshHost`:$RemoteDirScp/.env"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to upload .env."
 }
-scp -i "$SshKey" "$ComposePath" "$SshHost`:$RemoteDirShell/docker-compose.server.yml"
+scp -i "$SshKey" "$ComposePath" "$SshHost`:$RemoteDirScp/docker-compose.server.yml"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to upload docker-compose.server.yml."
 }
-scp -i "$SshKey" "$DumpFile" "$SshHost`:$RemoteDeployDir/$RemoteDumpName"
+scp -i "$SshKey" "$DumpFile" "$SshHost`:$RemoteDeployDirScp/$RemoteDumpName"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to upload SQL dump."
 }
