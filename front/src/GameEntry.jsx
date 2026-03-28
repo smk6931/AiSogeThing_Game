@@ -110,8 +110,8 @@ const GameEntry = () => {
     return () => window.removeEventListener('wheel', handleWheel);
   }, []); // [] 이므로 한 번만 등록됨
 
-  const checkMobile = () => window.innerWidth <= 768 || (window.innerHeight <= 500 && window.innerWidth <= 1024);
-  const [isMobile, setIsMobile] = useState(checkMobile());
+  const checkMobile = () => true; // 전기기 통일 클린 모바일 HUD
+  const [isMobile, setIsMobile] = useState(true);
 
   // 화면 크기 감지
   useEffect(() => {

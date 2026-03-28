@@ -121,20 +121,20 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[5/7] Run remote deploy..." -ForegroundColor Cyan
-$RemoteCommand = @"
+$RemoteCommand = @'
 set -e
 
 RESTORE_REQUESTED=0
 REMOTE_DB_BACKUP=''
 
 rollback_db() {
-    if [ "\$RESTORE_REQUESTED" != "1" ]; then
+    if [ "$RESTORE_REQUESTED" != "1" ]; then
         exit 1
     fi
 
-    if [ -n "\$REMOTE_DB_BACKUP" ] && [ -f "\$REMOTE_DB_BACKUP" ]; then
+    if [ -n "$REMOTE_DB_BACKUP" ] && [ -f "$REMOTE_DB_BACKUP" ]; then
         echo '[Rollback] Restoring previous server DB backup...'
-        docker exec -e PGPASSWORD="\$DB_PASSWORD" -i game-sogething-db psql -U "\$DB_USER" -d "\$DB_NAME" < "\$REMOTE_DB_BACKUP" || true
+        docker exec -e PGPASSWORD="$DB_PASSWORD" -i game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" < "$REMOTE_DB_BACKUP" || true
         echo '[Rollback] Previous DB restore attempted.'
     else
         echo '[Rollback] No previous DB backup found. Nothing to restore.'
@@ -143,16 +143,16 @@ rollback_db() {
 
 trap 'rollback_db' ERR
 
-if [ ! -d $RemoteDirShell/.git ]; then
+if [ ! -d __REMOTE_DIR__/.git ]; then
     echo '[Initial Setup] Clone project...'
-    mkdir -p $RemoteDirShell
-    rm -rf $RemoteDirShell/repo_bootstrap
-    git clone https://github.com/smk6931/AiSogeThing_Game.git $RemoteDirShell/repo_bootstrap
-    cp -a $RemoteDirShell/repo_bootstrap/. $RemoteDirShell/
-    rm -rf $RemoteDirShell/repo_bootstrap
+    mkdir -p __REMOTE_DIR__
+    rm -rf __REMOTE_DIR__/repo_bootstrap
+    git clone https://github.com/smk6931/AiSogeThing_Game.git __REMOTE_DIR__/repo_bootstrap
+    cp -a __REMOTE_DIR__/repo_bootstrap/. __REMOTE_DIR__/
+    rm -rf __REMOTE_DIR__/repo_bootstrap
 fi
 
-cd $RemoteDirShell
+cd __REMOTE_DIR__
 
 if [ ! -f .env ]; then
     echo '.env is missing on remote server'
@@ -168,7 +168,7 @@ if [ ! -f docker-compose.server.yml ]; then
     exit 1
 fi
 
-if [ ! -f '.deploy/$RemoteDumpName' ]; then
+if [ ! -f '.deploy/__REMOTE_DUMP__' ]; then
     echo 'SQL dump file is missing on remote server'
     exit 1
 fi
@@ -202,12 +202,12 @@ fi
 
 echo '[Remote 5/6] Backup current server DB before restore...'
 mkdir -p .deploy/server-pre-restore
-REMOTE_DB_BACKUP=".deploy/server-pre-restore/$DbName-pre-$timestamp.sql"
+REMOTE_DB_BACKUP=".deploy/server-pre-restore/__DB_NAME__-pre-__TIMESTAMP__.sql"
 docker exec -e PGPASSWORD="$DB_PASSWORD" game-sogething-db pg_dump -U "$DB_USER" -d "$DB_NAME" --clean --if-exists --no-owner --no-privileges > "$REMOTE_DB_BACKUP"
 
 echo '[Remote 5.1/6] Restore SQL dump into PostgreSQL...'
 RESTORE_REQUESTED=1
-docker exec -e PGPASSWORD="$DB_PASSWORD" -i game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" < '.deploy/$RemoteDumpName'
+docker exec -e PGPASSWORD="$DB_PASSWORD" -i game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" < '.deploy/__REMOTE_DUMP__'
 
 echo '[Remote 5.5/6] Run Alembic migration after restore...'
 cd back
@@ -249,7 +249,12 @@ fi
 RESTORE_REQUESTED=0
 pm2 status
 echo 'Deployment completed.'
-"@
+'@
+
+$RemoteCommand = $RemoteCommand.Replace('__REMOTE_DIR__', $RemoteDirShell)
+$RemoteCommand = $RemoteCommand.Replace('__REMOTE_DUMP__', $RemoteDumpName)
+$RemoteCommand = $RemoteCommand.Replace('__DB_NAME__', $DbName)
+$RemoteCommand = $RemoteCommand.Replace('__TIMESTAMP__', $timestamp)
 
 $RemoteCommand | ssh -i "$SshKey" "$SshHost" "bash"
 if ($LASTEXITCODE -ne 0) {

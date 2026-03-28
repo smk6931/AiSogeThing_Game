@@ -34,8 +34,9 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   const { moveSpeed, setMoveSpeed } = useGameConfig();
   const navigate = useNavigate();
 
-  const checkMobile = () => window.innerWidth <= 768 || (window.innerHeight <= 500 && window.innerWidth <= 1024);
-  const [isMobile, setIsMobile] = useState(checkMobile());
+  const checkMobile = () => true; // 전기기 통일 클린 모바일 HUD
+  const [isMobile, setIsMobile] = useState(true);
+  const [uiScale, setUiScale] = useState(() => Math.max(1, Math.min(2.2, window.innerWidth / 600)));
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState(null);
@@ -78,7 +79,10 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
       document.head.appendChild(style);
     }
 
-    const handleResize = () => setIsMobile(checkMobile());
+    const handleResize = () => {
+      setIsMobile(checkMobile());
+      setUiScale(Math.max(1, Math.min(2.2, window.innerWidth / 600)));
+    };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -209,15 +213,17 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
       <div
         style={{
           position: 'absolute',
-          top: isMobile ? 'max(10px, env(safe-area-inset-top))' : '18px',
-          left: isMobile ? 'max(10px, env(safe-area-inset-left))' : '18px',
-          width: isMobile ? '104px' : '260px',
-          padding: isMobile ? '8px' : '12px',
-          borderRadius: isMobile ? '12px' : '14px',
+          top: 'max(10px, env(safe-area-inset-top))',
+          left: 'max(10px, env(safe-area-inset-left))',
+          width: '104px',
+          padding: '8px',
+          borderRadius: '12px',
           background: PANEL_BG,
           backdropFilter: 'blur(16px)',
           border: `1px solid ${BORDER_COLOR}`,
           boxShadow: GLOW,
+          transformOrigin: 'top left',
+          transform: `scale(${uiScale})`,
           pointerEvents: 'auto',
         }}
       >
@@ -268,20 +274,22 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
       <div
         style={{
           position: 'absolute',
-          top: isMobile ? 'max(10px, env(safe-area-inset-top))' : '18px',
-          right: isMobile ? 'max(10px, env(safe-area-inset-right))' : '20px',
+          top: 'max(10px, env(safe-area-inset-top))',
+          right: 'max(10px, env(safe-area-inset-right))',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
           gap: '6px',
+          transformOrigin: 'top right',
+          transform: `scale(${uiScale})`,
           pointerEvents: 'auto',
         }}
       >
         <div
           style={{
             position: 'relative',
-            width: isMobile ? '96px' : '136px',
-            height: isMobile ? '76px' : '136px',
+            width: '96px',
+            height: '76px',
             background: PANEL_BG,
             borderRadius: isMobile ? '14px' : '24px',
             border: `2px solid ${BORDER_COLOR}`,
@@ -381,7 +389,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
               color: showPartitionPanel ? ACCENT : '#c8e8e2',
               borderRadius: '8px',
               padding: '5px 9px',
-              width: isMobile ? '96px' : '136px',
+              width: '96px',
               textAlign: 'left',
               cursor: 'pointer',
               boxShadow: GLOW,
@@ -606,7 +614,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
         style={{
           position: 'absolute',
           bottom: isMobile ? 'max(88px, env(safe-area-inset-bottom, 0px) + 88px)' : '28px',
-          right: isMobile ? '18px' : '104px',
+          right: '18px',
           display: 'flex',
           flexDirection: isMobile ? 'column' : 'row',
           alignItems: 'center',
@@ -756,8 +764,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
         onClick={() => { setSidebarOpen(v => !v); if (sidebarOpen) setSidebarTab(null); }}
         style={{
           position: 'absolute',
-          top: isMobile ? '116px' : '170px',
-          right: isMobile ? '10px' : '20px',
+          top: '116px',
+          right: '10px',
           width: '32px',
           height: '32px',
           background: sidebarOpen ? `rgba(19,50,60,0.95)` : 'rgba(8,14,22,0.88)',
@@ -770,6 +778,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
           pointerEvents: 'auto',
           boxShadow: GLOW,
           transition: 'all 0.15s',
+          transformOrigin: 'top right',
+          transform: `scale(${uiScale})`,
         }}
       >
         {sidebarOpen ? <X size={16} color={ACCENT} /> : <Menu size={16} color={GOLD} />}
@@ -780,9 +790,9 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
         <div
           style={{
             position: 'absolute',
-            top: isMobile ? '154px' : '208px',
-            right: isMobile ? '10px' : '20px',
-            width: isMobile ? '180px' : '220px',
+            top: '154px',
+            right: '10px',
+            width: '180px',
             background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
             border: `1px solid ${BORDER_COLOR}`,
             borderRadius: '12px',
@@ -790,6 +800,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
             zIndex: 100,
             pointerEvents: 'auto',
             boxShadow: GLOW,
+            transformOrigin: 'top right',
+            transform: `scale(${uiScale})`,
           }}
         >
           {/* 헤더 */}

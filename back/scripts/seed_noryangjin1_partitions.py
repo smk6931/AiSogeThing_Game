@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import json
 from pathlib import Path
 import sys
@@ -13,7 +14,30 @@ if str(BACK_DIR) not in sys.path:
 from core.database import async_session_factory
 from world.services.district_service import fetch_seoul_districts, fetch_seoul_sub_districts
 
-SEED_PATH = ROOT_DIR / "back" / "world" / "data" / "noryangjin1_level_partition_seed.json"
+DEFAULT_SEED_PATH = ROOT_DIR / "back" / "world" / "data" / "noryangjin1_level_partition_seed.json"
+
+CITY_SLUG_MAP = {
+    "서울특별시": "seoul",
+}
+
+DISTRICT_SLUG_MAP = {
+    "동작구": "dongjak",
+}
+
+DONG_SLUG_MAP = {
+    "노량진1동": "noryangjin1",
+    "노량진2동": "noryangjin2",
+}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--seed",
+        default=str(DEFAULT_SEED_PATH),
+        help="Path to the partition seed JSON file.",
+    )
+    return parser.parse_args()
 
 
 def polygon_from_coords(coords: list[list[float]]) -> str:
@@ -238,7 +262,9 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
 
 
 async def main() -> None:
-    seed_data = json.loads(SEED_PATH.read_text(encoding="utf-8-sig"))
+    args = parse_args()
+    seed_path = Path(args.seed)
+    seed_data = json.loads(seed_path.read_text(encoding="utf-8-sig"))
     meta = seed_data["meta"]
     district = find_district(meta["district"])
     dong = find_dong(int(meta["dong_osm_id"]))
@@ -246,6 +272,11 @@ async def main() -> None:
     district_id = district["id"]
     dong_id = int(meta["dong_osm_id"])
     city_id = 110000
+    city_slug = meta.get("city_slug") or CITY_SLUG_MAP.get(meta["city"], "seoul")
+    district_slug = meta.get("district_slug") or DISTRICT_SLUG_MAP.get(meta["district"], "district")
+    dong_slug = meta.get("dong_slug") or DONG_SLUG_MAP.get(meta["dong"], f"dong_{dong_id}")
+    district_area_code = f"{city_slug}.{district_slug}"
+    dong_area_code = f"{district_area_code}.{dong_slug}"
 
     async with async_session_factory() as session:
         await upsert_admin_area(
@@ -271,7 +302,7 @@ async def main() -> None:
                 "id": district_id,
                 "osm_id": district_id,
                 "area_level": "district",
-                "area_code": "seoul.dongjak",
+                "area_code": district_area_code,
                 "name": meta["district"],
                 "name_en": district.get("name_en"),
                 "parent_id": city_id,
@@ -288,7 +319,7 @@ async def main() -> None:
                 "id": dong_id,
                 "osm_id": dong_id,
                 "area_level": "dong",
-                "area_code": "seoul.dongjak.noryangjin1",
+                "area_code": dong_area_code,
                 "name": meta["dong"],
                 "name_en": dong.get("name_en"),
                 "parent_id": district_id,
