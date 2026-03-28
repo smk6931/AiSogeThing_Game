@@ -159,8 +159,10 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+tr -d '\r' < .env > .env.runtime
+
 set -a
-. ./.env
+. ./.env.runtime
 set +a
 
 if [ ! -f docker-compose.server.yml ]; then
