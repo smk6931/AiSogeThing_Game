@@ -67,18 +67,39 @@ const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => 
         state.camera.updateProjectionMatrix();
       }
 
-      let height, zOffset;
+      let cx, cz, baseHeight;
       if (cameraMode === 'isometric') {
         // 쿼터뷰: 실제 RPG처럼 20m 높이, 18m 뒤 고정 시작
-        height = 22;
-        zOffset = 18;
+        const isoDistMult = debugConfig?.camIsoDistMult || 50;
+        const dist = state.camera.isOrthographicCamera ? 10000 : isoDistMult * Math.pow(2, 16.5 - zoomLevel);
+        const pitch = ((debugConfig?.camIsoPitch || 25) * Math.PI) / 180;
+
+        if (state.camera.isOrthographicCamera) {
+          state.camera.zoom = 50 / isoDistMult;
+          state.camera.updateProjectionMatrix();
+        }
+
+        cx = targetPos.x;
+        cz = targetPos.z + dist * Math.sin(pitch);
+        baseHeight = dist * Math.cos(pitch);
       } else {
         // 360도 자유뷰: 15m 높이, 25m 뒤에서 시작 (낮은 RPG 시점)
-        height = 15;
-        zOffset = 25;
+        const playDistMult = debugConfig?.playCamDistMult || 20;
+        const playPitch = ((debugConfig?.playCamPitch || 60) * Math.PI) / 180;
+        const dist = state.camera.isOrthographicCamera ? 10000 : playDistMult * Math.pow(2, 16.5 - zoomLevel);
+
+        if (state.camera.isOrthographicCamera) {
+          state.camera.zoom = 50 / playDistMult;
+          state.camera.updateProjectionMatrix();
+        }
+
+        const radius = dist * Math.cos(playPitch);
+        cx = targetPos.x;
+        cz = targetPos.z + radius;
+        baseHeight = dist * Math.sin(playPitch);
       }
 
-      state.camera.position.set(targetPos.x, targetPos.y + height, targetPos.z + zOffset);
+      state.camera.position.set(cx, targetPos.y + baseHeight, cz);
       orbitRef.current.target.copy(targetPos);
       orbitRef.current.update();
       return;
@@ -94,6 +115,13 @@ const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => 
     if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
       state.camera.fov = debugConfig.cameraFov;
       state.camera.updateProjectionMatrix();
+    }
+
+    if (cameraMode === 'isometric') {
+      const az = (debugConfig?.camIsoAzimuth || 0) * (Math.PI / 180);
+      const pitch = ((debugConfig?.camIsoPitch || 15) * Math.PI) / 180;
+      orbitRef.current.setAzimuthalAngle(az);
+      orbitRef.current.setPolarAngle(pitch);
     }
 
     orbitRef.current.update();
@@ -162,8 +190,8 @@ const RpgWorld = ({
       camIsoDistMult: 40, // 초기값 최적화
 
       // 플레이 뷰 전용 설정
-      playCamPitch: 30,
-      playCamDistMult: 12,
+      playCamPitch: 60,
+      playCamDistMult: 20,
 
       // 지면
       showBaseFloor: false,

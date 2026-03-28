@@ -53,6 +53,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState(null);
+  const [sidebarMode, setSidebarMode] = useState('menu');
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
@@ -285,7 +286,16 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
 
       {/* 레이어 토글 버튼 — 미니맵 왼쪽 */}
       <div
-        onClick={() => { setSidebarOpen(true); setSidebarTab('settings'); }}
+        onClick={() => {
+          if (sidebarOpen && sidebarMode === 'layers') {
+            setSidebarOpen(false);
+            setSidebarTab(null);
+            return;
+          }
+          setSidebarMode('layers');
+          setSidebarOpen(true);
+          setSidebarTab('settings');
+        }}
         title="레이어 설정"
         style={{
           position: 'absolute',
@@ -294,8 +304,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
           width: '30px',
           height: '30px',
           borderRadius: '8px',
-          background: (sidebarOpen && sidebarTab === 'settings') ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
-          border: `1px solid ${(sidebarOpen && sidebarTab === 'settings') ? ACCENT : BORDER_COLOR}`,
+          background: (sidebarOpen && sidebarMode === 'layers') ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
+          border: `1px solid ${(sidebarOpen && sidebarMode === 'layers') ? ACCENT : BORDER_COLOR}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -764,15 +774,24 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
 
       {/* ===== 사이드바 토글 버튼 ===== */}
       <div
-        onClick={() => { setSidebarOpen(v => !v); if (sidebarOpen) setSidebarTab(null); }}
+        onClick={() => {
+          if (sidebarOpen && sidebarMode === 'menu') {
+            setSidebarOpen(false);
+            setSidebarTab(null);
+            return;
+          }
+          setSidebarMode('menu');
+          setSidebarTab(null);
+          setSidebarOpen(true);
+        }}
         style={{
           position: 'absolute',
           top: '116px',
           right: '10px',
           width: '32px',
           height: '32px',
-          background: sidebarOpen ? `rgba(19,50,60,0.95)` : 'rgba(8,14,22,0.88)',
-          border: `1px solid ${sidebarOpen ? ACCENT : BORDER_COLOR}`,
+          background: (sidebarOpen && sidebarMode === 'menu') ? `rgba(19,50,60,0.95)` : 'rgba(8,14,22,0.88)',
+          border: `1px solid ${(sidebarOpen && sidebarMode === 'menu') ? ACCENT : BORDER_COLOR}`,
           borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
@@ -785,7 +804,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
           transform: `scale(${uiScale})`,
         }}
       >
-        {sidebarOpen ? <X size={16} color={ACCENT} /> : <Menu size={16} color={GOLD} />}
+        {(sidebarOpen && sidebarMode === 'menu') ? <X size={16} color={ACCENT} /> : <Menu size={16} color={GOLD} />}
       </div>
 
       {/* ===== 사이드바 패널 ===== */}
@@ -809,11 +828,11 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
         >
           {/* 헤더 */}
           <div style={{ fontSize: '10px', color: GOLD, letterSpacing: '2px', fontWeight: '700', padding: '4px 8px 8px', borderBottom: `1px solid ${BORDER_COLOR}` }}>
-            MENU
+            {sidebarMode === 'layers' ? 'LAYERS' : 'MENU'}
           </div>
 
           {/* 메뉴 항목들 */}
-          {[
+          {sidebarMode === 'menu' && [
             { id: 'settings', Icon: Settings, label: '환경설정', color: ACCENT },
             { id: 'stats',    Icon: BarChart2, label: '스탯',    color: '#60a5fa' },
             { id: 'items',    Icon: Package,   label: '인벤토리', color: '#a78bfa' },
@@ -857,9 +876,9 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
               highlightCurrentGroup: { value: ms.highlightCurrentGroup, setter: ms.setHighlightCurrentGroup },
             };
             return (
-              <div style={{ padding: '10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+              <div style={{ padding: '10px', borderTop: sidebarMode === 'menu' ? `1px solid ${BORDER_COLOR}` : 'none', marginTop: sidebarMode === 'menu' ? '4px' : '0' }}>
                 {/* 레이어 토글 그리드 */}
-                <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>LAYERS</div>
+                <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>{sidebarMode === 'layers' ? 'WORLD LAYERS' : 'LAYERS'}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '10px' }}>
                   {LAYER_BUTTONS.map(({ key, label, icon, colorOn }) => {
                     const entry = layerStateMap[key];
@@ -1011,6 +1030,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
           )}
 
           {/* 구분선 + Home/Leave */}
+          {sidebarMode === 'menu' && (
           <div style={{ borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '8px', paddingTop: '4px' }}>
             <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px', borderRadius: '8px', cursor: 'pointer', color: GOLD, fontSize: '12px' }}>
               <Home size={13} color={GOLD} /> Home
@@ -1019,6 +1039,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
               <LogOut size={13} color='#ef4444' /> Leave
             </div>
           </div>
+          )}
         </div>
       )}
       {/* ===== 게임 도감 오버레이 ===== */}

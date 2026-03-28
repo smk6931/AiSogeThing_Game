@@ -98,16 +98,15 @@ try {
     $ErrLog = Join-Path $LogDir "backend-$timestamp.err.log"
 }
 
-$process = Start-Process -FilePath $PythonExe `
+$command = "Set-Location '$BackendDir'; `$env:PYTHONUTF8='1'; `$env:PYTHONIOENCODING='utf-8'; & '$PythonExe' -m uvicorn main:app --host 127.0.0.1 --port $backendPort"
+
+$process = Start-Process -FilePath "powershell.exe" `
     -ArgumentList @(
-        "-m", "uvicorn",
-        "main:app",
-        "--host", "127.0.0.1",
-        "--port", "$backendPort"
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-WindowStyle", "Hidden",
+        "-Command", $command
     ) `
-    -WorkingDirectory $BackendDir `
-    -RedirectStandardOutput $OutLog `
-    -RedirectStandardError $ErrLog `
     -WindowStyle Hidden `
     -PassThru
 
@@ -116,4 +115,4 @@ Set-Content -Encoding UTF8 -Path $PidPath -Value $process.Id
 Write-Host "Backend started."
 Write-Host "PID: $($process.Id)"
 Write-Host "Port: $backendPort"
-Write-Host "Logs: $OutLog"
+Write-Host "Mode: hidden powershell wrapper"
