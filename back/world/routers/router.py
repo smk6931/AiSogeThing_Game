@@ -9,6 +9,7 @@ from world.services.district_service import (
     get_current_dong as _get_current_dong
 )
 from world.services.block_service import block_service
+from world.services.world_design_service import get_yongsan_world_profile
 
 router = APIRouter(prefix="/api/world", tags=["World"])
 
@@ -128,3 +129,11 @@ async def get_block_textures():
     files = [f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
     # 프론트엔드에서 바로 접근 가능한 URL 경로로 반환
     return [f"/grounds/{f}" for f in files]
+
+
+@router.get("/design/yongsan")
+async def get_yongsan_design_profile():
+    """
+    용산구 월드 디자인 메타데이터 초안을 반환합니다.
+    """
+    return get_yongsan_world_profile()

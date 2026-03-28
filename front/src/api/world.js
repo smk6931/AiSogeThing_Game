@@ -64,6 +64,11 @@ const worldApi = {
   // 서버의 images 폴더 내 파일 목록 조회
   getBlockTextures: async () => {
     return await client.get('/api/world/block-textures');
+  },
+
+  // 용산구 월드 디자인 메타데이터 초안 조회
+  getYongsanDesignProfile: async () => {
+    return await client.get('/api/world/design/yongsan');
   }
 };
 

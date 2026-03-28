@@ -89,8 +89,14 @@ if ($existing -and $ForceRestart) {
     Start-Sleep -Seconds 1
 }
 
-if (Test-Path $OutLog) { Remove-Item -LiteralPath $OutLog -Force }
-if (Test-Path $ErrLog) { Remove-Item -LiteralPath $ErrLog -Force }
+try {
+    if (Test-Path $OutLog) { Remove-Item -LiteralPath $OutLog -Force }
+    if (Test-Path $ErrLog) { Remove-Item -LiteralPath $ErrLog -Force }
+} catch {
+    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $OutLog = Join-Path $LogDir "backend-$timestamp.out.log"
+    $ErrLog = Join-Path $LogDir "backend-$timestamp.err.log"
+}
 
 $process = Start-Process -FilePath "powershell.exe" `
     -ArgumentList @(

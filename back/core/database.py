@@ -117,3 +117,4 @@ async def get_db():
 # 모델 Import
 from user.models.models import User
 from player.models.models import GameCharacter
+from world.models.models import WorldAdminArea, WorldLevelPartition, WorldPartitionAdjacency
