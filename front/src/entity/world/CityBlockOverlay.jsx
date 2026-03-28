@@ -8,22 +8,21 @@ const TEXTURE_PROFILE_MAP = {
   frozen_bank_a: '/grounds/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__0.jpg',
   frozen_bank_b: '/grounds/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__1.jpg',
   frozen_bank_c: '/grounds/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__2.jpg',
-  dense_block_ground_a: '/grounds/image copy 4.png',
-  dense_block_ground_b: '/grounds/image copy 5.png',
-  dense_block_ground_c: '/grounds/image copy 3.png',
-  green_courtyard_a: '/grounds/image copy 6.png',
-  green_courtyard_b: '/grounds/image copy 2.png',
-  forest_canopy_a: '/grounds/Lucid_Origin_stylized_cartoonish_isometric_game_tile_texture_o_0.jpg',
-  forest_canopy_b: '/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_2.jpg',
-  academy_courtyard_a: '/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
-  academy_courtyard_b: '/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_1.jpg',
+  dense_block_ground_a: '/grounds/cc0/dirt_1.png',
+  dense_block_ground_b: '/grounds/cc0/dirt_2.png',
+  dense_block_ground_c: '/grounds/cc0/grass00.png',
+  green_courtyard_a: '/grounds/cc0/tileable_grass_00.png',
+  green_courtyard_b: '/grounds/cc0/tileable_grass_01.png',
+  forest_canopy_a: '/grounds/cc0/grass00.png',
+  forest_canopy_b: '/grounds/cc0/tileable_grass_01.png',
+  academy_courtyard_a: '/grounds/cc0/tileable_grass_00.png',
+  academy_courtyard_b: '/grounds/cc0/dirt_1.png',
   stone_route_a: '/ground/stone_bricks_atlas_4x4.png',
   stone_route_b: '/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_3.jpg',
   stone_route_trim: '/grounds/image.png',
   event_surface_a: '/grounds/gemini-2.5-flash-image_isometric_hand-painted_fantasy_RPG_tile_texture_of_dark_cracked_dungeon_floor_ti-0.jpg',
   event_surface_b: '/grounds/image copy.png',
 };
-const PARTITION_BASE_TEXTURE = '/grounds/image copy 4.png';
 
 const gpsToGame = (lat, lng) => ({
   x: (lng - GIS_ORIGIN.lng) * LNG_TO_M,
@@ -87,11 +86,6 @@ const buildTerrainBlockFromGeoJson = (boundaryGeoJson) => {
   return buildTerrainBlock(outerCoords, holeCoords);
 };
 
-const buildTerrainBlockFromDong = (currentDong) => {
-  if (!currentDong?.coords?.length) return null;
-  return buildTerrainBlock(currentDong.coords);
-};
-
 const DongMask = ({ currentDong, elevation }) => {
   const geo = useMemo(() => {
     if (!currentDong?.coords || currentDong.coords.length < 3) return null;
@@ -152,18 +146,6 @@ const CityBlockContent = ({
     return map;
   }, [texturePaths]);
 
-  const dongBaseGeo = useMemo(() => {
-    if (!showSectorBlocks) return null;
-    return buildTerrainBlockFromDong(currentDong);
-  }, [showSectorBlocks, currentDong]);
-
-  const baseTextureIndex = useMemo(() => {
-    if (textureIndexByPath.has(PARTITION_BASE_TEXTURE)) {
-      return textureIndexByPath.get(PARTITION_BASE_TEXTURE);
-    }
-    return 0;
-  }, [textureIndexByPath]);
-
   const blocks = useMemo(() => {
     const result = [];
     const texCount = Array.isArray(textures) ? textures.length : 1;
@@ -217,22 +199,6 @@ const CityBlockContent = ({
     <group>
       <DongMask currentDong={currentDong} elevation={elevation + 0.01} />
       <group position={[0, elevation, 0]}>
-        {showSectorBlocks && dongBaseGeo && (
-          <mesh geometry={dongBaseGeo} renderOrder={4}>
-            <meshStandardMaterial
-              map={Array.isArray(textures) ? textures[baseTextureIndex] : textures}
-              transparent={false}
-              opacity={0.92}
-              stencilWrite
-              stencilRef={1}
-              stencilFunc={THREE.EqualStencilFunc}
-              side={THREE.DoubleSide}
-              roughness={1}
-              metalness={0}
-              depthWrite
-            />
-          </mesh>
-        )}
         {blocks.map((block, index) => (
           <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
             <meshStandardMaterial
@@ -271,7 +237,7 @@ const CityBlockOverlay = ({
 
     const fetchPaths = async () => {
       try {
-        const dbTexturePaths = [...Object.values(TEXTURE_PROFILE_MAP), PARTITION_BASE_TEXTURE];
+        const dbTexturePaths = [...Object.values(TEXTURE_PROFILE_MAP)];
         const res = await worldApi.getBlockTextures();
         const serverPaths = Array.isArray(res.data) ? res.data : [];
         const merged = Array.from(new Set([...dbTexturePaths, ...serverPaths]));
@@ -280,7 +246,7 @@ const CityBlockOverlay = ({
         }
       } catch (_) {
         if (!cancelled) {
-          setTexturePaths(Array.from(new Set([...Object.values(TEXTURE_PROFILE_MAP), PARTITION_BASE_TEXTURE])));
+          setTexturePaths(Array.from(new Set([...Object.values(TEXTURE_PROFILE_MAP)])));
         }
       } finally {
         if (!cancelled) setLoading(false);

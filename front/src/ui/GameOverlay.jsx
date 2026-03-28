@@ -394,7 +394,6 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
             }}
           >
             <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-              <span style={{ fontSize: '9px', color: GOLD, flexShrink: 0 }}>REGION</span>
               <span style={{
                 fontSize: '10px',
                 fontWeight: '700',

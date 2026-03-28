@@ -30,7 +30,7 @@ DB 이름: `game-sogethingdb`
 파일 정렬 시 분류 기준으로 먼저 그룹핑되어 한눈에 파악하기 쉽다.
 
 ```
-{Tier}_{Region}_{Property}_{PKey}_{Name}.glb
+{OriginRegion}_{Tier}_{Property}_{PKey}_{Name}.glb
 ```
 
 | 자리 | 설명 | 예시 |
@@ -43,14 +43,14 @@ DB 이름: `game-sogethingdb`
 
 ### 실제 파일명 예시
 ```
-Normal_Noryangjin_Forest_001_Goblin.glb
-Elite_Yongsan_Stone_002_Orc.glb
-Boss_Gangnam_Fire_001_Dragon.glb
-Event_Mapo_Water_077_Slime.glb
+Noryangjin_Normal_Forest_001_Goblin.glb
+Yongsan_Elite_Stone_002_Orc.glb
+Gangnam_Boss_Fire_001_Dragon.glb
+Mapo_Event_Water_077_Slime.glb
 
 # 현재 프로젝트에 있는 파일
-Normal_Seoul_Water_001_Slime.glb
-Boss_Gangnam_Fire_001_Dragon.glb
+Seoul_Normal_Water_001_Slime.glb
+Gangnam_Boss_Fire_001_Dragon.glb
 ```
 
 ---

@@ -598,6 +598,7 @@ const RpgWorld = ({
             maxHp={m.maxHp}
             state={m.state}
             textureUrl={targetTexture}
+            modelPath={m.modelPath || null}
             scale={debugConfig.playerScale}
           />
         );

@@ -44,13 +44,13 @@
 분류 기준이 앞에, 이름이 맨 뒤에 온다. 파일 정렬 시 분류 기준으로 그룹핑되어 한눈에 파악 가능.
 
 ```
-{Tier}_{OriginRegion}_{Property}_{PKey}_{MonsterName}.glb
+{OriginRegion}_{Tier}_{Property}_{PKey}_{MonsterName}.glb
 
 예시)
-Normal_Noryangjin_Forest_001_Goblin.glb
-Elite_Yongsan_Stone_002_Orc.glb
-Boss_Gangnam_Fire_001_Dragon.glb
-Event_Mapo_Water_077_Slime.glb
+Noryangjin_Normal_Forest_001_Goblin.glb
+Yongsan_Elite_Stone_002_Orc.glb
+Gangnam_Boss_Fire_001_Dragon.glb
+Mapo_Event_Water_077_Slime.glb
 ```
 
 - `Tier`: `Normal` / `Elite` / `Event` / `Boss`
