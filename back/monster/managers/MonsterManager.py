@@ -36,56 +36,68 @@ class Monster:
         return data
 
 
+MONSTER_TEMPLATES = [
+    {"template_id": 1, "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",      "tier": "boss",   "hp": 5000, "speed": 0.5},
+    {"template_id": 2, "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",       "tier": "normal", "hp": 80,   "speed": 2.0},
+    {"template_id": 3, "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb","tier": "normal", "hp": 60,   "speed": 2.5},
+    {"template_id": 4, "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",     "tier": "elite",  "hp": 350,  "speed": 1.5},
+    {"template_id": 5, "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",  "tier": "normal", "hp": 90,   "speed": 1.2},
+    {"template_id": 6, "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",   "tier": "elite",  "hp": 280,  "speed": 2.0},
+    {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",     "tier": "boss",   "hp": 3000, "speed": 0.8},
+]
+
+
 class MonsterManager:
     def __init__(self):
         self.monsters: Dict[int, Monster] = {}
         self.next_id = 1
         self.is_running = False
-        self._spawn_dragon_at_start()
+        self._spawn_all_at_start()
 
-    def _spawn_dragon_at_start(self):
-        """서버 시작 시 드래곤을 플레이어 스폰 지점(0,0) 근처에 배치"""
-        dragon = Monster(
-            id=self.next_id,
-            x=8.0,
-            z=8.0,
-            hp=5000,
-            model_path="monsters/Gangnam_Boss_Fire_001_Dragon.glb",
-            tier="boss",
-            template_id=1,
-        )
-        dragon.monster_type = 0
-        dragon.speed = 0.5
-        self.monsters[dragon.id] = dragon
-        self.next_id += 1
+    def _spawn_all_at_start(self):
+        """서버 시작 시 7종 몬스터를 플레이어 스폰 지점 주변에 배치"""
+        positions = [
+            (8, 8), (-10, 5), (12, -8), (-6, -12), (15, 3), (-14, 10), (5, -15)
+        ]
+        for i, tmpl in enumerate(MONSTER_TEMPLATES):
+            x, z = positions[i % len(positions)]
+            x += random.uniform(-3, 3)
+            z += random.uniform(-3, 3)
+            m = Monster(
+                id=self.next_id,
+                x=x, z=z,
+                hp=tmpl["hp"],
+                model_path=tmpl["model_path"],
+                tier=tmpl["tier"],
+                template_id=tmpl["template_id"],
+            )
+            m.speed = tmpl["speed"]
+            self.monsters[m.id] = m
+            self.next_id += 1
+        print(f"Monster spawn complete: {len(MONSTER_TEMPLATES)} monsters spawned.")
 
     def spawn_random(self, count: int = 5, center_x: float = 0.0, center_z: float = 0.0):
-        """플레이어 근처 반경 20m 이내 랜덤 스폰 (일반 몬스터)"""
-        current_count = len(self.monsters)
-        max_monsters = 6  # 드래곤 1 + 일반 5
-        if current_count >= max_monsters:
+        """죽은 일반 몬스터 보충 스폰"""
+        normal_count = sum(1 for m in self.monsters.values() if m.tier == "normal")
+        if normal_count >= 5:
             return
-
-        to_spawn = min(count, max_monsters - current_count)
+        to_spawn = min(count, 5 - normal_count)
         start_id = max(self.monsters.keys()) + 1 if self.monsters else self.next_id
-
+        normal_templates = [t for t in MONSTER_TEMPLATES if t["tier"] == "normal"]
         for i in range(to_spawn):
+            tmpl = random.choice(normal_templates)
             angle = random.uniform(0, math.pi * 2)
             dist = random.uniform(5, 20)
             x = center_x + math.cos(angle) * dist
             z = center_z + math.sin(angle) * dist
-            is_elite = random.random() < 0.1
-            hp = 500 if is_elite else 100
-            tier = "elite" if is_elite else "normal"
-            monster = Monster(start_id + i, x, z, hp=hp,
-                              model_path="monsters/Seoul_Normal_Water_001_Slime.glb",
-                              tier=tier,
-                              template_id=2)
-            monster.is_elite = is_elite
-            self.monsters[monster.id] = monster
-
+            m = Monster(start_id + i, x, z, hp=tmpl["hp"],
+                        model_path=tmpl["model_path"],
+                        tier=tmpl["tier"],
+                        template_id=tmpl["template_id"])
+            m.speed = tmpl["speed"]
+            self.monsters[m.id] = m
         self.next_id = start_id + to_spawn
-        print(f"Monster spawn complete: {to_spawn} monsters spawned.")
+        print(f"Respawn: {to_spawn} normal monsters.")
 
     def get_all_monsters(self):
         return {mid: m.to_dict() for mid, m in self.monsters.items()}
@@ -114,7 +126,7 @@ class MonsterManager:
             has_update = False
 
             # 일반 몬스터 부족하면 보충 (드래곤 제외)
-            normal_count = sum(1 for m in self.monsters.values() if not m.model_path)
+            normal_count = sum(1 for m in self.monsters.values() if m.tier != "boss")
             if normal_count < 5:
                 self.spawn_random(count=5 - normal_count)
                 has_update = True

@@ -28,7 +28,7 @@ async def main() -> None:
     out_dir = BACKUP_ROOT / f"world_partition_backup_{stamp}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for table in ["world_admin_area", "world_level_partition", "world_partition_adjacency"]:
+    for table in ["world_admin_area", "world_level_partition"]:
         await backup_table(table, out_dir)
 
     async with async_session_factory() as session:
@@ -37,7 +37,6 @@ async def main() -> None:
             text(
                 """
                 TRUNCATE TABLE
-                    world_partition_adjacency,
                     world_level_partition,
                     world_admin_area
                 RESTART IDENTITY CASCADE

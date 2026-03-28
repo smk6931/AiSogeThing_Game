@@ -29,7 +29,20 @@ const injectFont = () => {
   document.head.appendChild(link);
 };
 
-const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, monsters = {} }) => {
+const LAYER_BUTTONS = [
+  { key: 'showOsmMap',              label: '지도',   icon: '🗺', colorOn: 'rgba(30,80,160,0.7)' },
+  { key: 'showGroundMesh',          label: '바닥',   icon: '🎨', colorOn: 'rgba(50,150,50,0.7)' },
+  { key: 'showSeoulRoads',          label: '도로',   icon: '🛣', colorOn: 'rgba(255,100,0,0.7)' },
+  { key: 'showSeoulNature',         label: '지형',   icon: '🌲', colorOn: 'rgba(30,120,50,0.7)' },
+  { key: 'showLanduseTextureLayer', label: '용도',   icon: '🧱', colorOn: 'rgba(100,80,180,0.7)' },
+  { key: 'showRoadSplitLayer',      label: '분할',   icon: '🧩', colorOn: 'rgba(150,90,200,0.7)' },
+  { key: 'showDistrictBoundaries',  label: '경계',   icon: '🏛', colorOn: 'rgba(0,180,200,0.7)' },
+  { key: 'showGroupBoundaries',     label: '그룹선', icon: '⬒', colorOn: 'rgba(0,210,220,0.7)' },
+  { key: 'showMicroBoundaries',     label: '미세선', icon: '┼', colorOn: 'rgba(240,190,90,0.7)' },
+  { key: 'highlightCurrentGroup',   label: '강조',   icon: '✦', colorOn: 'rgba(80,220,180,0.7)' },
+];
+
+const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, monsters = {}, mapSettings = {} }) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();
   const navigate = useNavigate();
@@ -610,15 +623,16 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
         </div>
       </div>
 
+      {/* ===== 이동속도 컨트롤 (우측 하단) ===== */}
       <div
         style={{
           position: 'absolute',
-          bottom: '88px',
+          bottom: '110px',
           right: '18px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '4px',
+          gap: '3px',
           pointerEvents: 'auto',
           zIndex: 100,
           transformOrigin: 'bottom right',
@@ -626,57 +640,16 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
         }}
       >
         <button
-          onClick={() => setMoveSpeed(prev => prev <= 5 ? Math.max(1, prev - 1) : Math.max(5, prev - 5))}
-          style={{
-            width: isMobile ? '28px' : '30px',
-            height: isMobile ? '20px' : '30px',
-            background: 'rgba(8,14,22,0.86)',
-            border: `1px solid ${BORDER_COLOR}`,
-            borderRadius: '6px',
-            color: ACCENT,
-            fontSize: isMobile ? '13px' : '16px',
-            lineHeight: 1,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+          onClick={() => setMoveSpeed(prev => Math.max(1, prev - 5))}
+          style={{ width: '26px', height: '18px', background: 'rgba(8,14,22,0.86)', border: `1px solid ${BORDER_COLOR}`, borderRadius: '5px', color: ACCENT, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >-</button>
-
-        <div
-          style={{
-            minWidth: isMobile ? '32px' : '52px',
-            textAlign: 'center',
-            background: 'rgba(8,14,22,0.88)',
-            border: `1px solid ${BORDER_COLOR}`,
-            borderRadius: '7px',
-            padding: isMobile ? '3px 4px' : '6px 8px',
-            fontFamily: GAME_FONT,
-            boxShadow: GLOW,
-          }}
-        >
-          <div style={{ fontSize: isMobile ? '8px' : '9px', color: GOLD, letterSpacing: '0.8px' }}>SPD</div>
-          <div style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '700', color: moveSpeed >= 40 ? '#ff7a7a' : ACCENT }}>
-            {Math.round(moveSpeed)}
-          </div>
+        <div style={{ textAlign: 'center', background: 'rgba(8,14,22,0.88)', border: `1px solid ${BORDER_COLOR}`, borderRadius: '6px', padding: '2px 5px', minWidth: '30px' }}>
+          <div style={{ fontSize: '7px', color: GOLD }}>SPD</div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: moveSpeed >= 40 ? '#ff7a7a' : ACCENT }}>{Math.round(moveSpeed)}</div>
         </div>
-
         <button
-          onClick={() => setMoveSpeed(prev => prev < 5 ? prev + 1 : Math.min(50, prev + 5))}
-          style={{
-            width: isMobile ? '28px' : '30px',
-            height: isMobile ? '20px' : '30px',
-            background: 'rgba(8,14,22,0.86)',
-            border: `1px solid ${BORDER_COLOR}`,
-            borderRadius: '6px',
-            color: ACCENT,
-            fontSize: isMobile ? '13px' : '16px',
-            lineHeight: 1,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+          onClick={() => setMoveSpeed(prev => Math.min(50, prev + 5))}
+          style={{ width: '26px', height: '18px', background: 'rgba(8,14,22,0.86)', border: `1px solid ${BORDER_COLOR}`, borderRadius: '5px', color: ACCENT, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >+</button>
       </div>
 
@@ -796,7 +769,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
             position: 'absolute',
             top: '154px',
             right: '10px',
-            width: '180px',
+            width: '200px',
             background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
             border: `1px solid ${BORDER_COLOR}`,
             borderRadius: '12px',
@@ -815,109 +788,209 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
 
           {/* 메뉴 항목들 */}
           {[
-            { id: 'editor', Icon: Wrench,    label: 'World Editor', color: ACCENT },
-            { id: 'stats',  Icon: BarChart2, label: 'Stats',        color: '#60a5fa' },
-            { id: 'items',  Icon: Package,   label: 'Items',        color: '#a78bfa' },
-            { id: 'codex',  Icon: BookOpen,  label: '게임 도감',    color: '#fbbf24', action: () => { setShowCodex(true); setSidebarOpen(false); } },
+            { id: 'settings', Icon: Settings, label: '환경설정', color: ACCENT },
+            { id: 'stats',    Icon: BarChart2, label: '스탯',    color: '#60a5fa' },
+            { id: 'items',    Icon: Package,   label: '인벤토리', color: '#a78bfa' },
+            { id: 'codex',    Icon: BookOpen,  label: '도감',    color: '#fbbf24', action: () => { setShowCodex(true); setSidebarOpen(false); } },
+            { id: 'editor',   Icon: Wrench,    label: '월드에디터', color: '#94a3b8' },
           ].map(({ id, Icon, label, color, action }) => (
             <div
               key={id}
               onClick={() => action ? action() : setSidebarTab(sidebarTab === id ? null : id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '9px 10px',
+                padding: '8px 10px',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 background: sidebarTab === id ? 'rgba(103,232,214,0.08)' : 'transparent',
                 border: `1px solid ${sidebarTab === id ? ACCENT : 'transparent'}`,
-                marginTop: '4px',
+                marginTop: '2px',
                 transition: 'all 0.12s',
               }}
             >
-              <Icon size={15} color={sidebarTab === id ? ACCENT : color} />
-              <span style={{ fontSize: '13px', color: sidebarTab === id ? ACCENT : '#c8e8e2', fontWeight: sidebarTab === id ? '700' : '400' }}>
+              <Icon size={14} color={sidebarTab === id ? ACCENT : color} />
+              <span style={{ fontSize: '12px', color: sidebarTab === id ? ACCENT : '#c8e8e2', fontWeight: sidebarTab === id ? '700' : '400' }}>
                 {label}
               </span>
             </div>
           ))}
 
-          {/* 서브 패널: World Editor */}
-          {sidebarTab === 'editor' && (
-            <div style={{ padding: '8px 10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
-              <div style={{ fontSize: '10px', color: '#8ca6a0', marginBottom: '8px' }}>lil-gui 기반 실시간 편집기</div>
-              <button
-                onClick={() => setWorldEditorOpen(v => !v)}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  background: worldEditorOpen ? 'rgba(103,232,214,0.15)' : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${worldEditorOpen ? ACCENT : BORDER_COLOR}`,
-                  borderRadius: '7px',
-                  color: worldEditorOpen ? ACCENT : '#c8e8e2',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  fontFamily: GAME_FONT,
-                }}
-              >
-                <Wrench size={13} /> {worldEditorOpen ? 'Hide Editor' : 'Open Editor'}
-              </button>
-            </div>
-          )}
+          {/* ===== 서브 패널: 환경설정 ===== */}
+          {sidebarTab === 'settings' && (() => {
+            const ms = mapSettings;
+            const layerStateMap = {
+              showOsmMap: { value: ms.showOsmMap, setter: ms.setShowOsmMap },
+              showGroundMesh: { value: ms.showGroundMesh, setter: ms.setShowGroundMesh },
+              showSeoulRoads: { value: ms.showSeoulRoads, setter: ms.setShowSeoulRoads },
+              showSeoulNature: { value: ms.showSeoulNature, setter: ms.setShowSeoulNature },
+              showLanduseTextureLayer: { value: ms.showLanduseTextureLayer, setter: ms.setShowLanduseTextureLayer },
+              showRoadSplitLayer: { value: ms.showRoadSplitLayer, setter: ms.setShowRoadSplitLayer },
+              showDistrictBoundaries: { value: ms.showDistrictBoundaries, setter: ms.setShowDistrictBoundaries },
+              showGroupBoundaries: { value: ms.showGroupBoundaries, setter: ms.setShowGroupBoundaries },
+              showMicroBoundaries: { value: ms.showMicroBoundaries, setter: ms.setShowMicroBoundaries },
+              highlightCurrentGroup: { value: ms.highlightCurrentGroup, setter: ms.setHighlightCurrentGroup },
+            };
+            return (
+              <div style={{ padding: '10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+                {/* 레이어 토글 그리드 */}
+                <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>LAYERS</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '10px' }}>
+                  {LAYER_BUTTONS.map(({ key, label, icon, colorOn }) => {
+                    const entry = layerStateMap[key];
+                    if (!entry) return null;
+                    const isOn = !!entry.value;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => entry.setter(prev => !prev)}
+                        style={{
+                          padding: '5px 6px',
+                          background: isOn ? colorOn : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${isOn ? 'rgba(112,181,171,0.56)' : 'rgba(100,100,100,0.35)'}`,
+                          borderRadius: '7px',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          color: isOn ? '#fff' : '#6a7a78',
+                          fontFamily: GAME_FONT,
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        <span style={{ fontSize: '11px' }}>{icon}</span>
+                        <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
+                        <span style={{ fontSize: '8px', color: isOn ? '#a7fff2' : '#444' }}>{isOn ? 'ON' : 'OFF'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-          {/* 서브 패널: Stats */}
+                {/* 카메라 / 플레이뷰 */}
+                <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>CAMERA</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '10px' }}>
+                  <button
+                    onClick={() => ms.setCameraMode && ms.setCameraMode(prev => prev === 'isometric' ? '360' : 'isometric')}
+                    style={{
+                      padding: '6px 8px', borderRadius: '7px', cursor: 'pointer', fontSize: '10px', fontFamily: GAME_FONT,
+                      background: ms.cameraMode === 'isometric' ? 'rgba(140,50,50,0.6)' : 'rgba(50,50,140,0.6)',
+                      border: '1px solid rgba(112,181,171,0.4)', color: '#fff',
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                    }}
+                  >
+                    <span>🎥</span>
+                    <span>{ms.cameraMode === 'isometric' ? '쿼터뷰' : '360도'}</span>
+                  </button>
+                  <button
+                    onClick={() => ms.onPlayView && ms.onPlayView()}
+                    style={{
+                      padding: '6px 8px', borderRadius: '7px', cursor: 'pointer', fontSize: '10px', fontFamily: GAME_FONT,
+                      background: 'rgba(180,140,30,0.5)', border: '1px solid rgba(212,175,55,0.5)', color: '#fff',
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                    }}
+                  >
+                    <span>🎮</span><span>플레이뷰</span>
+                  </button>
+                </div>
+
+                {/* 이동속도 */}
+                <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>이동속도</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button onClick={() => setMoveSpeed(p => Math.max(1, p - 5))} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER_COLOR}`, color: ACCENT, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                  <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '5px 0', border: `1px solid ${BORDER_COLOR}` }}>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: moveSpeed >= 40 ? '#ff7a7a' : ACCENT }}>{Math.round(moveSpeed)}</span>
+                    <span style={{ fontSize: '9px', color: '#6a9a94', marginLeft: '3px' }}>m/s</span>
+                  </div>
+                  <button onClick={() => setMoveSpeed(p => Math.min(50, p + 5))} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER_COLOR}`, color: ACCENT, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ===== 서브 패널: 스탯 ===== */}
           {sidebarTab === 'stats' && (
-            <div style={{ padding: '8px 10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+            <div style={{ padding: '10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '8px' }}>PLAYER STATS</div>
               {[
-                { label: 'Level', value: playerStats.level, color: GOLD },
-                { label: 'HP', value: `${playerStats.hp} / ${playerStats.maxHp}`, color: '#ff6b6b' },
-                { label: 'MP', value: `${playerStats.mp} / ${playerStats.maxMp}`, color: '#60a5fa' },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '4px 0', borderBottom: `1px solid rgba(124,171,166,0.1)` }}>
-                  <span style={{ color: '#8ca6a0' }}>{label}</span>
+                { label: 'Level', value: playerStats.level, color: GOLD, icon: '⭐' },
+                { label: 'HP',    value: `${playerStats.hp} / ${playerStats.maxHp}`, color: '#ff6b6b', icon: '❤️' },
+                { label: 'MP',    value: `${playerStats.mp} / ${playerStats.maxMp}`, color: '#60a5fa', icon: '💧' },
+              ].map(({ label, value, color, icon }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', padding: '6px 4px', borderBottom: `1px solid rgba(124,171,166,0.1)` }}>
+                  <span style={{ color: '#8ca6a0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontSize: '12px' }}>{icon}</span>{label}
+                  </span>
                   <span style={{ color, fontWeight: '700' }}>{value}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* 서브 패널: Items */}
+          {/* ===== 서브 패널: 인벤토리 ===== */}
           {sidebarTab === 'items' && (
-            <div style={{ padding: '8px 10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+            <div style={{ padding: '10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '8px' }}>INVENTORY</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                 {items.map((item) => (
                   <div
                     key={item.key}
                     style={{
-                      padding: '8px',
-                      background: 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${BORDER_COLOR}`,
+                      padding: '8px 6px',
+                      background: item.name ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${item.name ? BORDER_COLOR : 'rgba(80,80,80,0.25)'}`,
                       borderRadius: '8px',
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '11px',
-                      color: item.name ? '#c8e8e2' : '#444',
+                      gap: '3px',
+                      fontSize: '10px',
+                      color: item.name ? '#c8e8e2' : '#333',
+                      cursor: item.name ? 'pointer' : 'default',
                     }}
                   >
-                    <span style={{ fontSize: '16px' }}>{item.icon || '▫'}</span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || 'Empty'}</div>
-                      {item.count > 0 && <div style={{ color: GOLD, fontSize: '10px' }}>×{item.count}</div>}
-                    </div>
+                    <span style={{ fontSize: '20px' }}>{item.icon || '▫'}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', textAlign: 'center' }}>{item.name || 'Empty'}</span>
+                    {item.count > 0 && <span style={{ color: GOLD, fontSize: '9px' }}>×{item.count}</span>}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
+          {/* ===== 서브 패널: 월드에디터 ===== */}
+          {sidebarTab === 'editor' && (
+            <div style={{ padding: '10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '8px' }}>WORLD EDITOR</div>
+              <div style={{ fontSize: '10px', color: '#6a8a84', marginBottom: '10px', lineHeight: 1.5 }}>
+                실시간 씬 편집기 (lil-gui)
+              </div>
+              <button
+                onClick={() => setWorldEditorOpen(v => !v)}
+                style={{
+                  width: '100%', padding: '9px',
+                  background: worldEditorOpen ? 'rgba(103,232,214,0.12)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${worldEditorOpen ? ACCENT : BORDER_COLOR}`,
+                  borderRadius: '8px',
+                  color: worldEditorOpen ? ACCENT : '#8ca6a0',
+                  fontSize: '12px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+                  fontFamily: GAME_FONT, transition: 'all 0.15s',
+                }}
+              >
+                <Wrench size={13} />
+                {worldEditorOpen ? '에디터 닫기' : '에디터 열기'}
+                <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: worldEditorOpen ? 'rgba(103,232,214,0.2)' : 'rgba(255,255,255,0.06)', color: worldEditorOpen ? ACCENT : '#555' }}>
+                  {worldEditorOpen ? 'ON' : 'OFF'}
+                </span>
+              </button>
+            </div>
+          )}
+
           {/* 구분선 + Home/Leave */}
           <div style={{ borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '8px', paddingTop: '4px' }}>
-            <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', cursor: 'pointer', color: GOLD, fontSize: '13px' }}>
-              <Home size={14} color={GOLD} /> Home
+            <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px', borderRadius: '8px', cursor: 'pointer', color: GOLD, fontSize: '12px' }}>
+              <Home size={13} color={GOLD} /> Home
             </div>
-            <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', fontSize: '13px' }}>
-              <LogOut size={14} color='#ef4444' /> Leave
+            <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', fontSize: '12px' }}>
+              <LogOut size={13} color='#ef4444' /> Leave
             </div>
           </div>
         </div>

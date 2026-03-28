@@ -194,8 +194,8 @@ const RpgWorld = ({
       camIsoDistMult: 40, // 초기값 최적화
 
       // 플레이 뷰 전용 설정
-      playCamPitch: 60,
-      playCamDistMult: 20, 
+      playCamPitch: 30,
+      playCamDistMult: 12,
 
       // 지면
       showBaseFloor: false,

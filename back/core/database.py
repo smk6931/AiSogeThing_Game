@@ -117,5 +117,5 @@ async def get_db():
 # 紐⑤뜽 Import
 from user.models.models import User
 from player.models.models import GameCharacter
-from world.models.models import WorldAdminArea, WorldLevelPartition, WorldPartitionAdjacency
+from world.models.models import WorldAdminArea, WorldLevelPartition
 from monster.models.model import MonsterTemplate

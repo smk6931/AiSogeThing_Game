@@ -9,12 +9,11 @@ import GameOverlay from '@ui/GameOverlay';
 import ChatBox from '@ui/ChatBox';
 import WorldMapModal from '@ui/WorldMapModal';
 import { getMap } from '@entity/world/mapConfig';
-import LeafletMapBackground from '@ui/LeafletMapBackground'; // [NEW] 실시간 지도 모듈
 import { loadHeightMap } from '@entity/world/terrainHandler';
-import MapControlOverlay from '@ui/MapControlOverlay';
 import { useGameConfig } from '@contexts/GameConfigContext';
 import GameCanvas from '@engine/GameCanvas';
 import MonsterInfoPanel from '@entity/monster/MonsterInfoPanel';
+import MapControlOverlay from '@ui/MapControlOverlay';
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -205,6 +204,22 @@ const GameEntry = () => {
         onlineCount={otherPlayers ? Object.keys(otherPlayers).length + 1 : 1}
         myStats={myStats}
         monsters={monsters}
+        mapSettings={{
+          showOsmMap, setShowOsmMap,
+          showSeoulRoads, setShowSeoulRoads,
+          showSeoulNature, setShowSeoulNature,
+          showLanduseTextureLayer, setShowLanduseTextureLayer,
+          showRoadSplitLayer, setShowRoadSplitLayer,
+          showLanduseZones, setShowLanduseZones,
+          landuseFilters, setLanduseFilters,
+          showGroundMesh, setShowGroundMesh,
+          showDistrictBoundaries, setShowDistrictBoundaries,
+          showMicroBoundaries, setShowMicroBoundaries,
+          showGroupBoundaries, setShowGroupBoundaries,
+          highlightCurrentGroup, setHighlightCurrentGroup,
+          cameraMode, setCameraMode,
+          onPlayView: () => { setZoomLevel(18.5); setCameraMode('isometric'); },
+        }}
       />
 
       {/* ================= Monster Info Panel ================= */}
@@ -215,11 +230,10 @@ const GameEntry = () => {
         />
       )}
 
-
       {/* ================= Chat Box ================= */}
       <ChatBox messages={chatMessages} onSend={sendChatMessage} isMobile={isMobile} />
 
-      {/* ================= Map Toggle Control Overlay ================= */}
+      {/* ================= Map Layer Controls ================= */}
       <MapControlOverlay
         showOsmMap={showOsmMap} setShowOsmMap={setShowOsmMap}
         showSeoulRoads={showSeoulRoads} setShowSeoulRoads={setShowSeoulRoads}
@@ -236,10 +250,7 @@ const GameEntry = () => {
         cameraMode={cameraMode} setCameraMode={setCameraMode}
         moveSpeed={moveSpeed} setMoveSpeed={setMoveSpeed}
         isMobile={isMobile}
-        onPlayView={() => {
-          setZoomLevel(18.5); // 캐릭터가 크게 보이도록 줌인
-          setCameraMode('isometric');
-        }}
+        onPlayView={() => { setZoomLevel(18.5); setCameraMode('isometric'); }}
       />
 
       {/* ================= Joystick ================= */}

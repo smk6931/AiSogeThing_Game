@@ -81,18 +81,3 @@ class WorldLevelPartition(Base):
     __table_args__ = (
         UniqueConstraint("admin_area_id", "partition_stage", "partition_seq", name="uq_partition_admin_stage_seq"),
     )
-
-
-class WorldPartitionAdjacency(Base):
-    __tablename__ = "world_partition_adjacency"
-
-    id = Column(BigInteger, primary_key=True, index=True)
-    from_partition_id = Column(BigInteger, ForeignKey("world_level_partition.id"), nullable=False, index=True)
-    to_partition_id = Column(BigInteger, ForeignKey("world_level_partition.id"), nullable=False, index=True)
-    relation_type = Column(String(32), nullable=False, index=True)
-    traversal_cost = Column(Float, nullable=True)
-    edge_meta = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    from_partition = relationship("WorldLevelPartition", foreign_keys=[from_partition_id], backref="out_edges")
-    to_partition = relationship("WorldLevelPartition", foreign_keys=[to_partition_id], backref="in_edges")

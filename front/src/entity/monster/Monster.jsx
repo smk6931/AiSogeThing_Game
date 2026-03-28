@@ -8,8 +8,13 @@ const BASE_MODEL_URL = '/models/';
  * 모델 파일별 스케일·Y오프셋 설정 (TODO: monster_template DB 컬럼으로 이전 예정)
  */
 const MODEL_CONFIG = {
-  'monsters/Gangnam_Boss_Fire_001_Dragon.glb': { scale: 0.12, yOffset: 0 },
-  'monsters/Seoul_Normal_Water_001_Slime.glb': { scale: 0.6, yOffset: 0.014 },
+  'monsters/Gangnam_Boss_Fire_001_Dragon.glb':      { scale: 0.4,  yOffset: 0 },
+  'monsters/Seoul_Normal_Water_001_Slime.glb':      { scale: 0.6,  yOffset: 0.014 },
+  'monsters/Noryangjin_Normal_Forest_003_Goblin.glb': { scale: 0.6,  yOffset: 0 },
+  'monsters/Noryangjin_Elite_Stone_004_Orc.glb':    { scale: 0.7,  yOffset: 0 },
+  'monsters/Noryangjin_Normal_Dark_005_Zombie.glb': { scale: 0.6,  yOffset: 0 },
+  'monsters/Noryangjin_Elite_Magic_006_Witch.glb':  { scale: 0.65, yOffset: 0 },
+  'monsters/Noryangjin_Boss_Earth_007_Ogre.glb':    { scale: 0.9,  yOffset: 0 },
 };
 const DEFAULT_CONFIG = { scale: 0.6, yOffset: 0 };
 
