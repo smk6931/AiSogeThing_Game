@@ -82,8 +82,8 @@ const ZONE_COLORS = {
   water: '#2a6ab5',
   park: '#4caf50',
   forest: '#2d6a28',
-  road_major: '#999999', // 큰도로: 중간 회색
-  road_minor: '#d0d0d0', // 작은도로: 연한 회색 (거의 흰색)
+  road_major: '#cfbc92',
+  road_minor: '#e5d8b7',
   residential: '#8bc34a',
   commercial: '#2196f3',
   industrial: '#ffc107',
@@ -106,8 +106,8 @@ const ZONE_OPACITY = {
   water: 0.35,
   park: 0.3,
   forest: 0.3,
-  road_major: 0.4,
-  road_minor: 0.25,
+  road_major: 0.62,
+  road_minor: 0.42,
   residential: 0.25,
   commercial: 0.25,
   industrial: 0.25,
@@ -299,7 +299,7 @@ const calcDistrictBbox = (coords) => {
 const ZoneOverlay = ({
   playerPos, currentDistrict = null, dongId = null, currentDong = null,
   elevation = 0.05, heightScale = 1.0, onZoneLoaded, visible = true, enabledZones = {},
-  zoneRadius = 2500, roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 8
+  zoneRadius = 2500, roadWidthMajor = 16, roadWidthMid = 8, roadWidthMinor = 4
 }) => {
   const [zoneData, setZoneData] = useState({ zones: {}, categories: {} });
   const [loadingGroups, setLoadingGroups] = useState({});
@@ -530,12 +530,6 @@ const ZoneOverlay = ({
       {activeMask && <ZoneMask maskArea={activeMask} elevation={elevation - 0.005} />}
 
       {/* 라인 기반 Zone (도로 등) - 항상 폴리곤보다 위에 위치하도록 renderOrder 상향 및 투명 패스 강제 */}
-      {enabled.road_major && geometries.road_major && (
-        <ZoneLineMesh geometry={geometries.road_major.geometry} color={ZONE_COLORS.road_major} opacity={1.0} elevation={elevation + 0.07} useStencil={!!activeMask} renderOrder={102} />
-      )}
-      {enabled.road_minor && geometries.road_minor && (
-        <ZoneLineMesh geometry={geometries.road_minor.geometry} color={ZONE_COLORS.road_minor} opacity={1.0} elevation={elevation + 0.06} useStencil={!!activeMask} renderOrder={101} />
-      )}
       {enabled.sectors && geometries.sectors && (
         <ZoneMesh geometry={geometries.sectors.geometry} color={ZONE_COLORS.sectors} opacity={ZONE_OPACITY.sectors} elevation={elevation + 0.03} useStencil={!!activeMask} />
       )}
@@ -601,10 +595,10 @@ const ZoneOverlay = ({
 
       {/* 라인 기반 Zone (도로) */}
       {enabled.road_major && geometries.road_major && (
-        <ZoneLineMesh geometry={geometries.road_major.geometry} color={ZONE_COLORS.road_major} opacity={ZONE_OPACITY.road_major} elevation={elevation + 0.03} useStencil={!!activeMask} />
+        <ZoneLineMesh geometry={geometries.road_major.geometry} color={ZONE_COLORS.road_major} opacity={ZONE_OPACITY.road_major} elevation={elevation + 0.06} useStencil={!!activeMask} renderOrder={102} />
       )}
       {enabled.road_minor && geometries.road_minor && (
-        <ZoneLineMesh geometry={geometries.road_minor.geometry} color={ZONE_COLORS.road_minor} opacity={ZONE_OPACITY.road_minor} elevation={elevation + 0.025} useStencil={!!activeMask} />
+        <ZoneLineMesh geometry={geometries.road_minor.geometry} color={ZONE_COLORS.road_minor} opacity={ZONE_OPACITY.road_minor} elevation={elevation + 0.05} useStencil={!!activeMask} renderOrder={101} />
       )}
     </group>
   );

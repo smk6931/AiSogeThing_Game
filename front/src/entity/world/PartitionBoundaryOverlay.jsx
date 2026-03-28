@@ -32,7 +32,7 @@ const buildWallFromSegment = (startLngLat, endLngLat, height, thickness) => {
   return boxGeo;
 };
 
-const buildWallsFromRing = (ring, height = 28, thickness = 7.5) => {
+const buildWallsFromRing = (ring, height = 1.5, thickness = 2.0) => {
   if (!ring || ring.length < 2) return [];
   const geos = [];
   for (let i = 0; i < ring.length - 1; i += 1) {
@@ -51,7 +51,7 @@ const buildPartitionBoundaryGeometry = (boundaryGeoJson) => {
   return geos.length ? mergeGeometries(geos, false) : null;
 };
 
-const buildGroupBoundaryGeometry = (partitions, height = 42, thickness = 12) => {
+const buildGroupBoundaryGeometry = (partitions, height = 2.5, thickness = 3.0) => {
   const edgeMap = new Map();
 
   partitions.forEach((partition) => {
@@ -202,9 +202,8 @@ const PartitionBoundaryOverlay = ({
             <meshBasicMaterial
               color={entry.groupKey === currentGroupKey ? '#67e8d6' : '#8bd8ff'}
               transparent
-              opacity={entry.groupKey === currentGroupKey ? 0.82 : 0.48}
+              opacity={entry.groupKey === currentGroupKey ? 0.7 : 0.35}
               depthWrite={false}
-              depthTest={false}
             />
           </mesh>
         ))}
@@ -212,14 +211,14 @@ const PartitionBoundaryOverlay = ({
       {highlightCurrentGroup &&
         currentGroupMicroMeshes.map((entry) => (
           <mesh key={`partition-current-group-${entry.id}`} geometry={entry.geometry} renderOrder={15}>
-            <meshBasicMaterial color="#67e8d6" transparent opacity={0.46} depthWrite={false} depthTest={false} />
+            <meshBasicMaterial color="#67e8d6" transparent opacity={0.4} depthWrite={false} />
           </mesh>
         ))}
 
       {highlightCurrentGroup &&
         currentMicroMeshes.map((entry) => (
           <mesh key={`partition-current-micro-${entry.id}`} geometry={entry.geometry} renderOrder={16}>
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.96} depthWrite={false} depthTest={false} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.55} depthWrite={false} />
           </mesh>
         ))}
     </group>

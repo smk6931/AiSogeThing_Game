@@ -44,11 +44,8 @@ const GameCanvas = ({
         gl.setClearColor(0x0a0a0a, 1);
       }}
       style={{
-        width: '100%',
-        height: '100%',
         position: 'absolute',
-        top: 0,
-        left: 0,
+        inset: 0,
         zIndex: 10
       }}
     >

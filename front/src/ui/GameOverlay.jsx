@@ -283,6 +283,32 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
         </div>
       </div>
 
+      {/* 레이어 토글 버튼 — 미니맵 왼쪽 */}
+      <div
+        onClick={() => { setSidebarOpen(true); setSidebarTab('settings'); }}
+        title="레이어 설정"
+        style={{
+          position: 'absolute',
+          top: 'max(10px, env(safe-area-inset-top))',
+          right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 8)}px)`,
+          width: '30px',
+          height: '30px',
+          borderRadius: '8px',
+          background: (sidebarOpen && sidebarTab === 'settings') ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
+          border: `1px solid ${(sidebarOpen && sidebarTab === 'settings') ? ACCENT : BORDER_COLOR}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+          boxShadow: GLOW,
+          fontSize: '15px',
+          zIndex: 60,
+        }}
+      >
+        🗺
+      </div>
+
       {/* 미니맵 */}
       <div
         style={{
