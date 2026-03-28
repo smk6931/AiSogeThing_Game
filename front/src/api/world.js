@@ -40,6 +40,12 @@ const worldApi = {
     });
   },
 
+  getCurrentRegion: async (lat, lng) => {
+    return await client.get('/api/world/region/current', {
+      params: { lat, lng }
+    });
+  },
+
   // 특정 동(Dong) 고유 지형 데이터 조회
   getDongTerrain: async (dongId) => {
     return await client.get(`/api/world/terrain/dong/${dongId}`);

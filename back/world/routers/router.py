@@ -10,6 +10,7 @@ from world.services.district_service import (
 )
 from world.services.block_service import block_service
 from world.services.world_design_service import get_yongsan_world_profile
+from world.services.partition_service import get_current_region_info
 
 router = APIRouter(prefix="/api/world", tags=["World"])
 
@@ -68,6 +69,11 @@ async def get_current_dong(lat: float, lng: float):
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, _get_current_dong, lat, lng)
     return result or {"name": None, "id": None}
+
+
+@router.get("/region/current")
+async def get_current_region(lat: float, lng: float):
+    return await get_current_region_info(lat, lng)
 
 
 @router.get("/terrain/district/{district_id}")

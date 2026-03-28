@@ -40,7 +40,11 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_novel_cuts_id'), 'novel_cuts', ['id'], unique=False)
-    op.drop_column('youtube_channels', 'updated_at')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    youtube_channel_columns = {column["name"] for column in inspector.get_columns("youtube_channels")}
+    if "updated_at" in youtube_channel_columns:
+        op.drop_column('youtube_channels', 'updated_at')
     # ### end Alembic commands ###
 
 

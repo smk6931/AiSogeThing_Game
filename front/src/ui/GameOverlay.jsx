@@ -6,6 +6,7 @@ import LeafletMapBackground from './LeafletMapBackground';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M, getAllMaps } from '@entity/world/mapConfig';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
+import worldApi from '@api/world';
 
 // =============================
 // 공통 가이드 & 유틸리티
@@ -35,6 +36,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
   const [mapZoom, setMapZoom] = useState(15);
   const [gpsCoords, setGpsCoords] = useState({ lat: GIS_ORIGIN.lat, lng: GIS_ORIGIN.lng });
   const [currentDistrict, setCurrentDistrict] = useState(null);
+  const [currentRegionInfo, setCurrentRegionInfo] = useState(null);
   const [showZoneTitle, setShowZoneTitle] = useState(false);
   const lastDistrictRef = useRef('');
 
@@ -82,6 +84,34 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
     const interval = setInterval(updateGps, 500);
     return () => clearInterval(interval);
   }, [myPositionRef, getDistrictAt]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRegionInfo = async () => {
+      if (!currentDong?.id) {
+        setCurrentRegionInfo(null);
+        return;
+      }
+
+      try {
+        const response = await worldApi.getCurrentRegion(gpsCoords.lat, gpsCoords.lng);
+        if (!cancelled) {
+          setCurrentRegionInfo(response.data?.db_region || null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setCurrentRegionInfo(null);
+        }
+      }
+    };
+
+    loadRegionInfo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentDong?.id]);
 
   // 초기화 및 글로벌 스타일 주입
   useEffect(() => {
@@ -226,6 +256,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
         </div>
 
         {!isMapExpanded && (
+          <>
           <div style={{
             background: 'rgba(6,12,18,0.82)',
             border: `1px solid ${currentDistrict?.name?.includes('동작') ? ACCENT : BORDER_COLOR}`,
@@ -242,6 +273,37 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats })
             <Flame size={12} color={currentDistrict?.name?.includes('동작') ? ACCENT : GOLD} />
             {currentDistrict?.name || 'SEOUL'}
           </div>
+          {currentRegionInfo && (
+            <div style={{
+              width: isMobile ? '220px' : '280px',
+              padding: isMobile ? '10px 12px' : '12px 14px',
+              borderRadius: '16px',
+              background: 'linear-gradient(180deg, rgba(8, 14, 20, 0.94), rgba(7, 10, 16, 0.92))',
+              border: `1px solid ${BORDER_COLOR}`,
+              boxShadow: GLOW,
+              color: '#eefaf7',
+              pointerEvents: 'auto'
+            }}>
+              <div style={{ fontSize: '10px', color: GOLD, letterSpacing: '1.2px', marginBottom: '4px' }}>DB REGION</div>
+              <div style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: '700', marginBottom: '4px' }}>
+                {currentRegionInfo.admin_area?.name || currentDong?.name}
+              </div>
+              <div style={{ fontSize: '11px', color: '#9fb7b2', marginBottom: '8px' }}>
+                파티션 {currentRegionInfo.partition_count}개
+              </div>
+              {currentRegionInfo.featured_partitions?.[0] && (
+                <div style={{ fontSize: '12px', lineHeight: 1.45 }}>
+                  <div style={{ color: ACCENT, fontWeight: '700', marginBottom: '2px' }}>
+                    {currentRegionInfo.featured_partitions[0].display_name}
+                  </div>
+                  <div style={{ color: '#d7e6e2' }}>
+                    {currentRegionInfo.featured_partitions[0].summary || currentRegionInfo.featured_partitions[0].description}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          </>
         )}
       </div>
 

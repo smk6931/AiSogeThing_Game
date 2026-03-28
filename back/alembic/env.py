@@ -14,11 +14,11 @@ import os
 from dotenv import load_dotenv
 
 # 1. 루트 경로의 .env 로드 (절대 경로)
-env_path = r"c:/GitHub/AiSogeThing/.env"
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 print(f"📄 Loading .env from: {env_path}")
 load_dotenv(env_path)
 
-sys.path.append(os.getcwd())
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # 이제 models.py 대신 core.database를 불러옵니다.
 # (이 안에 모델들이 다 들어있음)
@@ -51,11 +51,11 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     
     # [Patch] 환경변수 우선 (서버: 5432, 로컬: 5433)
-    db_user = os.getenv("DB_USER", "postgres")
+    db_user = os.getenv("DB_USER", "game_sogething")
     db_password = os.getenv("DB_PASSWORD", "0000")
     db_host = os.getenv("DB_HOST", "127.0.0.1")
-    db_port = os.getenv("DB_PORT", "5433") 
-    db_name = os.getenv("DB_NAME", "aisogething")
+    db_port = os.getenv("DB_PORT", "5100") 
+    db_name = os.getenv("DB_NAME", "game_sogething")
     
     sqlalchemy_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     print(f"🔗 Alembic Connecting to: {sqlalchemy_url}")

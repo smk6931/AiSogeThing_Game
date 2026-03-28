@@ -15,11 +15,11 @@ else:
 #  [Async] DB 연결 설정 (SQLAlchemy Async Core)
 # ==========================================================
 
-DB_USER = os.getenv("DB_USER", "postgres")
+DB_USER = os.getenv("DB_USER", "game_sogething")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "0000")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5433")
-DB_NAME = os.getenv("DB_NAME", "aisogething")
+DB_NAME = os.getenv("DB_NAME", "game_sogething")
 
 # 비동기 드라이버 (postgresql+asyncpg)
 SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
