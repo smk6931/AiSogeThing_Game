@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Polygon Preview</title>
+    <style>
+      :root {
+        --bg: #f4efe7;
+        --panel: #fffaf2;
+        --line: #1f2937;
+        --fill: rgba(234, 88, 12, 0.28);
+        --point: #c2410c;
+        --grid: rgba(31, 41, 55, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(251, 191, 36, 0.18), transparent 35%),
+          linear-gradient(180deg, #f7f1e8 0%, var(--bg) 100%);
+        color: #111827;
+      }
+
+      .wrap {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .panel {
+        width: min(960px, 100%);
+        background: var(--panel);
+        border: 1px solid rgba(31, 41, 55, 0.12);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 20px 60px rgba(31, 41, 55, 0.12);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: #4b5563;
+      }
+
+      svg {
+        width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 16px;
+        background:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+          #ffffff;
+        background-size: 40px 40px;
+        border: 1px solid rgba(31, 41, 55, 0.08);
+      }
+
+      .meta {
+        margin-top: 16px;
+        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.72);
+        border-radius: 12px;
+        font-family: Consolas, monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+
+      .label {
+        font: 12px Consolas, monospace;
+        fill: #374151;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="panel">
+        <h1>Polygon Preview</h1>
+        <p>입력한 좌표를 SVG 다각형으로 렌더링한 결과입니다.</p>
+        <svg id="canvas" viewBox="0 0 800 650" aria-label="Polygon preview"></svg>
+        <div id="meta" class="meta"></div>
+      </section>
+    </div>
+
+    <script>
+      const polygon = [
+        [180, 60],
+        [400, 40],
+        [700, 250],
+        [600, 520],
+        [300, 580],
+        [120, 450],
+        [250, 350],
+        [100, 300],
+      ];
+
+      const svg = document.getElementById("canvas");
+      const meta = document.getElementById("meta");
+      const pointsText = polygon.map(([x, y]) => `${x},${y}`).join(" ");
+
+      const polygonNode = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      polygonNode.setAttribute("points", pointsText);
+      polygonNode.setAttribute("fill", "var(--fill)");
+      polygonNode.setAttribute("stroke", "var(--line)");
+      polygonNode.setAttribute("stroke-width", "4");
+      polygonNode.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(polygonNode);
+
+      polygon.forEach(([x, y], index) => {
+        const point = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        point.setAttribute("cx", x);
+        point.setAttribute("cy", y);
+        point.setAttribute("r", "6");
+        point.setAttribute("fill", "var(--point)");
+        svg.appendChild(point);
+
+        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("x", x + 10);
+        label.setAttribute("y", y - 10);
+        label.setAttribute("class", "label");
+        label.textContent = `${index}: (${x}, ${y})`;
+        svg.appendChild(label);
+      });
+
+      meta.textContent =
+        `polygon = ${JSON.stringify(polygon, null, 2)}\n\n` +
+        `points attribute = "${pointsText}"`;
+    </script>
+  </body>
+</html>

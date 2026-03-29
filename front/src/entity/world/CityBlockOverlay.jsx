@@ -106,7 +106,6 @@ const buildTerrainBlock = (coords, holes = []) => {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geo.computeVertexNormals();
   return geo;
 };
 
@@ -288,7 +287,7 @@ const CityBlockContent = ({
       <group position={[0, elevation, 0]}>
         {blocks.map((block, index) => (
           <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
-            <meshStandardMaterial
+            <meshBasicMaterial
               map={Array.isArray(textures) ? textures[block.texIdx] : textures}
               transparent={false}
               opacity={1}
@@ -296,9 +295,8 @@ const CityBlockContent = ({
               stencilRef={1}
               stencilFunc={THREE.EqualStencilFunc}
               side={THREE.DoubleSide}
-              roughness={1}
-              metalness={0}
-              depthWrite
+              toneMapped={false}
+              depthWrite={false}
             />
           </mesh>
         ))}

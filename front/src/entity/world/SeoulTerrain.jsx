@@ -106,6 +106,46 @@ const findNearestGroupKey = (playerPos, partitions) => {
   return nearestGroupKey;
 };
 
+const getGroupBounds = (partitions, groupKey) => {
+  if (!groupKey || !partitions?.length) return null;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+
+  for (const partition of partitions) {
+    if (partition.group_key !== groupKey) continue;
+    const rings = partition.boundary_geojson?.coordinates || [];
+    for (const ring of rings) {
+      for (const [lng, lat] of ring) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
+    }
+  }
+
+  if (!Number.isFinite(minLat) || !Number.isFinite(minLng)) return null;
+  const pad = 0.00035;
+  return {
+    minLat: minLat - pad,
+    maxLat: maxLat + pad,
+    minLng: minLng - pad,
+    maxLng: maxLng + pad,
+  };
+};
+
+const featureTouchesBounds = (feature, bounds) => {
+  if (!feature?.coords?.length || !bounds) return true;
+  return feature.coords.some(([lat, lng]) => (
+    lat >= bounds.minLat &&
+    lat <= bounds.maxLat &&
+    lng >= bounds.minLng &&
+    lng <= bounds.maxLng
+  ));
+};
+
 const cropAtlasTile = (image, col, row) => {
   const tileWidth = Math.floor(image.width / ROAD_ATLAS_GRID);
   const tileHeight = Math.floor(image.height / ROAD_ATLAS_GRID);
@@ -311,7 +351,11 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
   return (
     <mesh rotation={rotation} position={position} renderOrder={finalRenderOrder}>
       <primitive object={geometry} attach="geometry" />
-      <meshStandardMaterial {...materialProps} side={THREE.DoubleSide} />
+      {isRoad ? (
+        <meshBasicMaterial {...materialProps} side={THREE.DoubleSide} />
+      ) : (
+        <meshStandardMaterial {...materialProps} side={THREE.DoubleSide} />
+      )}
     </mesh>
   );
 };
@@ -533,30 +577,38 @@ const SeoulTerrain = ({
     if (!data) return;
     const build = async () => {
       const { water, forest, grass, roads } = data.layers;
-      const roadFeatures = dongId
+      const groupBounds = clipToCurrentGroup ? getGroupBounds(groupPartitions, currentGroupKey) : null;
+      const filteredRoadBase = dongId
         ? roads
         : roads.filter(r => ['major', 'mid', 'alley'].includes(ROAD_CLASS[r.highway] || 'alley'));
-      const majorRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'major');
-      const midRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'mid');
-      const alleyRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'alley');
-      const pedestrianRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'pedestrian');
-      const serviceRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'service');
+      const roadFeatures = groupBounds
+        ? filteredRoadBase.filter((road) => featureTouchesBounds(road, groupBounds))
+        : filteredRoadBase;
+      const majorRoads = showRoads ? roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'major') : [];
+      const midRoads = showRoads ? roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'mid') : [];
+      const alleyRoads = showRoads ? roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'alley') : [];
+      const pedestrianRoads = showRoads ? roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'pedestrian') : [];
+      const serviceRoads = showRoads ? roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'service') : [];
+      const grassPolygons = showNature ? grass.filter((f) => !groupBounds || featureTouchesBounds(f, groupBounds)).filter(f => f.type === 'polygon') : [];
+      const forestPolygons = showNature ? forest.filter((f) => !groupBounds || featureTouchesBounds(f, groupBounds)).filter(f => f.type === 'polygon') : [];
+      const waterPolygons = showNature ? water.filter((f) => !groupBounds || featureTouchesBounds(f, groupBounds)).filter(f => f.type === 'polygon') : [];
+      const waterLines = showNature ? water.filter((f) => !groupBounds || featureTouchesBounds(f, groupBounds)).filter(f => f.type === 'line') : [];
 
       setGeos({
-        grass: buildPolygonGeometry(grass.filter(f => f.type === 'polygon')),
-        forest: buildPolygonGeometry(forest.filter(f => f.type === 'polygon')),
-        waterPoly: buildPolygonGeometry(water.filter(f => f.type === 'polygon')),
-        waterLine: buildSimpleLineGeometry(water.filter(f => f.type === 'line'), 30, 15, 5),
-        roadMajor: buildRoadAtlasGeometry(majorRoads, 'major', roadWidthMajor, roadWidthMid, roadWidthMinor),
-        roadMid: buildRoadAtlasGeometry(midRoads, 'mid', roadWidthMajor, roadWidthMid, roadWidthMinor),
-        roadAlley: buildRoadAtlasGeometry(alleyRoads, 'alley', roadWidthMajor, roadWidthMid, roadWidthMinor),
-        roadPedestrian: buildRoadAtlasGeometry(pedestrianRoads, 'pedestrian', roadWidthMajor, roadWidthMid, roadWidthMinor),
-        roadService: buildRoadAtlasGeometry(serviceRoads, 'service', roadWidthMajor, roadWidthMid, roadWidthMinor),
+        grass: showNature ? buildPolygonGeometry(grassPolygons) : null,
+        forest: showNature ? buildPolygonGeometry(forestPolygons) : null,
+        waterPoly: showNature ? buildPolygonGeometry(waterPolygons) : null,
+        waterLine: showNature ? buildSimpleLineGeometry(waterLines, 30, 15, 5) : null,
+        roadMajor: showRoads ? buildRoadAtlasGeometry(majorRoads, 'major', roadWidthMajor, roadWidthMid, roadWidthMinor) : null,
+        roadMid: showRoads ? buildRoadAtlasGeometry(midRoads, 'mid', roadWidthMajor, roadWidthMid, roadWidthMinor) : null,
+        roadAlley: showRoads ? buildRoadAtlasGeometry(alleyRoads, 'alley', roadWidthMajor, roadWidthMid, roadWidthMinor) : null,
+        roadPedestrian: showRoads ? buildRoadAtlasGeometry(pedestrianRoads, 'pedestrian', roadWidthMajor, roadWidthMid, roadWidthMinor) : null,
+        roadService: showRoads ? buildRoadAtlasGeometry(serviceRoads, 'service', roadWidthMajor, roadWidthMid, roadWidthMinor) : null,
         shiftX: 0, shiftZ: 0
       });
     };
     build();
-  }, [data, shiftX, shiftZ, currentDistrict, currentDong, roadWidthMajor, roadWidthMid, roadWidthMinor]);
+  }, [data, shiftX, shiftZ, currentDistrict, currentDong, roadWidthMajor, roadWidthMid, roadWidthMinor, clipToCurrentGroup, currentGroupKey, groupPartitions, showNature, showRoads]);
 
   if (!visible || !geos) return null;
 
