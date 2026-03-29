@@ -104,7 +104,7 @@ const GameEntry = () => {
       e.preventDefault();
       // 모든 휠 이벤트를 ZoomController 단일 경로로 통일 (OrbitControls zoom 비활성화)
       const delta = e.deltaY > 0 ? -0.4 : 0.4;
-      setZoomLevel(prev => Math.max(10, Math.min(22, prev + delta)));
+      setZoomLevel(prev => Math.max(6, Math.min(23.5, prev + delta)));
     };
 
     window.addEventListener('wheel', handleWheel, { passive: false });

@@ -99,17 +99,26 @@ const cropAtlasTile = (image, col, row) => {
   const ctx = canvas.getContext('2d');
   if (!ctx) return image;
 
+  const insetX = Math.max(2, Math.floor(tileWidth * 0.04));
+  const insetY = Math.max(2, Math.floor(tileHeight * 0.04));
+  const sourceX = col * tileWidth + insetX;
+  const sourceY = row * tileHeight + insetY;
+  const sourceW = Math.max(1, tileWidth - insetX * 2);
+  const sourceH = Math.max(1, tileHeight - insetY * 2);
+
+  ctx.filter = 'brightness(1.14) saturate(1.08) contrast(1.02)';
   ctx.drawImage(
     image,
-    col * tileWidth,
-    row * tileHeight,
-    tileWidth,
-    tileHeight,
+    sourceX,
+    sourceY,
+    sourceW,
+    sourceH,
     0,
     0,
     tileWidth,
     tileHeight,
   );
+  ctx.filter = 'none';
   return canvas;
 };
 
@@ -357,15 +366,16 @@ const SeoulTerrain = ({
           loaded.image = cropAtlasTile(loaded.image, tile.col, tile.row);
           loaded.needsUpdate = true;
         }
-      });
-      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = 8;
-      texture.magFilter = THREE.LinearFilter;
-      texture.minFilter = THREE.LinearMipmapLinearFilter;
-      texture.needsUpdate = true;
-      return texture;
-    };
+        });
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.anisotropy = 8;
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+        texture.needsUpdate = true;
+        return texture;
+      };
     return {
       major: loadTexture(roadAtlasChoices.major.atlasUrl, roadAtlasChoices.major),
       mid: loadTexture(roadAtlasChoices.mid.atlasUrl, roadAtlasChoices.mid),
