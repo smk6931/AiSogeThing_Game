@@ -132,14 +132,14 @@ async def get_block_textures():
     import os
     # back/world/routers/router.py -> 4단계 상위가 루트
     base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-    images_dir = os.path.join(base_path, "front", "public", "grounds")
+    images_dir = os.path.join(base_path, "front", "public", "ground")
     
     if not os.path.exists(images_dir):
         return []
         
     files = [f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
     # 프론트엔드에서 바로 접근 가능한 URL 경로로 반환
-    return [f"/grounds/{f}" for f in files]
+    return [f"/ground/{f}" for f in files]
 
 
 @router.get("/design/yongsan")

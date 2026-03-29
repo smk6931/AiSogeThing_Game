@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import { Html } from '@react-three/drei';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import worldApi from '@api/world';
-import { getTerrainHeight, loadHeightMap } from './terrainHandler';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
 // ===========================
@@ -26,31 +24,48 @@ const ROAD_CLASS = {
   living_street: 'minor', pedestrian: 'minor', footway: 'minor', path: 'minor'
 };
 
+const ROAD_ATLAS_GRID = 4;
+const ROAD_ATLAS_CELL_MAP = {
+  major: { col: 0, row: 0, tileLength: 42 },
+  mid: { col: 1, row: 0, tileLength: 28 },
+  minor: { col: 2, row: 0, tileLength: 18 },
+};
+const ROAD_STYLE = {
+  major: {
+    color: new THREE.Color('#8c939b'),
+    opacity: 0.98,
+    roughness: 0.92,
+    metalness: 0.02,
+    renderOrder: 112,
+    yOffset: 0.15,
+  },
+  mid: {
+    color: new THREE.Color('#747b84'),
+    opacity: 0.92,
+    roughness: 0.96,
+    metalness: 0.01,
+    renderOrder: 110,
+    yOffset: 0.12,
+  },
+  minor: {
+    color: new THREE.Color('#6a665d'),
+    opacity: 0.82,
+    roughness: 1,
+    metalness: 0,
+    renderOrder: 108,
+    yOffset: 0.09,
+  },
+};
+
 // GPS → 게임 좌표 변환
 const gpsToGame = (lat, lng) => ({
   x: (lng - GIS_ORIGIN.lng) * LNG_TO_M,
   z: (GIS_ORIGIN.lat - lat) * LAT_TO_M,
 });
 
-// Ray-casting Point-in-Polygon
-const pointInPolygon = (lat, lng, coords) => {
-  let inside = false;
-  const n = coords.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    const yi = coords[i][0], xi = coords[i][1];
-    const yj = coords[j][0], xj = coords[j][1];
-    if (((yi > lat) !== (yj > lat)) &&
-      (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  return inside;
-};
-
 // 폴리곤 생성
 function buildPolygonGeometry(features, maskArea = null) {
   const geos = [];
-  const maskCoords = maskArea?.coords;
 
   for (const f of features) {
     if (!f.coords || f.coords.length < 3) continue;
@@ -71,8 +86,18 @@ function buildPolygonGeometry(features, maskArea = null) {
   try { return mergeGeometries(geos, false); } catch (_) { return null; }
 }
 
-// 라인 생성
-function buildLineGeometry(features, roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 6, maskArea = null) {
+function getAtlasUvs(cell) {
+  const inset = 0.002;
+  const cellSize = 1 / ROAD_ATLAS_GRID;
+  const u0 = cell.col * cellSize + inset;
+  const u1 = (cell.col + 1) * cellSize - inset;
+  const v1 = 1 - cell.row * cellSize - inset;
+  const v0 = 1 - (cell.row + 1) * cellSize + inset;
+  return { u0, u1, v0, v1 };
+}
+
+// 단순 라인 생성
+function buildSimpleLineGeometry(features, roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 6) {
   const geos = [];
 
   for (const f of features) {
@@ -95,21 +120,26 @@ function buildLineGeometry(features, roadWidthMajor = 20, roadWidthMid = 12, roa
 
       const nx = -dz / len * halfW;
       const nz = dx / len * halfW;
-
-      // [OFF] 등고선 비활성화 - 모든 도로가 평면(Y=0.1)에 렌더링
-      let ay = 0.1; // getTerrainHeight(ax, az);
-      let by = 0.1; // getTerrainHeight(bx, bz);
+      const sy = 0.25;
+      const ey = 0.25;
 
       const geometry = new THREE.BufferGeometry();
       const vertices = new Float32Array([
-        ax + nx, ay + 0.15, az + nz,
-        bx + nx, by + 0.15, bz + nz,
-        bx - nx, by + 0.15, bz - nz,
-        ax + nx, ay + 0.15, az + nz,
-        bx - nx, by + 0.15, bz - nz,
-        ax - nx, ay + 0.15, az - nz
+        ax + nx, sy, az + nz,
+        bx + nx, ey, bz + nz,
+        bx - nx, ey, bz - nz,
+        ax + nx, sy, az + nz,
+        bx - nx, ey, bz - nz,
+        ax - nx, sy, az - nz
       ]);
-      const uvs = new Float32Array([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1]);
+      const uvs = new Float32Array([
+        0, 0,
+        1, 0,
+        1, 1,
+        0, 0,
+        1, 1,
+        0, 1,
+      ]);
       geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
       geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
       geos.push(geometry);
@@ -119,26 +149,97 @@ function buildLineGeometry(features, roadWidthMajor = 20, roadWidthMid = 12, roa
   try { return mergeGeometries(geos, false); } catch (_) { return null; }
 }
 
-const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, isRoad = false, textureUrl = null, useStencil = false }) => {
+// 도로 전용 아틀라스 라인 생성
+function buildRoadAtlasGeometry(features, roadType = 'minor', roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 6) {
+  const geos = [];
+
+  for (const f of features) {
+    const coords = f.coords;
+    if (!coords || coords.length < 2) continue;
+
+    const width = roadType === 'major' ? roadWidthMajor : (roadType === 'mid' ? roadWidthMid : roadWidthMinor);
+    const halfW = width / 2;
+    const atlasCell = ROAD_ATLAS_CELL_MAP[roadType] || ROAD_ATLAS_CELL_MAP.minor;
+    const style = ROAD_STYLE[roadType] || ROAD_STYLE.minor;
+    const { u0, u1, v0, v1 } = getAtlasUvs(atlasCell);
+
+    for (let i = 0; i < coords.length - 1; i++) {
+      const p1 = gpsToGame(coords[i][0], coords[i][1]);
+      const p2 = gpsToGame(coords[i + 1][0], coords[i + 1][1]);
+
+      const ax = p1.x, az = p1.z;
+      const bx = p2.x, bz = p2.z;
+      const dx = bx - ax, dz = bz - az;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len < 0.1) continue;
+
+      const stepCount = Math.max(1, Math.min(12, Math.ceil(len / atlasCell.tileLength)));
+
+      for (let step = 0; step < stepCount; step++) {
+        const t0 = step / stepCount;
+        const t1 = (step + 1) / stepCount;
+        const sx = ax + dx * t0;
+        const sz = az + dz * t0;
+        const ex = ax + dx * t1;
+        const ez = az + dz * t1;
+        const segDx = ex - sx;
+        const segDz = ez - sz;
+        const segLen = Math.sqrt(segDx * segDx + segDz * segDz);
+        if (segLen < 0.1) continue;
+
+        const nx = -segDz / segLen * halfW;
+        const nz = segDx / segLen * halfW;
+
+        const geometry = new THREE.BufferGeometry();
+        const vertices = new Float32Array([
+          sx + nx, style.yOffset, sz + nz,
+          ex + nx, style.yOffset, ez + nz,
+          ex - nx, style.yOffset, ez - nz,
+          sx + nx, style.yOffset, sz + nz,
+          ex - nx, style.yOffset, ez - nz,
+          sx - nx, style.yOffset, sz - nz
+        ]);
+        const uvs = new Float32Array([
+          u0, v0,
+          u1, v0,
+          u1, v1,
+          u0, v0,
+          u1, v1,
+          u0, v1,
+        ]);
+        geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        geos.push(geometry);
+      }
+    }
+  }
+  if (geos.length === 0) return null;
+  try { return mergeGeometries(geos, false); } catch (_) { return null; }
+}
+
+const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, isRoad = false, roadType = 'minor', texture = null, useStencil = false }) => {
   if (!geometry) return null;
-  const isRoadHighlight = color.r > 0.9 && color.g > 0.9;
+  const roadStyle = ROAD_STYLE[roadType] || ROAD_STYLE.minor;
   const materialProps = isWater ? {
     color: color, transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.3, emissive: color, emissiveIntensity: 0.3,
-  } : isRoadHighlight ? {
-    color: '#ffffff',
-    map: textureUrl ? new THREE.TextureLoader().load(textureUrl, (tex) => {
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(1, 4);
-    }) : null,
-    emissive: textureUrl ? '#000000' : '#44aaff',
-    emissiveIntensity: textureUrl ? 0 : 2.5,
-    roughness: 0.5,
+  } : isRoad ? {
+    color: roadStyle.color,
+    map: texture,
+    transparent: true,
+    opacity: roadStyle.opacity,
+    roughness: roadStyle.roughness,
+    metalness: roadStyle.metalness,
+    depthWrite: false,
+    alphaTest: 0.08,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
   } : { 
     color: color,
-    transparent: isRoad,
-    opacity: isRoad ? 1.0 : 1.0,
-    depthWrite: !isRoad,
-    depthTest: !isRoad // 도로면 무조건 최상단 강제
+    transparent: false,
+    opacity: 1.0,
+    depthWrite: true,
+    depthTest: true
   };
 
   if (useStencil) {
@@ -147,7 +248,7 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
     materialProps.stencilFunc = THREE.EqualStencilFunc;
   }
 
-  const finalRenderOrder = isRoad ? 100 : (isWater ? 5 : 1);
+  const finalRenderOrder = isRoad ? roadStyle.renderOrder : (isWater ? 5 : 1);
 
   return (
     <mesh rotation={rotation} position={position} renderOrder={finalRenderOrder}>
@@ -200,6 +301,15 @@ const SeoulTerrain = ({
   const [data, setData] = useState(null);
   const [geos, setGeos] = useState(null);
   const loadingRef = useRef(false);
+  const roadTexture = useMemo(() => {
+    if (!roadTextureUrl) return null;
+    const texture = new THREE.TextureLoader().load(roadTextureUrl);
+    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 8;
+    texture.needsUpdate = true;
+    return texture;
+  }, [roadTextureUrl]);
 
   useEffect(() => {
     if (!visible || loadingRef.current) return;
@@ -232,14 +342,18 @@ const SeoulTerrain = ({
     const build = async () => {
       const { water, forest, grass, roads } = data.layers;
       const roadFeatures = dongId ? roads : roads.filter(r => ROAD_CLASS[r.highway] === 'major' || ROAD_CLASS[r.highway] === 'mid');
-      const maskArea = currentDong || currentDistrict;
+      const majorRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'minor') === 'major');
+      const midRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'minor') === 'mid');
+      const minorRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'minor') === 'minor');
 
       setGeos({
-        grass: buildPolygonGeometry(grass.filter(f => f.type === 'polygon'), maskArea),
-        forest: buildPolygonGeometry(forest.filter(f => f.type === 'polygon'), maskArea),
-        waterPoly: buildPolygonGeometry(water.filter(f => f.type === 'polygon'), maskArea),
-        waterLine: buildLineGeometry(water.filter(f => f.type === 'line'), 30, 15, 5, maskArea),
-        roadFeatures: buildLineGeometry(roadFeatures, roadWidthMajor, roadWidthMid, roadWidthMinor, maskArea),
+        grass: buildPolygonGeometry(grass.filter(f => f.type === 'polygon')),
+        forest: buildPolygonGeometry(forest.filter(f => f.type === 'polygon')),
+        waterPoly: buildPolygonGeometry(water.filter(f => f.type === 'polygon')),
+        waterLine: buildSimpleLineGeometry(water.filter(f => f.type === 'line'), 30, 15, 5),
+        roadMajor: buildRoadAtlasGeometry(majorRoads, 'major', roadWidthMajor, roadWidthMid, roadWidthMinor),
+        roadMid: buildRoadAtlasGeometry(midRoads, 'mid', roadWidthMajor, roadWidthMid, roadWidthMinor),
+        roadMinor: buildRoadAtlasGeometry(minorRoads, 'minor', roadWidthMajor, roadWidthMid, roadWidthMinor),
         shiftX: 0, shiftZ: 0
       });
     };
@@ -266,7 +380,9 @@ const SeoulTerrain = ({
       )}
       {showRoads && (
         <group name="roads-layer" position={[0, 0.1, 0]}>
-          <MergedMesh geometry={geos.roadFeatures} color={COLORS.road_major} textureUrl={roadTextureUrl} useStencil={!!activeMask} isRoad={true} />
+          <MergedMesh geometry={geos.roadMinor} color={COLORS.road_minor} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="minor" />
+          <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="mid" />
+          <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="major" />
         </group>
       )}
     </group>

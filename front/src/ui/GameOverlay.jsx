@@ -40,6 +40,8 @@ const LAYER_BUTTONS = [
   { key: 'showGroupBoundaries',     label: '그룹선', icon: '⬒', colorOn: 'rgba(0,210,220,0.7)' },
   { key: 'showMicroBoundaries',     label: '미세선', icon: '┼', colorOn: 'rgba(240,190,90,0.7)' },
   { key: 'highlightCurrentGroup',   label: '강조',   icon: '✦', colorOn: 'rgba(80,220,180,0.7)' },
+  { key: 'showCurrentGroupTexture', label: '그룹텍', icon: '◆', colorOn: 'rgba(220,160,30,0.8)' },
+  { key: 'showCullRadius',          label: '컬링선', icon: '⊙', colorOn: 'rgba(255,60,60,0.8)'  },
 ];
 
 const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, monsters = {}, mapSettings = {} }) => {

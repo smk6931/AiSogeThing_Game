@@ -3,6 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 
+// 모든 RemotePlayer 인스턴스가 공유하는 geometry (한 번만 생성)
+const CYLINDER_GEO = new THREE.CylinderGeometry(0.5, 0.5, 1, 16);
+const BOX_GEO = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+
 // 각도 보간 함수 (Shortest path lerp for angles)
 const lerpAngle = (start, end, t) => {
   let diff = (end - start) % (Math.PI * 2);
@@ -41,14 +45,12 @@ const RemotePlayer = ({ position, rotation, animation, nickname, chat, scale = 1
   return (
     <group ref={meshRef} scale={scale}>
       {/* 캐릭터 몸체 (플레이어와 동일한 원통형) */}
-      <mesh castShadow position={[0, 0.5, 0]}>
-        <cylinderGeometry args={[0.5, 0.5, 1, 16]} />
-        <meshStandardMaterial color="#6bff6b" /> {/* 상대방은 초록색 계열로 구분 */}
+      <mesh castShadow position={[0, 0.5, 0]} geometry={CYLINDER_GEO}>
+        <meshStandardMaterial color="#6bff6b" />
       </mesh>
 
       {/* 머리/장식 (방향 확인용) */}
-      <mesh position={[0, 0.3, 0.4]}>
-        <boxGeometry args={[0.2, 0.2, 0.2]} />
+      <mesh position={[0, 0.3, 0.4]} geometry={BOX_GEO}>
         <meshStandardMaterial color="white" />
       </mesh>
 

@@ -77,6 +77,8 @@ const GameEntry = () => {
   const [showMicroBoundaries, setShowMicroBoundaries] = useState(false);
   const [showGroupBoundaries, setShowGroupBoundaries] = useState(true);
   const [highlightCurrentGroup, setHighlightCurrentGroup] = useState(true);
+  const [showCurrentGroupTexture, setShowCurrentGroupTexture] = useState(false);
+  const [showCullRadius, setShowCullRadius] = useState(false);
   const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
 
 
@@ -157,6 +159,8 @@ const GameEntry = () => {
           showMicroBoundaries={showMicroBoundaries}
           showGroupBoundaries={showGroupBoundaries}
           highlightCurrentGroup={highlightCurrentGroup}
+          showCurrentGroupTexture={showCurrentGroupTexture}
+          showCullRadius={showCullRadius}
           cameraMode={cameraMode}
           onMonsterClick={setSelectedMonster}
         />
@@ -193,6 +197,8 @@ const GameEntry = () => {
           showMicroBoundaries, setShowMicroBoundaries,
           showGroupBoundaries, setShowGroupBoundaries,
           highlightCurrentGroup, setHighlightCurrentGroup,
+          showCurrentGroupTexture, setShowCurrentGroupTexture,
+          showCullRadius, setShowCullRadius,
           cameraMode, setCameraMode,
           onPlayView: () => { setZoomLevel(18.5); setCameraMode('isometric'); },
         }}

@@ -61,9 +61,9 @@ const MonsterGLB = ({ modelPath, scale: playerScale, state }) => {
   );
 };
 
-/** HP바 */
+/** HP바 — geometry는 고정 크기, scale.x로 너비 조절 (geometry 재생성 없음) */
 const HpBar = ({ hp, maxHp, name, hpBarHeight, tier }) => {
-  const hpPercent = maxHp > 0 ? hp / maxHp : 0;
+  const hpPercent = maxHp > 0 ? Math.max(0, hp / maxHp) : 0;
   const hpColor = hpPercent > 0.5 ? 'green' : hpPercent > 0.2 ? 'orange' : 'red';
   const nameColor = tier === 'boss' ? '#ff4444' : tier === 'elite' ? '#ff9900' : 'white';
   return (
@@ -72,8 +72,12 @@ const HpBar = ({ hp, maxHp, name, hpBarHeight, tier }) => {
         <planeGeometry args={[4.0, 0.4]} />
         <meshBasicMaterial color="black" />
       </mesh>
-      <mesh position={[-(4.0 * (1 - hpPercent)) / 2, 0, 0.01]}>
-        <planeGeometry args={[4.0 * hpPercent, 0.32]} />
+      {/* scale.x로 너비 변경 — geometry 재생성 없음 */}
+      <mesh
+        position={[-(4.0 * (1 - hpPercent)) / 2, 0, 0.01]}
+        scale={[hpPercent, 1, 1]}
+      >
+        <planeGeometry args={[4.0, 0.32]} />
         <meshBasicMaterial color={hpColor} />
       </mesh>
       <Text position={[0, 0.8, 0]} fontSize={0.8} color={nameColor} anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="black">

@@ -9,7 +9,22 @@ export const useGameSocket = (addProjectile) => {
     const [chatMessages, setChatMessages] = useState([]);;
     const [latestChatMap, setLatestChatMap] = useState({});
     const [myStats, setMyStats] = useState(null);
-    const [monsters, setMonsters] = useState({}); // [NEW] 몬스터 목록
+    const [monsters, setMonsters] = useState({});
+
+    // 몬스터 배칭: ref로 최신값 유지, RAF로 프레임당 1회 flush
+    const monstersRef = useRef({});
+    const monsterFlushRef = useRef(null);
+    const scheduleMonsterFlush = () => {
+        if (!monsterFlushRef.current) {
+            monsterFlushRef.current = requestAnimationFrame(() => {
+                setMonsters({ ...monstersRef.current });
+                monsterFlushRef.current = null;
+            });
+        }
+    };
+
+    // 위치 쓰로틀: 유저별 마지막 업데이트 시각 추적 (50ms = 20Hz)
+    const lastPositionTimeRef = useRef({});
 
     useEffect(() => {
         if (!user) return;
@@ -22,42 +37,37 @@ export const useGameSocket = (addProjectile) => {
             const message = JSON.parse(event.data);
 
             switch (message.type) {
-                // [NEW] 몬스터 목록 동기화
                 case 'sync_monsters':
-                    setMonsters(message.monsters);
+                    monstersRef.current = message.monsters;
+                    setMonsters(message.monsters); // 전체 동기화는 즉시 반영
                     break;
 
-                // [NEW] 몬스터 피격 (시각 효과 및 즉시 상태 반영)
-                case 'monster_hit':
-                    setMonsters(prev => {
-                        const m = prev[message.monsterId];
-                        if (!m) return prev;
-                        return {
-                            ...prev,
-                            [message.monsterId]: {
-                                ...m,
-                                hp: message.hp ?? Math.max(0, m.hp - message.damage),
-                                maxHp: message.maxHp ?? m.maxHp,
-                                state: message.state || (message.killed ? 'dead' : 'hit')
-                            }
-                        };
-                    });
+                case 'monster_hit': {
+                    const m = monstersRef.current[message.monsterId];
+                    if (!m) break;
+                    monstersRef.current = {
+                        ...monstersRef.current,
+                        [message.monsterId]: {
+                            ...m,
+                            hp: message.hp ?? Math.max(0, m.hp - message.damage),
+                            maxHp: message.maxHp ?? m.maxHp,
+                            state: message.state || (message.killed ? 'dead' : 'hit')
+                        }
+                    };
+                    scheduleMonsterFlush();
                     break;
+                }
 
-                case 'monster_dead':
-                    setMonsters(prev => {
-                        const m = prev[message.monsterId];
-                        if (!m) return prev;
-                        return {
-                            ...prev,
-                            [message.monsterId]: {
-                                ...m,
-                                hp: 0,
-                                state: 'dead'
-                            }
-                        };
-                    });
+                case 'monster_dead': {
+                    const m = monstersRef.current[message.monsterId];
+                    if (!m) break;
+                    monstersRef.current = {
+                        ...monstersRef.current,
+                        [message.monsterId]: { ...m, hp: 0, state: 'dead' }
+                    };
+                    scheduleMonsterFlush();
                     break;
+                }
 
                 case 'player_reward':
                     setMyStats(message.stats);
@@ -113,10 +123,13 @@ export const useGameSocket = (addProjectile) => {
                     }));
                     break;
 
-                // 3. 유저 이동/행동 업데이트
-                case 'update_position':
+                // 3. 유저 이동/행동 업데이트 (50ms 쓰로틀 = 20Hz)
+                case 'update_position': {
+                    const now = Date.now();
+                    if (now - (lastPositionTimeRef.current[message.userId] || 0) < 50) break;
+                    lastPositionTimeRef.current[message.userId] = now;
                     setOtherPlayers(prev => {
-                        if (!prev[message.userId]) return prev; // 없는 유저면 패스
+                        if (!prev[message.userId]) return prev;
                         return {
                             ...prev,
                             [message.userId]: {
@@ -124,11 +137,12 @@ export const useGameSocket = (addProjectile) => {
                                 position: message.position,
                                 rotation: message.rotation,
                                 animation: message.animation,
-                                mapId: message.mapId // [NEW] 맵 정보 업데이트
+                                mapId: message.mapId
                             }
                         };
                     });
                     break;
+                }
 
                 // 4. 유저 퇴장
                 case 'leave':
@@ -169,7 +183,10 @@ export const useGameSocket = (addProjectile) => {
         socket.onclose = () => console.log('[LEAVE] Game Socket Disconnected');
         socket.onerror = (err) => console.error('[ERROR] Game Socket Error:', err);
 
-        return () => socket.close();
+        return () => {
+            socket.close();
+            if (monsterFlushRef.current) cancelAnimationFrame(monsterFlushRef.current);
+        };
     }, [user?.id]); // user가 바뀔 때만 재연결 (user.id 체크)
 
     // 전송 로직도 API 레이어에 위임

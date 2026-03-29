@@ -30,6 +30,8 @@ const GameCanvas = ({
   showMicroBoundaries,
   showGroupBoundaries,
   highlightCurrentGroup,
+  showCurrentGroupTexture,
+  showCullRadius,
   cameraMode,
   onMonsterClick,
 }) => {
@@ -89,6 +91,8 @@ const GameCanvas = ({
           showMicroBoundaries={showMicroBoundaries}
           showGroupBoundaries={showGroupBoundaries}
           highlightCurrentGroup={highlightCurrentGroup}
+          showCurrentGroupTexture={showCurrentGroupTexture}
+          showCullRadius={showCullRadius}
           cameraMode={cameraMode}
           onMonsterClick={onMonsterClick}
           orbitRef={orbitRef}

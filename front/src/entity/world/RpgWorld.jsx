@@ -24,6 +24,28 @@ import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
+const ROAD_ATLAS_URL = '/ground/asphalt_atlas_4x4.png';
+
+// 몬스터 컬링 반경 — 이 값 하나만 바꾸면 시각화 원과 실제 렌더 범위 둘 다 반영됨
+const MONSTER_CULL_RADIUS = 100;
+const MONSTER_CULL_SQ = MONSTER_CULL_RADIUS * MONSTER_CULL_RADIUS;
+
+const CullRadiusIndicator = ({ playerRef }) => {
+  const meshRef = useRef();
+  useFrame(() => {
+    if (meshRef.current && playerRef.current) {
+      meshRef.current.position.x = playerRef.current.position.x;
+      meshRef.current.position.z = playerRef.current.position.z;
+    }
+  });
+  return (
+    <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1, 0]}>
+      <ringGeometry args={[MONSTER_CULL_RADIUS - 8, MONSTER_CULL_RADIUS, 128]} />
+      <meshBasicMaterial color="#ff4444" transparent opacity={0.55} side={THREE.DoubleSide} depthWrite={false} />
+    </mesh>
+  );
+};
+
 // 각도 보간 함수 (Shortest path lerp for angles)
 const lerpAngle = (start, end, t) => {
   let diff = (end - start) % (Math.PI * 2);
@@ -138,6 +160,8 @@ const RpgWorld = ({
   showMicroBoundaries = false,
   showGroupBoundaries = true,
   highlightCurrentGroup = true,
+  showCurrentGroupTexture = false,
+  showCullRadius = false,
   orbitRef,
   cameraMode,
   onMonsterClick,
@@ -297,12 +321,11 @@ const RpgWorld = ({
           if (monster.state === 'dead') return;
           if (projectileHits.current[p.id]?.has(mId)) return;
 
-          const dist = Math.sqrt(
+          const distSq =
             (currentPos.x - monster.position.x) ** 2 +
-            (currentPos.z - monster.position.z) ** 2
-          );
+            (currentPos.z - monster.position.z) ** 2;
 
-          if (dist < 3.0) {
+          if (distSq < 9.0) { // sqrt 제거: 3.0² = 9.0
             if (sendHit) {
               sendHit({
                 monsterId: parseInt(mId),
@@ -407,6 +430,7 @@ const RpgWorld = ({
         visible={showSeoulNature || showSeoulRoads}
         showRoads={showSeoulRoads}
         showNature={showSeoulNature}
+        roadTextureUrl={ROAD_ATLAS_URL}
         dongId={currentDongId}
         currentDong={currentDong}
         roadWidthMajor={debugConfig.roadWidthMajor}
@@ -439,8 +463,8 @@ const RpgWorld = ({
           water: showSeoulNature,
           park: showSeoulNature,
           forest: showSeoulNature,
-          road_major: showSeoulRoads,
-          road_minor: showSeoulRoads,
+          road_major: false,
+          road_minor: false,
           residential: showLanduseZones && landuseFilters.residential,
           commercial: showLanduseZones && landuseFilters.commercial,
           industrial: showLanduseZones && landuseFilters.industrial,
@@ -483,6 +507,21 @@ const RpgWorld = ({
         dongId={currentDongId}
         currentDong={currentDong}
         elevation={debugConfig.mapElevation + 0.09}
+        playerPositionRef={playerRef}
+      />
+
+      {/* 7. 현재 그룹만 텍스처 — 인접 없이 캐릭터 파티션 그룹 단독 렌더 */}
+      <CityBlockOverlay
+        zoneData={sharedZoneData}
+        visible={showCurrentGroupTexture}
+        showOriginalBlocks={false}
+        showSectorBlocks={true}
+        currentGroupOnly={true}
+        currentDistrict={currentDistrict}
+        dongId={currentDongId}
+        currentDong={currentDong}
+        elevation={debugConfig.mapElevation + 0.11}
+        playerPositionRef={playerRef}
       />
 
       {/* 등고선 지형 (Zone 데이터로 텍스쳐 페인팅) */}
@@ -534,57 +573,52 @@ const RpgWorld = ({
           />
         ))}
 
-      {/* 3. Monster Rendering (Culling & Dynamic Texture) */}
-      {monsters && Object.keys(monsters).map(key => {
-        const m = monsters[key];
-        // [Culling] 플레이어와 거리가 너무 먼 몬스터만 렌더링하지 않음 (최적화)
-        if (playerRef.current) {
-          const dist = Math.sqrt(
-            (m.position.x - playerRef.current.position.x) ** 2 +
-            (m.position.z - playerRef.current.position.z) ** 2
-          );
-          // 쿼터뷰 모드일 때는 시야각이 고정되므로 더 공격적인 컬링 적용 (성능 향상)
-          const cullDistance = 600;
-          if (dist > cullDistance) return null;
-        }
+      {/* 3. Monster Rendering — 1km 컬링, 범위 내 없으면 루프 스킵 */}
+      {monsters && (() => {
+        const monsterKeys = Object.keys(monsters);
+        if (monsterKeys.length === 0) return null;
 
-        // [Texture] 서버에서 내려준 monsterType 우선 사용, 없으면 거리 기반
-        const monsterMap = (m.monsterType !== undefined && allMaps[m.monsterType])
-          ? allMaps[m.monsterType]
-          : null;
+        const playerPos = playerRef.current?.position;
+        const CULL_SQ = MONSTER_CULL_SQ;
 
-        let targetTexture = monsterMap ? monsterMap.monsterTexture : allMaps[0].monsterTexture;
+        // 범위 내 몬스터가 하나라도 있는지 먼저 확인 — 없으면 루프 전체 스킵
+        const hasNearby = !playerPos || monsterKeys.some(key => {
+          const m = monsters[key];
+          if (!m?.position) return false;
+          return (m.position.x - playerPos.x) ** 2 + (m.position.z - playerPos.z) ** 2 <= CULL_SQ;
+        });
+        if (!hasNearby) return null;
 
-        // Fallback: 위치 기반 (이미 타입이 결정되었으면 생략 가능하지만 구조 유지용)
-        if (!monsterMap) {
-          let minMapDist = 99999;
-          for (const map of allMaps) {
-            const d = Math.sqrt(
-              (m.position.x - map.position[0]) ** 2 +
-              (m.position.z - map.position[2]) ** 2
-            );
-            if (d < minMapDist) {
-              minMapDist = d;
-              targetTexture = map.monsterTexture;
-            }
+        return monsterKeys.map(key => {
+          const m = monsters[key];
+          if (!m?.position) return null;
+
+          if (playerPos) {
+            const distSq =
+              (m.position.x - playerPos.x) ** 2 +
+              (m.position.z - playerPos.z) ** 2;
+            if (distSq > CULL_SQ) return null;
           }
-        }
 
-        return (
-          <group key={m.id} onClick={(e) => { e.stopPropagation(); onMonsterClick && onMonsterClick(m); }}>
-            <Monster
-              id={m.id}
-              position={m.position}
-              hp={m.hp}
-              maxHp={m.maxHp}
-              state={m.state}
-              modelPath={m.modelPath || null}
-              tier={m.tier || 'normal'}
-              scale={debugConfig.playerScale}
-            />
-          </group>
-        );
-      })}
+          return (
+            <group key={m.id} onClick={(e) => { e.stopPropagation(); onMonsterClick && onMonsterClick(m); }}>
+              <Monster
+                id={m.id}
+                position={m.position}
+                hp={m.hp}
+                maxHp={m.maxHp}
+                state={m.state}
+                modelPath={m.modelPath || null}
+                tier={m.tier || 'normal'}
+                scale={debugConfig.playerScale}
+              />
+            </group>
+          );
+        });
+      })()}
+
+      {/* 몬스터 컬링 반경 시각화 (디버그) */}
+      {showCullRadius && <CullRadiusIndicator playerRef={playerRef} />}
 
 
 
