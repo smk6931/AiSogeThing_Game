@@ -4,6 +4,11 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import worldApi from '@api/world';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
+const ROAD_ATLAS_TEXTURES = {
+  asphalt: '/ground/asphalt_atlas_4x4.png',
+  stone: '/ground/stone_bricks_atlas_4x4.png',
+};
+
 // ===========================
 // 레이어별 색상
 // ===========================
@@ -29,11 +34,11 @@ const ROAD_CLASS = {
 
 const ROAD_ATLAS_GRID = 4;
 const ROAD_ATLAS_CELL_MAP = {
-  major: { col: 0, row: 0, tileLength: 42 },
-  mid: { col: 1, row: 0, tileLength: 28 },
-  alley: { col: 2, row: 0, tileLength: 18 },
-  pedestrian: { col: 0, row: 1, tileLength: 14 },
-  service: { col: 1, row: 1, tileLength: 16 },
+  major: { atlas: 'asphalt', col: 0, row: 0, tileLength: 42 },
+  mid: { atlas: 'asphalt', col: 1, row: 0, tileLength: 28 },
+  alley: { atlas: 'asphalt', col: 2, row: 0, tileLength: 18 },
+  pedestrian: { atlas: 'stone', col: 0, row: 1, tileLength: 14 },
+  service: { atlas: 'stone', col: 1, row: 1, tileLength: 16 },
 };
 const ROAD_STYLE = {
   major: {
@@ -330,14 +335,20 @@ const SeoulTerrain = ({
     pedestrian: roadTypeFilters.pedestrian !== false,
     service: roadTypeFilters.service !== false,
   }), [roadTypeFilters]);
-  const roadTexture = useMemo(() => {
-    if (!roadTextureUrl) return null;
-    const texture = new THREE.TextureLoader().load(roadTextureUrl);
-    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 8;
-    texture.needsUpdate = true;
-    return texture;
+  const roadTextures = useMemo(() => {
+    const loader = new THREE.TextureLoader();
+    const loadTexture = (url) => {
+      const texture = loader.load(url);
+      texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = 8;
+      texture.needsUpdate = true;
+      return texture;
+    };
+    return {
+      asphalt: loadTexture(roadTextureUrl || ROAD_ATLAS_TEXTURES.asphalt),
+      stone: loadTexture(ROAD_ATLAS_TEXTURES.stone),
+    };
   }, [roadTextureUrl]);
 
   useEffect(() => {
@@ -415,11 +426,11 @@ const SeoulTerrain = ({
       )}
       {showRoads && (
         <group name="roads-layer" position={[0, 0.1, 0]}>
-          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="service" />}
-          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="pedestrian" />}
-          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="alley" />}
-          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="mid" />}
-          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="major" />}
+          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTextures[ROAD_ATLAS_CELL_MAP.service.atlas]} useStencil={!!activeMask} isRoad={true} roadType="service" />}
+          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTextures[ROAD_ATLAS_CELL_MAP.pedestrian.atlas]} useStencil={!!activeMask} isRoad={true} roadType="pedestrian" />}
+          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTextures[ROAD_ATLAS_CELL_MAP.alley.atlas]} useStencil={!!activeMask} isRoad={true} roadType="alley" />}
+          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTextures[ROAD_ATLAS_CELL_MAP.mid.atlas]} useStencil={!!activeMask} isRoad={true} roadType="mid" />}
+          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTextures[ROAD_ATLAS_CELL_MAP.major.atlas]} useStencil={!!activeMask} isRoad={true} roadType="major" />}
         </group>
       )}
     </group>
