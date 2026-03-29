@@ -4,18 +4,12 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import worldApi from '@api/world';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
-const ROAD_ATLAS_TEXTURES = {
-  asphalt: '/ground/asphalt_atlas_4x4.png',
-  stone: '/ground/stone_bricks_atlas_4x4.png',
-};
+const ROAD_ATLAS_TEXTURES = [
+  '/ground/0697877e-b61e-41a0-8560-05ccbc5c07bb.png',
+  '/ground/4628b0ae-fd8d-4497-8edb-338a5edcf82e.png',
+  '/ground/ChatGPT%20Image.png',
+];
 const ROAD_ATLAS_GRID = 4;
-const ROAD_ATLAS_TILE = {
-  major: { atlas: 'asphalt', col: 3, row: 0 },
-  mid: { atlas: 'asphalt', col: 1, row: 1 },
-  alley: { atlas: 'asphalt', col: 0, row: 3 },
-  pedestrian: { atlas: 'stone', col: 2, row: 0 },
-  service: { atlas: 'stone', col: 3, row: 2 },
-};
 
 // ===========================
 // 레이어별 색상
@@ -118,6 +112,12 @@ const cropAtlasTile = (image, col, row) => {
   );
   return canvas;
 };
+
+const randomAtlasChoice = () => ({
+  atlasUrl: ROAD_ATLAS_TEXTURES[Math.floor(Math.random() * ROAD_ATLAS_TEXTURES.length)],
+  col: Math.floor(Math.random() * ROAD_ATLAS_GRID),
+  row: Math.floor(Math.random() * ROAD_ATLAS_GRID),
+});
 
 // 폴리곤 생성
 function buildPolygonGeometry(features, maskArea = null) {
@@ -342,6 +342,13 @@ const SeoulTerrain = ({
     pedestrian: roadTypeFilters.pedestrian !== false,
     service: roadTypeFilters.service !== false,
   }), [roadTypeFilters]);
+  const roadAtlasChoices = useMemo(() => ({
+    major: randomAtlasChoice(),
+    mid: randomAtlasChoice(),
+    alley: randomAtlasChoice(),
+    pedestrian: randomAtlasChoice(),
+    service: randomAtlasChoice(),
+  }), []);
   const roadTextures = useMemo(() => {
     const loader = new THREE.TextureLoader();
     const loadTexture = (atlasUrl, tile) => {
@@ -360,13 +367,13 @@ const SeoulTerrain = ({
       return texture;
     };
     return {
-      major: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.major.atlas], ROAD_ATLAS_TILE.major),
-      mid: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.mid.atlas], ROAD_ATLAS_TILE.mid),
-      alley: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.alley.atlas], ROAD_ATLAS_TILE.alley),
-      pedestrian: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.pedestrian.atlas], ROAD_ATLAS_TILE.pedestrian),
-      service: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.service.atlas], ROAD_ATLAS_TILE.service),
+      major: loadTexture(roadAtlasChoices.major.atlasUrl, roadAtlasChoices.major),
+      mid: loadTexture(roadAtlasChoices.mid.atlasUrl, roadAtlasChoices.mid),
+      alley: loadTexture(roadAtlasChoices.alley.atlasUrl, roadAtlasChoices.alley),
+      pedestrian: loadTexture(roadAtlasChoices.pedestrian.atlasUrl, roadAtlasChoices.pedestrian),
+      service: loadTexture(roadAtlasChoices.service.atlasUrl, roadAtlasChoices.service),
     };
-  }, []);
+  }, [roadAtlasChoices]);
 
   useEffect(() => {
     if (!visible || loadingRef.current) return;
