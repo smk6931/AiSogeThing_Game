@@ -4,9 +4,12 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import worldApi from '@api/world';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
-const ROAD_ATLAS_TEXTURES = {
-  asphalt: '/ground/asphalt_atlas_4x4.png',
-  stone: '/ground/stone_bricks_atlas_4x4.png',
+const ROAD_TEST_TEXTURES = {
+  major: '/images/image.png',
+  mid: '/images/image copy 3.png',
+  alley: '/images/image copy 5.png',
+  pedestrian: '/images/gemini-2.5-flash-image_isometric_hand-painted_fantasy_RPG_tile_texture_of_dark_cracked_dungeon_floor_ti-0.jpg',
+  service: '/images/2b8a23a7dec37e59d324efa9d0f0ef99.jpg',
 };
 
 // ===========================
@@ -32,50 +35,49 @@ const ROAD_CLASS = {
   service: 'service',
 };
 
-const ROAD_ATLAS_GRID = 4;
-const ROAD_ATLAS_CELL_MAP = {
-  major: { atlas: 'asphalt', col: 0, row: 0, tileLength: 42 },
-  mid: { atlas: 'asphalt', col: 1, row: 0, tileLength: 28 },
-  alley: { atlas: 'asphalt', col: 2, row: 0, tileLength: 18 },
-  pedestrian: { atlas: 'stone', col: 0, row: 1, tileLength: 14 },
-  service: { atlas: 'stone', col: 1, row: 1, tileLength: 16 },
+const ROAD_TILE_REPEAT = {
+  major: 0.035,
+  mid: 0.05,
+  alley: 0.07,
+  pedestrian: 0.08,
+  service: 0.06,
 };
 const ROAD_STYLE = {
   major: {
-    color: new THREE.Color('#8c939b'),
-    opacity: 0.98,
-    roughness: 0.92,
+    color: new THREE.Color('#ffffff'),
+    opacity: 1,
+    roughness: 1,
     metalness: 0.02,
     renderOrder: 112,
     yOffset: 0.15,
   },
   mid: {
-    color: new THREE.Color('#747b84'),
-    opacity: 0.92,
-    roughness: 0.96,
+    color: new THREE.Color('#ffffff'),
+    opacity: 1,
+    roughness: 1,
     metalness: 0.01,
     renderOrder: 110,
     yOffset: 0.12,
   },
   alley: {
-    color: new THREE.Color('#6a665d'),
-    opacity: 0.82,
+    color: new THREE.Color('#ffffff'),
+    opacity: 1,
     roughness: 1,
     metalness: 0,
     renderOrder: 108,
     yOffset: 0.09,
   },
   pedestrian: {
-    color: new THREE.Color('#a59878'),
-    opacity: 0.74,
+    color: new THREE.Color('#ffffff'),
+    opacity: 1,
     roughness: 1,
     metalness: 0,
     renderOrder: 106,
     yOffset: 0.07,
   },
   service: {
-    color: new THREE.Color('#5f5a52'),
-    opacity: 0.7,
+    color: new THREE.Color('#ffffff'),
+    opacity: 1,
     roughness: 1,
     metalness: 0,
     renderOrder: 104,
@@ -110,16 +112,6 @@ function buildPolygonGeometry(features, maskArea = null) {
   }
   if (geos.length === 0) return null;
   try { return mergeGeometries(geos, false); } catch (_) { return null; }
-}
-
-function getAtlasUvs(cell) {
-  const inset = 0.002;
-  const cellSize = 1 / ROAD_ATLAS_GRID;
-  const u0 = cell.col * cellSize + inset;
-  const u1 = (cell.col + 1) * cellSize - inset;
-  const v1 = 1 - cell.row * cellSize - inset;
-  const v0 = 1 - (cell.row + 1) * cellSize + inset;
-  return { u0, u1, v0, v1 };
 }
 
 // 단순 라인 생성
@@ -175,7 +167,7 @@ function buildSimpleLineGeometry(features, roadWidthMajor = 20, roadWidthMid = 1
   try { return mergeGeometries(geos, false); } catch (_) { return null; }
 }
 
-// 도로 전용 아틀라스 라인 생성
+// 도로 전용 텍스처 라인 생성
 function buildRoadAtlasGeometry(features, roadType = 'alley', roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 6) {
   const geos = [];
 
@@ -185,9 +177,8 @@ function buildRoadAtlasGeometry(features, roadType = 'alley', roadWidthMajor = 2
 
     const width = roadType === 'major' ? roadWidthMajor : (roadType === 'mid' ? roadWidthMid : roadWidthMinor);
     const halfW = width / 2;
-    const atlasCell = ROAD_ATLAS_CELL_MAP[roadType] || ROAD_ATLAS_CELL_MAP.alley;
     const style = ROAD_STYLE[roadType] || ROAD_STYLE.alley;
-    const { u0, u1, v0, v1 } = getAtlasUvs(atlasCell);
+    const uvRepeat = ROAD_TILE_REPEAT[roadType] || 0.05;
 
     for (let i = 0; i < coords.length - 1; i++) {
       const p1 = gpsToGame(coords[i][0], coords[i][1]);
@@ -199,44 +190,28 @@ function buildRoadAtlasGeometry(features, roadType = 'alley', roadWidthMajor = 2
       const len = Math.sqrt(dx * dx + dz * dz);
       if (len < 0.1) continue;
 
-      const stepCount = Math.max(1, Math.min(12, Math.ceil(len / atlasCell.tileLength)));
-
-      for (let step = 0; step < stepCount; step++) {
-        const t0 = step / stepCount;
-        const t1 = (step + 1) / stepCount;
-        const sx = ax + dx * t0;
-        const sz = az + dz * t0;
-        const ex = ax + dx * t1;
-        const ez = az + dz * t1;
-        const segDx = ex - sx;
-        const segDz = ez - sz;
-        const segLen = Math.sqrt(segDx * segDx + segDz * segDz);
-        if (segLen < 0.1) continue;
-
-        const nx = -segDz / segLen * halfW;
-        const nz = segDx / segLen * halfW;
-
-        const geometry = new THREE.BufferGeometry();
-        const vertices = new Float32Array([
-          sx + nx, style.yOffset, sz + nz,
-          ex + nx, style.yOffset, ez + nz,
-          ex - nx, style.yOffset, ez - nz,
-          sx + nx, style.yOffset, sz + nz,
-          ex - nx, style.yOffset, ez - nz,
-          sx - nx, style.yOffset, sz - nz
-        ]);
-        const uvs = new Float32Array([
-          u0, v0,
-          u1, v0,
-          u1, v1,
-          u0, v0,
-          u1, v1,
-          u0, v1,
-        ]);
-        geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-        geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-        geos.push(geometry);
-      }
+      const nx = -dz / len * halfW;
+      const nz = dx / len * halfW;
+      const geometry = new THREE.BufferGeometry();
+      const vertices = new Float32Array([
+        ax + nx, style.yOffset, az + nz,
+        bx + nx, style.yOffset, bz + nz,
+        bx - nx, style.yOffset, bz - nz,
+        ax + nx, style.yOffset, az + nz,
+        bx - nx, style.yOffset, bz - nz,
+        ax - nx, style.yOffset, az - nz
+      ]);
+      const uvs = new Float32Array([
+        0, 0,
+        len * uvRepeat, 0,
+        len * uvRepeat, 1,
+        0, 0,
+        len * uvRepeat, 1,
+        0, 1,
+      ]);
+      geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+      geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geos.push(geometry);
     }
   }
   if (geos.length === 0) return null;
@@ -251,12 +226,15 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
   } : isRoad ? {
     color: roadStyle.color,
     map: texture,
-    transparent: true,
+    transparent: false,
     opacity: roadStyle.opacity,
-    roughness: roadStyle.roughness,
-    metalness: roadStyle.metalness,
+    roughness: 1,
+    metalness: 0,
+    emissive: new THREE.Color('#000000'),
+    emissiveIntensity: 0,
     depthWrite: false,
-    alphaTest: 0.08,
+    toneMapped: false,
+    alphaTest: 0,
     polygonOffset: true,
     polygonOffsetFactor: -2,
     polygonOffsetUnits: -2,
@@ -339,17 +317,22 @@ const SeoulTerrain = ({
     const loader = new THREE.TextureLoader();
     const loadTexture = (url) => {
       const texture = loader.load(url);
-      texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.anisotropy = 8;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.needsUpdate = true;
       return texture;
     };
     return {
-      asphalt: loadTexture(roadTextureUrl || ROAD_ATLAS_TEXTURES.asphalt),
-      stone: loadTexture(ROAD_ATLAS_TEXTURES.stone),
+      major: loadTexture(ROAD_TEST_TEXTURES.major),
+      mid: loadTexture(ROAD_TEST_TEXTURES.mid),
+      alley: loadTexture(ROAD_TEST_TEXTURES.alley),
+      pedestrian: loadTexture(ROAD_TEST_TEXTURES.pedestrian),
+      service: loadTexture(ROAD_TEST_TEXTURES.service),
     };
-  }, [roadTextureUrl]);
+  }, []);
 
   useEffect(() => {
     if (!visible || loadingRef.current) return;
@@ -426,11 +409,11 @@ const SeoulTerrain = ({
       )}
       {showRoads && (
         <group name="roads-layer" position={[0, 0.1, 0]}>
-          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTextures[ROAD_ATLAS_CELL_MAP.service.atlas]} useStencil={!!activeMask} isRoad={true} roadType="service" />}
-          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTextures[ROAD_ATLAS_CELL_MAP.pedestrian.atlas]} useStencil={!!activeMask} isRoad={true} roadType="pedestrian" />}
-          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTextures[ROAD_ATLAS_CELL_MAP.alley.atlas]} useStencil={!!activeMask} isRoad={true} roadType="alley" />}
-          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTextures[ROAD_ATLAS_CELL_MAP.mid.atlas]} useStencil={!!activeMask} isRoad={true} roadType="mid" />}
-          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTextures[ROAD_ATLAS_CELL_MAP.major.atlas]} useStencil={!!activeMask} isRoad={true} roadType="major" />}
+          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTextures.service} useStencil={!!activeMask} isRoad={true} roadType="service" />}
+          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTextures.pedestrian} useStencil={!!activeMask} isRoad={true} roadType="pedestrian" />}
+          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTextures.alley} useStencil={!!activeMask} isRoad={true} roadType="alley" />}
+          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTextures.mid} useStencil={!!activeMask} isRoad={true} roadType="mid" />}
+          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTextures.major} useStencil={!!activeMask} isRoad={true} roadType="major" />}
         </group>
       )}
     </group>
