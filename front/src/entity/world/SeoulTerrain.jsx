@@ -90,6 +90,22 @@ const gpsToGame = (lat, lng) => ({
   z: (GIS_ORIGIN.lat - lat) * LAT_TO_M,
 });
 
+const findNearestGroupKey = (playerPos, partitions) => {
+  if (!playerPos || !partitions?.length) return null;
+  let nearestGroupKey = null;
+  let minDistSq = Infinity;
+  for (const partition of partitions) {
+    if (!partition.group_key || !partition.centroid_lat || !partition.centroid_lng) continue;
+    const center = gpsToGame(partition.centroid_lat, partition.centroid_lng);
+    const distSq = (center.x - playerPos.x) ** 2 + (center.z - playerPos.z) ** 2;
+    if (distSq < minDistSq) {
+      minDistSq = distSq;
+      nearestGroupKey = partition.group_key;
+    }
+  }
+  return nearestGroupKey;
+};
+
 const cropAtlasTile = (image, col, row) => {
   const tileWidth = Math.floor(image.width / ROAD_ATLAS_GRID);
   const tileHeight = Math.floor(image.height / ROAD_ATLAS_GRID);
@@ -334,15 +350,78 @@ const TerrainMask = ({ maskArea, elevation }) => {
   );
 };
 
+const GroupTerrainMask = ({ partitions, groupKey, elevation }) => {
+  const geometries = useMemo(() => {
+    if (!groupKey || !partitions?.length) return [];
+    const result = [];
+    for (const partition of partitions) {
+      if (partition.group_key !== groupKey) continue;
+      const boundary = partition.boundary_geojson;
+      if (!boundary?.coordinates?.length) continue;
+      try {
+        const [outer, ...holes] = boundary.coordinates;
+        if (!outer?.length) continue;
+        const shape = new THREE.Shape();
+        const first = gpsToGame(outer[0][1], outer[0][0]);
+        shape.moveTo(first.x, first.z);
+        for (let i = 1; i < outer.length; i += 1) {
+          const point = gpsToGame(outer[i][1], outer[i][0]);
+          shape.lineTo(point.x, point.z);
+        }
+        shape.closePath();
+        shape.holes = holes.map((ring) => {
+          const hole = new THREE.Path();
+          const firstHole = gpsToGame(ring[0][1], ring[0][0]);
+          hole.moveTo(firstHole.x, firstHole.z);
+          for (let i = 1; i < ring.length; i += 1) {
+            const point = gpsToGame(ring[i][1], ring[i][0]);
+            hole.lineTo(point.x, point.z);
+          }
+          hole.closePath();
+          return hole;
+        });
+        result.push(new THREE.ShapeGeometry(shape));
+      } catch (_) {
+        // noop
+      }
+    }
+    return result;
+  }, [partitions, groupKey]);
+
+  if (!geometries.length) return null;
+
+  return (
+    <>
+      {geometries.map((geo, index) => (
+        <mesh key={`group-mask-${groupKey}-${index}`} geometry={geo} rotation={[-Math.PI / 2, 0, 0]} position={[0, elevation, 0]} renderOrder={5}>
+          <meshBasicMaterial
+            colorWrite={false}
+            depthWrite={false}
+            depthTest={false}
+            stencilWrite={true}
+            stencilRef={1}
+            stencilFunc={THREE.AlwaysStencilFunc}
+            stencilZPass={THREE.ReplaceStencilOp}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ))}
+    </>
+  );
+};
+
 const SeoulTerrain = ({
   visible = true, showRoads = true, showNature = true, roadTextureUrl = null,
   roadTypeFilters = {},
   districtId = null, dongId = null, currentDistrict = null, currentDong = null,
+  clipToCurrentGroup = false, playerPositionRef = null,
   elevation = 0, shiftX = -450, shiftZ = 320,
   roadWidthMajor = 18, roadWidthMid = 10, roadWidthMinor = 6
 }) => {
   const [data, setData] = useState(null);
   const [geos, setGeos] = useState(null);
+  const [groupPartitions, setGroupPartitions] = useState([]);
+  const [currentGroupKey, setCurrentGroupKey] = useState(null);
   const loadingRef = useRef(false);
   const activeRoadTypes = useMemo(() => ({
     major: roadTypeFilters.major !== false,
@@ -384,6 +463,45 @@ const SeoulTerrain = ({
       service: loadTexture(roadAtlasChoices.service.atlasUrl, roadAtlasChoices.service),
     };
   }, [roadAtlasChoices]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPartitions = async () => {
+      if (!clipToCurrentGroup || !currentDong?.id) {
+        setGroupPartitions([]);
+        return;
+      }
+      try {
+        const res = await worldApi.getDongPartitions(currentDong.id);
+        if (!cancelled) setGroupPartitions(Array.isArray(res.data) ? res.data : []);
+      } catch (_) {
+        if (!cancelled) setGroupPartitions([]);
+      }
+    };
+
+    loadPartitions();
+    return () => {
+      cancelled = true;
+    };
+  }, [clipToCurrentGroup, currentDong?.id]);
+
+  useEffect(() => {
+    if (!clipToCurrentGroup || !groupPartitions.length) {
+      setCurrentGroupKey(null);
+      return;
+    }
+
+    const updateGroupKey = () => {
+      const playerPos = playerPositionRef?.current?.position;
+      const nextGroupKey = findNearestGroupKey(playerPos, groupPartitions);
+      setCurrentGroupKey(nextGroupKey || null);
+    };
+
+    updateGroupKey();
+    const interval = setInterval(updateGroupKey, 500);
+    return () => clearInterval(interval);
+  }, [clipToCurrentGroup, groupPartitions, playerPositionRef]);
 
   useEffect(() => {
     if (!visible || loadingRef.current) return;
@@ -442,29 +560,32 @@ const SeoulTerrain = ({
 
   if (!visible || !geos) return null;
 
-  const activeMask = currentDong || currentDistrict;
+  const useGroupMask = clipToCurrentGroup && !!currentGroupKey && groupPartitions.length > 0;
+  const activeMask = useGroupMask ? null : (currentDong || currentDistrict);
+  const stencilEnabled = useGroupMask || !!activeMask;
 
   return (
     <group name="seoul-terrain-group" position={[geos.shiftX, elevation, geos.shiftZ]}>
 
       {/* 0. 스텐실 마스크 렌더링 (구/동 모양 도장 찍기) */}
+      {useGroupMask && <GroupTerrainMask partitions={groupPartitions} groupKey={currentGroupKey} elevation={0.01} />}
       {activeMask && <TerrainMask maskArea={activeMask} elevation={0.01} />}
 
       {showNature && (
         <group name="nature-layer">
-          <MergedMesh geometry={geos.grass} color={COLORS.grass} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} useStencil={!!activeMask} />
-          <MergedMesh geometry={geos.forest} color={COLORS.forest} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]} useStencil={!!activeMask} />
-          <MergedMesh geometry={geos.waterPoly} color={COLORS.water} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} isWater={true} useStencil={!!activeMask} />
-          <MergedMesh geometry={geos.waterLine} color={COLORS.water} isWater={true} useStencil={!!activeMask} />
+          <MergedMesh geometry={geos.grass} color={COLORS.grass} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} useStencil={stencilEnabled} />
+          <MergedMesh geometry={geos.forest} color={COLORS.forest} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]} useStencil={stencilEnabled} />
+          <MergedMesh geometry={geos.waterPoly} color={COLORS.water} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} isWater={true} useStencil={stencilEnabled} />
+          <MergedMesh geometry={geos.waterLine} color={COLORS.water} isWater={true} useStencil={stencilEnabled} />
         </group>
       )}
       {showRoads && (
         <group name="roads-layer" position={[0, 0.1, 0]}>
-          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTextures.service} useStencil={!!activeMask} isRoad={true} roadType="service" />}
-          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTextures.pedestrian} useStencil={!!activeMask} isRoad={true} roadType="pedestrian" />}
-          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTextures.alley} useStencil={!!activeMask} isRoad={true} roadType="alley" />}
-          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTextures.mid} useStencil={!!activeMask} isRoad={true} roadType="mid" />}
-          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTextures.major} useStencil={!!activeMask} isRoad={true} roadType="major" />}
+          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTextures.service} useStencil={stencilEnabled} isRoad={true} roadType="service" />}
+          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTextures.pedestrian} useStencil={stencilEnabled} isRoad={true} roadType="pedestrian" />}
+          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTextures.alley} useStencil={stencilEnabled} isRoad={true} roadType="alley" />}
+          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTextures.mid} useStencil={stencilEnabled} isRoad={true} roadType="mid" />}
+          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTextures.major} useStencil={stencilEnabled} isRoad={true} roadType="major" />}
         </group>
       )}
     </group>
