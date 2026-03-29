@@ -44,11 +44,7 @@ export const useGameSocket = (addProjectile) => {
                     break;
 
                 // [NEW] 다른 유저의 스킬 사용 수신
-                // [NEW] 다른 유저의 스킬 사용 수신
                 case 'skill':
-                    // 내 스킬은 내가 이미 그렸으니 무시 (옵션)
-                    // if (message.userId === String(user.id)) return;
-
                     if (addProjectile) {
                         const skillData = message.data;
 
@@ -149,9 +145,9 @@ export const useGameSocket = (addProjectile) => {
             }
         };
 
-        socket.onopen = () => console.log('Game Socket Connected! 🟢');
-        socket.onclose = () => console.log('Game Socket Disconnected 🔴');
-        socket.onerror = (err) => console.error('Game Socket Error:', err);
+        socket.onopen = () => console.log('[OK] Game Socket Connected');
+        socket.onclose = () => console.log('[LEAVE] Game Socket Disconnected');
+        socket.onerror = (err) => console.error('[ERROR] Game Socket Error:', err);
 
         return () => socket.close();
     }, [user?.id]); // user가 바뀔 때만 재연결 (user.id 체크)

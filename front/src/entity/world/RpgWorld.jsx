@@ -1,6 +1,6 @@
-import React, { useRef, useEffect } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
-import { useTexture, OrbitControls, Html, TransformControls, Environment, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { OrbitControls, OrthographicCamera, PerspectiveCamera, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import Player from '@entity/player/Player';
 import RemotePlayer from '@entity/player/RemotePlayer';
@@ -8,12 +8,9 @@ import ZoomController from '@engine/ZoomController';
 import { useAuth } from '@contexts/AuthContext';
 import { PunchProjectile } from '@entity/player/projectile/PunchProjectile';
 import Monster from '@entity/monster/Monster';
-import SceneLoader from '@entity/world/SceneLoader';
 import WorldDebugger from '@entity/world/WorldDebugger';
-import { useState, useMemo } from 'react';
 
-import { getAllMaps, getMap } from '@entity/world/mapConfig';
-import Portal from '@entity/world/Portal';
+import { getAllMaps } from '@entity/world/mapConfig';
 import MapTiles from '@entity/world/MapTiles';
 import SeoulHeightMap from '@entity/world/SeoulHeightMap';
 import SeoulSubwayLines from '@entity/world/SeoulSubwayLines';

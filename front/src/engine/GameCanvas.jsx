@@ -1,5 +1,5 @@
 import React, { Suspense, useRef } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import RpgWorld from '@entity/world/RpgWorld';
 import EnvironmentEffects from '@entity/world/EnvironmentEffects';

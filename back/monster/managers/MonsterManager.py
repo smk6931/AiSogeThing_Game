@@ -117,7 +117,7 @@ class MonsterManager:
         for mid in dead_ids:
             self.monsters.pop(mid, None)
 
-    async def game_loop(self, broadcast_func):
+    async def game_loop(self, broadcast_func, get_players_func=None):
         """몬스터 AI 루프 (0.1초마다 실행, 10 FPS)"""
         self.is_running = True
         print("Monster AI loop started.")
@@ -125,7 +125,14 @@ class MonsterManager:
         while self.is_running:
             has_update = False
 
-            # 일반 몬스터 부족하면 보충 (드래곤 제외)
+            # 접속 중인 플레이어 위치 수집
+            player_positions = []
+            if get_players_func:
+                for pdata in get_players_func().values():
+                    pos = pdata.get("position", {})
+                    player_positions.append((pos.get("x", 0), pos.get("z", 0)))
+
+            # 일반 몬스터 부족하면 보충 (드래곤/보스 제외)
             normal_count = sum(1 for m in self.monsters.values() if m.tier != "boss")
             if normal_count < 5:
                 self.spawn_random(count=5 - normal_count)
@@ -160,11 +167,21 @@ class MonsterManager:
                 if monster.state == "idle":
                     if random.random() < 0.05:
                         monster.state = "move"
-                        dist = math.sqrt(monster.x**2 + monster.z**2)
-                        if dist > 30:
-                            angle = math.atan2(-monster.z, -monster.x)
+
+                        # 가장 가까운 플레이어 찾기 — 100m 이상 멀면 해당 방향으로 이동
+                        nearest = None
+                        nearest_dist = float('inf')
+                        for px, pz in player_positions:
+                            d = math.sqrt((monster.x - px) ** 2 + (monster.z - pz) ** 2)
+                            if d < nearest_dist:
+                                nearest_dist = d
+                                nearest = (px, pz)
+
+                        if nearest and nearest_dist > 100:
+                            angle = math.atan2(nearest[1] - monster.z, nearest[0] - monster.x)
                         else:
                             angle = random.uniform(0, math.pi * 2)
+
                         monster.dx = math.cos(angle) * monster.speed * 0.1
                         monster.dz = math.sin(angle) * monster.speed * 0.1
 

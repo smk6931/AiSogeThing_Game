@@ -1,3 +1,8 @@
+import sys
+# Windows cp949 인코딩 문제 방지 — 이모지 등 비ASCII 예외 메시지 출력 시 크래시 예방
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 from dotenv import load_dotenv
 load_dotenv(override=True) # .env 파일 로드 (시스템 환경변수 덮어쓰기)
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Joystick } from 'react-joystick-component';
 import { useAuth } from '@contexts/AuthContext';
-import userApi from '@api/auth';
 import { useGameInput } from '@engine/useGameInput';
 import { useProjectiles } from '@hooks/useProjectiles';
 import { useGameSocket } from '@engine/useGameSocket';
@@ -9,16 +8,12 @@ import GameOverlay from '@ui/GameOverlay';
 import ChatBox from '@ui/ChatBox';
 import WorldMapModal from '@ui/WorldMapModal';
 import { getMap } from '@entity/world/mapConfig';
-import { loadHeightMap } from '@entity/world/terrainHandler';
 import { useGameConfig } from '@contexts/GameConfigContext';
 import GameCanvas from '@engine/GameCanvas';
 import MonsterInfoPanel from '@entity/monster/MonsterInfoPanel';
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();
-
-  // Website online count (optional, can be removed if not used)
-  const [websiteOnlineCount, setWebsiteOnlineCount] = useState(0);
 
   const [selectedMonster, setSelectedMonster] = useState(null);
 
@@ -115,23 +110,6 @@ const GameEntry = () => {
     const handleResize = () => setIsMobile(checkMobile());
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // 접속자 수 폴링 [임시 비활성 - auth 라우터 미연결]
-  useEffect(() => {
-    // const fetchStatus = async () => {
-    //   try {
-    //     const response = await userApi.getOnlineStats();
-    //     setWebsiteOnlineCount(response.data.online_users);
-    //   } catch (error) {
-    //     console.error('Status Error:', error);
-    //   }
-    // };
-    // fetchStatus();
-    // const interval = setInterval(fetchStatus, 10000);
-    // [OFF] 등고선 비활성화 - heightmap 미리 로딩 건너뛰기
-    // loadHeightMap();
-    // return () => clearInterval(interval);
   }, []);
 
   return (
