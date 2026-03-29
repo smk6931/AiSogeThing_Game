@@ -315,25 +315,26 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
   if (!geometry) return null;
   const roadStyle = ROAD_STYLE[roadType] || ROAD_STYLE.alley;
   const materialProps = isWater ? {
-    color: color, transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.3, emissive: color, emissiveIntensity: 0.3,
+    color,
+    transparent: true,
+    opacity: 0.85,
+    roughness: 0.1,
+    metalness: 0.3,
+    emissive: color,
+    emissiveIntensity: 0.3,
   } : isRoad ? {
     color: roadStyle.color,
-    map: texture,
+    map: texture ?? null,
     transparent: false,
     opacity: roadStyle.opacity,
-    roughness: 1,
-    metalness: 0,
-    emissive: new THREE.Color('#000000'),
-    emissiveIntensity: 0,
     depthWrite: false,
     depthTest: false,
     toneMapped: false,
-    alphaTest: 0,
     polygonOffset: true,
     polygonOffsetFactor: -2,
     polygonOffsetUnits: -2,
-  } : { 
-    color: color,
+  } : {
+    color,
     transparent: false,
     opacity: 1.0,
     depthWrite: true,
@@ -407,19 +408,19 @@ const GroupTerrainMask = ({ partitions, groupKey, elevation }) => {
         if (!outer?.length) continue;
         const shape = new THREE.Shape();
         const first = gpsToGame(outer[0][1], outer[0][0]);
-        shape.moveTo(first.x, first.z);
+        shape.moveTo(first.x, -first.z);
         for (let i = 1; i < outer.length; i += 1) {
           const point = gpsToGame(outer[i][1], outer[i][0]);
-          shape.lineTo(point.x, point.z);
+          shape.lineTo(point.x, -point.z);
         }
         shape.closePath();
         shape.holes = holes.map((ring) => {
           const hole = new THREE.Path();
           const firstHole = gpsToGame(ring[0][1], ring[0][0]);
-          hole.moveTo(firstHole.x, firstHole.z);
+          hole.moveTo(firstHole.x, -firstHole.z);
           for (let i = 1; i < ring.length; i += 1) {
             const point = gpsToGame(ring[i][1], ring[i][0]);
-            hole.lineTo(point.x, point.z);
+            hole.lineTo(point.x, -point.z);
           }
           hole.closePath();
           return hole;
@@ -552,17 +553,31 @@ const SeoulTerrain = ({
     const loadData = async () => {
       loadingRef.current = true;
       try {
-        let terrainData;
+        let terrainData = null;
+
         if (dongId) {
-          const res = await worldApi.getDongTerrain(dongId);
-          terrainData = res.data;
-        } else if (districtId) {
-          const res = await worldApi.getDistrictTerrain(districtId);
-          terrainData = res.data;
-        } else {
+          try {
+            const res = await worldApi.getDongTerrain(dongId);
+            terrainData = res.data;
+          } catch (_) {
+            terrainData = null;
+          }
+        }
+
+        if (!terrainData && districtId) {
+          try {
+            const res = await worldApi.getDistrictTerrain(districtId);
+            terrainData = res.data;
+          } catch (_) {
+            terrainData = null;
+          }
+        }
+
+        if (!terrainData) {
           const res = await fetch('/seoul_terrain.json');
           terrainData = await res.json();
         }
+
         setData(terrainData);
       } catch (err) {
         console.error('[SeoulTerrain] 로딩 실패:', err);
@@ -608,7 +623,7 @@ const SeoulTerrain = ({
       });
     };
     build();
-  }, [data, shiftX, shiftZ, currentDistrict, currentDong, roadWidthMajor, roadWidthMid, roadWidthMinor, clipToCurrentGroup, currentGroupKey, groupPartitions, showNature, showRoads]);
+  }, [data, dongId, roadWidthMajor, roadWidthMid, roadWidthMinor, clipToCurrentGroup, currentGroupKey, groupPartitions, showNature, showRoads]);
 
   if (!visible || !geos) return null;
 
