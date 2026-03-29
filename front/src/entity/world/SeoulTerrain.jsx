@@ -4,12 +4,17 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import worldApi from '@api/world';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
-const ROAD_TEST_TEXTURES = {
-  major: '/images/image.png',
-  mid: '/images/image copy 3.png',
-  alley: '/images/image copy 5.png',
-  pedestrian: '/images/gemini-2.5-flash-image_isometric_hand-painted_fantasy_RPG_tile_texture_of_dark_cracked_dungeon_floor_ti-0.jpg',
-  service: '/images/2b8a23a7dec37e59d324efa9d0f0ef99.jpg',
+const ROAD_ATLAS_TEXTURES = {
+  asphalt: '/ground/asphalt_atlas_4x4.png',
+  stone: '/ground/stone_bricks_atlas_4x4.png',
+};
+const ROAD_ATLAS_GRID = 4;
+const ROAD_ATLAS_TILE = {
+  major: { atlas: 'asphalt', col: 3, row: 0 },
+  mid: { atlas: 'asphalt', col: 1, row: 1 },
+  alley: { atlas: 'asphalt', col: 0, row: 3 },
+  pedestrian: { atlas: 'stone', col: 2, row: 0 },
+  service: { atlas: 'stone', col: 3, row: 2 },
 };
 
 // ===========================
@@ -36,11 +41,11 @@ const ROAD_CLASS = {
 };
 
 const ROAD_TILE_REPEAT = {
-  major: 0.035,
-  mid: 0.05,
-  alley: 0.07,
-  pedestrian: 0.08,
-  service: 0.06,
+  major: 0.075,
+  mid: 0.1,
+  alley: 0.14,
+  pedestrian: 0.16,
+  service: 0.13,
 };
 const ROAD_STYLE = {
   major: {
@@ -49,7 +54,7 @@ const ROAD_STYLE = {
     roughness: 1,
     metalness: 0.02,
     renderOrder: 112,
-    yOffset: 0.15,
+    yOffset: 0.34,
   },
   mid: {
     color: new THREE.Color('#ffffff'),
@@ -57,7 +62,7 @@ const ROAD_STYLE = {
     roughness: 1,
     metalness: 0.01,
     renderOrder: 110,
-    yOffset: 0.12,
+    yOffset: 0.32,
   },
   alley: {
     color: new THREE.Color('#ffffff'),
@@ -65,7 +70,7 @@ const ROAD_STYLE = {
     roughness: 1,
     metalness: 0,
     renderOrder: 108,
-    yOffset: 0.09,
+    yOffset: 0.3,
   },
   pedestrian: {
     color: new THREE.Color('#ffffff'),
@@ -73,7 +78,7 @@ const ROAD_STYLE = {
     roughness: 1,
     metalness: 0,
     renderOrder: 106,
-    yOffset: 0.07,
+    yOffset: 0.28,
   },
   service: {
     color: new THREE.Color('#ffffff'),
@@ -81,7 +86,7 @@ const ROAD_STYLE = {
     roughness: 1,
     metalness: 0,
     renderOrder: 104,
-    yOffset: 0.05,
+    yOffset: 0.26,
   },
 };
 
@@ -90,6 +95,29 @@ const gpsToGame = (lat, lng) => ({
   x: (lng - GIS_ORIGIN.lng) * LNG_TO_M,
   z: (GIS_ORIGIN.lat - lat) * LAT_TO_M,
 });
+
+const cropAtlasTile = (image, col, row) => {
+  const tileWidth = Math.floor(image.width / ROAD_ATLAS_GRID);
+  const tileHeight = Math.floor(image.height / ROAD_ATLAS_GRID);
+  const canvas = document.createElement('canvas');
+  canvas.width = tileWidth;
+  canvas.height = tileHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return image;
+
+  ctx.drawImage(
+    image,
+    col * tileWidth,
+    row * tileHeight,
+    tileWidth,
+    tileHeight,
+    0,
+    0,
+    tileWidth,
+    tileHeight,
+  );
+  return canvas;
+};
 
 // 폴리곤 생성
 function buildPolygonGeometry(features, maskArea = null) {
@@ -233,6 +261,7 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
     emissive: new THREE.Color('#000000'),
     emissiveIntensity: 0,
     depthWrite: false,
+    depthTest: false,
     toneMapped: false,
     alphaTest: 0,
     polygonOffset: true,
@@ -301,7 +330,7 @@ const SeoulTerrain = ({
   roadTypeFilters = {},
   districtId = null, dongId = null, currentDistrict = null, currentDong = null,
   elevation = 0, shiftX = -450, shiftZ = 320,
-  roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 8
+  roadWidthMajor = 18, roadWidthMid = 10, roadWidthMinor = 6
 }) => {
   const [data, setData] = useState(null);
   const [geos, setGeos] = useState(null);
@@ -315,8 +344,13 @@ const SeoulTerrain = ({
   }), [roadTypeFilters]);
   const roadTextures = useMemo(() => {
     const loader = new THREE.TextureLoader();
-    const loadTexture = (url) => {
-      const texture = loader.load(url);
+    const loadTexture = (atlasUrl, tile) => {
+      const texture = loader.load(atlasUrl, (loaded) => {
+        if (loaded.image) {
+          loaded.image = cropAtlasTile(loaded.image, tile.col, tile.row);
+          loaded.needsUpdate = true;
+        }
+      });
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.anisotropy = 8;
@@ -326,11 +360,11 @@ const SeoulTerrain = ({
       return texture;
     };
     return {
-      major: loadTexture(ROAD_TEST_TEXTURES.major),
-      mid: loadTexture(ROAD_TEST_TEXTURES.mid),
-      alley: loadTexture(ROAD_TEST_TEXTURES.alley),
-      pedestrian: loadTexture(ROAD_TEST_TEXTURES.pedestrian),
-      service: loadTexture(ROAD_TEST_TEXTURES.service),
+      major: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.major.atlas], ROAD_ATLAS_TILE.major),
+      mid: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.mid.atlas], ROAD_ATLAS_TILE.mid),
+      alley: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.alley.atlas], ROAD_ATLAS_TILE.alley),
+      pedestrian: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.pedestrian.atlas], ROAD_ATLAS_TILE.pedestrian),
+      service: loadTexture(ROAD_ATLAS_TEXTURES[ROAD_ATLAS_TILE.service.atlas], ROAD_ATLAS_TILE.service),
     };
   }, []);
 
