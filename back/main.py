@@ -33,7 +33,7 @@ async def startup_event():
     # 몬스터 스폰 및 AI 루프 시작
     if not monster_manager.monsters:
         monster_manager.spawn_random(count=5)
-    asyncio.create_task(monster_manager.game_loop(player_manager.broadcast))
+    asyncio.create_task(monster_manager.game_loop(player_manager.broadcast, player_manager.get_all_players))
     print("Monster AI loop started via app startup.")
 
 origins = [

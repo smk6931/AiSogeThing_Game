@@ -100,10 +100,7 @@ const GameCanvas = ({
         enablePan={false}
         enableRotate={cameraMode === '360'}
         enableDamping={false}
-        enableZoom={true}
-        zoomSpeed={0.6}
-        minDistance={5}
-        maxDistance={200}
+        enableZoom={false}
         makeDefault
       />
     </Canvas>

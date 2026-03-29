@@ -97,12 +97,10 @@ const GameEntry = () => {
   useEffect(() => {
     const handleWheel = (e) => {
       if (e.target.closest('input, textarea, button')) return;
-      // canvas 위에서 스크롤은 OrbitControls(3D zoom)에 맡김 — 2D 지도는 미니맵 영역만
-      const onCanvas = e.target.tagName === 'CANVAS';
-      if (onCanvas) return;
       e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      setZoomLevel(prev => Math.max(4, Math.min(22, prev + delta)));
+      // 모든 휠 이벤트를 ZoomController 단일 경로로 통일 (OrbitControls zoom 비활성화)
+      const delta = e.deltaY > 0 ? -0.4 : 0.4;
+      setZoomLevel(prev => Math.max(10, Math.min(22, prev + delta)));
     };
 
     window.addEventListener('wheel', handleWheel, { passive: false });

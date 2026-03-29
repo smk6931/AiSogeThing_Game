@@ -27,3 +27,9 @@ Priority: high
 
 - dump, 키, 임시 백업은 `.gitignore`에 추가한다.
 - 이미 추적된 민감 파일은 `git rm --cached`로 인덱스에서 제거한다.
+
+## 콘솔 출력 원칙
+
+- 백엔드(Python) print/log 문에 이모지를 절대 사용하지 않는다.
+- 이유: Windows 기본 인코딩(cp949)이 이모지(유니코드 고번위)를 처리 못해 UnicodeEncodeError 발생 → WebSocket 등 ASGI 핸들러가 크래시됨.
+- 대체: `[OK]`, `[WARN]`, `[ERROR]`, `[LEAVE]` 같은 ASCII 태그 사용.

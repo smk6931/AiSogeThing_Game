@@ -39,14 +39,14 @@ class PlayerManager:
         }
         
         self.active_connections[user_id] = initial_state
-        print(f"✅ Player Connected: {nickname} (ID: {user_id}, Lv.{stats['level']})")
+        print(f"[OK] Player Connected: {nickname} (ID: {user_id}, Lv.{stats['level']})")
         return stats
 
     def disconnect(self, user_id: str):
         """플레이어 접속 해제 처리"""
         if user_id in self.active_connections:
             del self.active_connections[user_id]
-            print(f"❌ Player Disconnected: ID {user_id}")
+            print(f"[LEAVE] Player Disconnected: ID {user_id}")
 
     def get_player(self, user_id: str) -> Optional[dict]:
         """특정 플레이어 정보 조회"""
@@ -75,7 +75,7 @@ class PlayerManager:
             try:
                 await socket.send_json(message)
             except Exception as e:
-                print(f"⚠️ Broadcast Error to {user_id}: {e}")
+                print(f"[WARN] Broadcast Error to {user_id}: {e}")
                 # 에러 발생 시 처리 (옵션)
 
 # 싱글톤 인스턴스

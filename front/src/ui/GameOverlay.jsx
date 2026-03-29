@@ -54,6 +54,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState(null);
   const [sidebarMode, setSidebarMode] = useState('menu');
+  const [showLayerPopup, setShowLayerPopup] = useState(false);
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
@@ -286,16 +287,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
 
       {/* 레이어 토글 버튼 — 미니맵 왼쪽 */}
       <div
-        onClick={() => {
-          if (sidebarOpen && sidebarMode === 'layers') {
-            setSidebarOpen(false);
-            setSidebarTab(null);
-            return;
-          }
-          setSidebarMode('layers');
-          setSidebarOpen(true);
-          setSidebarTab('settings');
-        }}
+        onClick={() => setShowLayerPopup(v => !v)}
         title="레이어 설정"
         style={{
           position: 'absolute',
@@ -304,8 +296,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
           width: '30px',
           height: '30px',
           borderRadius: '8px',
-          background: (sidebarOpen && sidebarMode === 'layers') ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
-          border: `1px solid ${(sidebarOpen && sidebarMode === 'layers') ? ACCENT : BORDER_COLOR}`,
+          background: showLayerPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
+          border: `1px solid ${showLayerPopup ? ACCENT : BORDER_COLOR}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -318,6 +310,91 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
       >
         🗺
       </div>
+
+      {/* 레이어 팝업 — 독립 플로팅 패널 (레이어 + 카메라) */}
+      {showLayerPopup && (
+        <div
+          style={{
+            position: 'absolute',
+            top: `calc(max(10px, env(safe-area-inset-top)) + 36px)`,
+            right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 8)}px)`,
+            width: '164px',
+            padding: '10px',
+            borderRadius: '12px',
+            background: 'linear-gradient(180deg, rgba(10,16,24,0.97), rgba(6,10,18,0.96))',
+            border: `1px solid ${BORDER_COLOR}`,
+            boxShadow: `${GLOW}, 0 4px 24px rgba(0,0,0,0.6)`,
+            pointerEvents: 'auto',
+            zIndex: 62,
+          }}
+        >
+          {/* 레이어 섹션 */}
+          <div style={{ color: GOLD, fontSize: '9px', fontWeight: '700', letterSpacing: '1.5px', marginBottom: '7px', textTransform: 'uppercase' }}>
+            Layers
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '10px' }}>
+            {LAYER_BUTTONS.map(({ key, label, icon, colorOn }) => {
+              const isOn = !!mapSettings[key];
+              const setterKey = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+              const setter = mapSettings[setterKey];
+              return (
+                <button
+                  key={key}
+                  onClick={() => setter && setter(!isOn)}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                    padding: '5px 4px',
+                    borderRadius: '7px',
+                    border: `1px solid ${isOn ? ACCENT : 'rgba(80,100,120,0.3)'}`,
+                    background: isOn ? colorOn : 'rgba(10,18,28,0.6)',
+                    color: isOn ? '#fff' : 'rgba(150,160,170,0.7)',
+                    fontSize: '9px',
+                    cursor: 'pointer',
+                    fontFamily: GAME_FONT,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span style={{ fontSize: '14px', lineHeight: 1 }}>{icon}</span>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 구분선 */}
+          <div style={{ borderTop: `1px solid ${BORDER_COLOR}`, marginBottom: '8px' }} />
+
+          {/* 카메라 섹션 */}
+          <div style={{ color: GOLD, fontSize: '9px', fontWeight: '700', letterSpacing: '1.5px', marginBottom: '7px', textTransform: 'uppercase' }}>
+            Camera
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+            <button
+              onClick={() => mapSettings.setCameraMode && mapSettings.setCameraMode(prev => prev === 'isometric' ? '360' : 'isometric')}
+              style={{
+                padding: '6px 4px', borderRadius: '7px', cursor: 'pointer', fontSize: '9px', fontFamily: GAME_FONT,
+                background: mapSettings.cameraMode === 'isometric' ? 'rgba(103,232,214,0.2)' : 'rgba(50,50,140,0.5)',
+                border: `1px solid ${mapSettings.cameraMode === 'isometric' ? ACCENT : 'rgba(80,100,180,0.5)'}`,
+                color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+              }}
+            >
+              <span style={{ fontSize: '14px' }}>🎥</span>
+              <span>{mapSettings.cameraMode === 'isometric' ? '쿼터뷰' : '360도'}</span>
+            </button>
+            <button
+              onClick={() => mapSettings.onPlayView && mapSettings.onPlayView()}
+              style={{
+                padding: '6px 4px', borderRadius: '7px', cursor: 'pointer', fontSize: '9px', fontFamily: GAME_FONT,
+                background: 'rgba(180,140,30,0.4)', border: '1px solid rgba(212,175,55,0.4)', color: '#fff',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+              }}
+            >
+              <span style={{ fontSize: '14px' }}>🎮</span>
+              <span>플레이뷰</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 미니맵 */}
       <div
@@ -824,6 +901,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
             boxShadow: GLOW,
             transformOrigin: 'top right',
             transform: `scale(${uiScale})`,
+            maxHeight: `${Math.floor(window.innerHeight / uiScale - 60)}px`,
+            overflowY: 'auto',
           }}
         >
           {/* 헤더 */}
@@ -860,95 +939,20 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
             </div>
           ))}
 
-          {/* ===== 서브 패널: 환경설정 ===== */}
-          {sidebarTab === 'settings' && (() => {
-            const ms = mapSettings;
-            const layerStateMap = {
-              showOsmMap: { value: ms.showOsmMap, setter: ms.setShowOsmMap },
-              showGroundMesh: { value: ms.showGroundMesh, setter: ms.setShowGroundMesh },
-              showSeoulRoads: { value: ms.showSeoulRoads, setter: ms.setShowSeoulRoads },
-              showSeoulNature: { value: ms.showSeoulNature, setter: ms.setShowSeoulNature },
-              showLanduseTextureLayer: { value: ms.showLanduseTextureLayer, setter: ms.setShowLanduseTextureLayer },
-              showRoadSplitLayer: { value: ms.showRoadSplitLayer, setter: ms.setShowRoadSplitLayer },
-              showDistrictBoundaries: { value: ms.showDistrictBoundaries, setter: ms.setShowDistrictBoundaries },
-              showGroupBoundaries: { value: ms.showGroupBoundaries, setter: ms.setShowGroupBoundaries },
-              showMicroBoundaries: { value: ms.showMicroBoundaries, setter: ms.setShowMicroBoundaries },
-              highlightCurrentGroup: { value: ms.highlightCurrentGroup, setter: ms.setHighlightCurrentGroup },
-            };
-            return (
-              <div style={{ padding: '10px', borderTop: sidebarMode === 'menu' ? `1px solid ${BORDER_COLOR}` : 'none', marginTop: sidebarMode === 'menu' ? '4px' : '0' }}>
-                {/* 레이어 토글 그리드 */}
-                <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>{sidebarMode === 'layers' ? 'WORLD LAYERS' : 'LAYERS'}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '10px' }}>
-                  {LAYER_BUTTONS.map(({ key, label, icon, colorOn }) => {
-                    const entry = layerStateMap[key];
-                    if (!entry) return null;
-                    const isOn = !!entry.value;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => entry.setter(prev => !prev)}
-                        style={{
-                          padding: '5px 6px',
-                          background: isOn ? colorOn : 'rgba(255,255,255,0.04)',
-                          border: `1px solid ${isOn ? 'rgba(112,181,171,0.56)' : 'rgba(100,100,100,0.35)'}`,
-                          borderRadius: '7px',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          color: isOn ? '#fff' : '#6a7a78',
-                          fontFamily: GAME_FONT,
-                          display: 'flex', alignItems: 'center', gap: '4px',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        <span style={{ fontSize: '11px' }}>{icon}</span>
-                        <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
-                        <span style={{ fontSize: '8px', color: isOn ? '#a7fff2' : '#444' }}>{isOn ? 'ON' : 'OFF'}</span>
-                      </button>
-                    );
-                  })}
+          {/* ===== 서브 패널: 환경설정 (이동속도만, 레이어/카메라는 🗺 팝업으로 이동) ===== */}
+          {sidebarTab === 'settings' && (
+            <div style={{ padding: '10px', borderTop: `1px solid ${BORDER_COLOR}`, marginTop: '4px' }}>
+              <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>이동속도</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button onClick={() => setMoveSpeed(p => Math.max(1, p - 5))} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER_COLOR}`, color: ACCENT, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '5px 0', border: `1px solid ${BORDER_COLOR}` }}>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: moveSpeed >= 40 ? '#ff7a7a' : ACCENT }}>{Math.round(moveSpeed)}</span>
+                  <span style={{ fontSize: '9px', color: '#6a9a94', marginLeft: '3px' }}>m/s</span>
                 </div>
-
-                {/* 카메라 / 플레이뷰 */}
-                <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>CAMERA</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '10px' }}>
-                  <button
-                    onClick={() => ms.setCameraMode && ms.setCameraMode(prev => prev === 'isometric' ? '360' : 'isometric')}
-                    style={{
-                      padding: '6px 8px', borderRadius: '7px', cursor: 'pointer', fontSize: '10px', fontFamily: GAME_FONT,
-                      background: ms.cameraMode === 'isometric' ? 'rgba(140,50,50,0.6)' : 'rgba(50,50,140,0.6)',
-                      border: '1px solid rgba(112,181,171,0.4)', color: '#fff',
-                      display: 'flex', alignItems: 'center', gap: '4px',
-                    }}
-                  >
-                    <span>🎥</span>
-                    <span>{ms.cameraMode === 'isometric' ? '쿼터뷰' : '360도'}</span>
-                  </button>
-                  <button
-                    onClick={() => ms.onPlayView && ms.onPlayView()}
-                    style={{
-                      padding: '6px 8px', borderRadius: '7px', cursor: 'pointer', fontSize: '10px', fontFamily: GAME_FONT,
-                      background: 'rgba(180,140,30,0.5)', border: '1px solid rgba(212,175,55,0.5)', color: '#fff',
-                      display: 'flex', alignItems: 'center', gap: '4px',
-                    }}
-                  >
-                    <span>🎮</span><span>플레이뷰</span>
-                  </button>
-                </div>
-
-                {/* 이동속도 */}
-                <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '7px' }}>이동속도</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button onClick={() => setMoveSpeed(p => Math.max(1, p - 5))} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER_COLOR}`, color: ACCENT, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                  <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '5px 0', border: `1px solid ${BORDER_COLOR}` }}>
-                    <span style={{ fontSize: '14px', fontWeight: '700', color: moveSpeed >= 40 ? '#ff7a7a' : ACCENT }}>{Math.round(moveSpeed)}</span>
-                    <span style={{ fontSize: '9px', color: '#6a9a94', marginLeft: '3px' }}>m/s</span>
-                  </div>
-                  <button onClick={() => setMoveSpeed(p => Math.min(50, p + 5))} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER_COLOR}`, color: ACCENT, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                </div>
+                <button onClick={() => setMoveSpeed(p => Math.min(50, p + 5))} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER_COLOR}`, color: ACCENT, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
-            );
-          })()}
+            </div>
+          )}
 
           {/* ===== 서브 패널: 스탯 ===== */}
           {sidebarTab === 'stats' && (

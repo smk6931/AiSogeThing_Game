@@ -1,6 +1,7 @@
 .app {
-  position: relative;
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   background: var(--bg-primary);
 }
 

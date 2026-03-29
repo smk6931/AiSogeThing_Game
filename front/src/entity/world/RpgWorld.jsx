@@ -67,32 +67,19 @@ const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => 
         state.camera.updateProjectionMatrix();
       }
 
+      // camera.zoom은 ZoomController가 단독으로 관리 — 여기서는 위치/각도만 설정
       let cx, cz, baseHeight;
       if (cameraMode === 'isometric') {
-        // 쿼터뷰: 실제 RPG처럼 20m 높이, 18m 뒤 고정 시작
         const isoDistMult = debugConfig?.camIsoDistMult || 50;
         const dist = state.camera.isOrthographicCamera ? 10000 : isoDistMult * Math.pow(2, 16.5 - zoomLevel);
         const pitch = ((debugConfig?.camIsoPitch || 25) * Math.PI) / 180;
-
-        if (state.camera.isOrthographicCamera) {
-          state.camera.zoom = 50 / isoDistMult;
-          state.camera.updateProjectionMatrix();
-        }
-
         cx = targetPos.x;
         cz = targetPos.z + dist * Math.sin(pitch);
         baseHeight = dist * Math.cos(pitch);
       } else {
-        // 360도 자유뷰: 15m 높이, 25m 뒤에서 시작 (낮은 RPG 시점)
         const playDistMult = debugConfig?.playCamDistMult || 20;
         const playPitch = ((debugConfig?.playCamPitch || 60) * Math.PI) / 180;
         const dist = state.camera.isOrthographicCamera ? 10000 : playDistMult * Math.pow(2, 16.5 - zoomLevel);
-
-        if (state.camera.isOrthographicCamera) {
-          state.camera.zoom = 50 / playDistMult;
-          state.camera.updateProjectionMatrix();
-        }
-
         const radius = dist * Math.cos(playPitch);
         cx = targetPos.x;
         cz = targetPos.z + radius;
