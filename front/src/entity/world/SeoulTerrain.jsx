@@ -13,22 +13,27 @@ const COLORS = {
   grass: new THREE.Color(0x5a9e45),
   road_major: new THREE.Color(0x999999), // 더 연한 주요도로
   road_mid: new THREE.Color(0xcccccc),   // 중간도로
-  road_minor: new THREE.Color(0xe0e0e0), // 아주 연한 소형도로
+  road_alley: new THREE.Color(0xbca98b),
+  road_pedestrian: new THREE.Color(0xd4c59e),
+  road_service: new THREE.Color(0x8b8274),
 };
 
 const ROAD_CLASS = {
   motorway: 'major', trunk: 'major', primary: 'major',
   motorway_link: 'major', trunk_link: 'major', primary_link: 'major',
   secondary: 'mid', secondary_link: 'mid', tertiary: 'mid', tertiary_link: 'mid',
-  residential: 'minor', unclassified: 'minor', service: 'minor',
-  living_street: 'minor', pedestrian: 'minor', footway: 'minor', path: 'minor'
+  residential: 'alley', unclassified: 'alley', living_street: 'alley',
+  pedestrian: 'pedestrian', footway: 'pedestrian', path: 'pedestrian',
+  service: 'service',
 };
 
 const ROAD_ATLAS_GRID = 4;
 const ROAD_ATLAS_CELL_MAP = {
   major: { col: 0, row: 0, tileLength: 42 },
   mid: { col: 1, row: 0, tileLength: 28 },
-  minor: { col: 2, row: 0, tileLength: 18 },
+  alley: { col: 2, row: 0, tileLength: 18 },
+  pedestrian: { col: 0, row: 1, tileLength: 14 },
+  service: { col: 1, row: 1, tileLength: 16 },
 };
 const ROAD_STYLE = {
   major: {
@@ -47,13 +52,29 @@ const ROAD_STYLE = {
     renderOrder: 110,
     yOffset: 0.12,
   },
-  minor: {
+  alley: {
     color: new THREE.Color('#6a665d'),
     opacity: 0.82,
     roughness: 1,
     metalness: 0,
     renderOrder: 108,
     yOffset: 0.09,
+  },
+  pedestrian: {
+    color: new THREE.Color('#a59878'),
+    opacity: 0.74,
+    roughness: 1,
+    metalness: 0,
+    renderOrder: 106,
+    yOffset: 0.07,
+  },
+  service: {
+    color: new THREE.Color('#5f5a52'),
+    opacity: 0.7,
+    roughness: 1,
+    metalness: 0,
+    renderOrder: 104,
+    yOffset: 0.05,
   },
 };
 
@@ -150,7 +171,7 @@ function buildSimpleLineGeometry(features, roadWidthMajor = 20, roadWidthMid = 1
 }
 
 // 도로 전용 아틀라스 라인 생성
-function buildRoadAtlasGeometry(features, roadType = 'minor', roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 6) {
+function buildRoadAtlasGeometry(features, roadType = 'alley', roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 6) {
   const geos = [];
 
   for (const f of features) {
@@ -159,8 +180,8 @@ function buildRoadAtlasGeometry(features, roadType = 'minor', roadWidthMajor = 2
 
     const width = roadType === 'major' ? roadWidthMajor : (roadType === 'mid' ? roadWidthMid : roadWidthMinor);
     const halfW = width / 2;
-    const atlasCell = ROAD_ATLAS_CELL_MAP[roadType] || ROAD_ATLAS_CELL_MAP.minor;
-    const style = ROAD_STYLE[roadType] || ROAD_STYLE.minor;
+    const atlasCell = ROAD_ATLAS_CELL_MAP[roadType] || ROAD_ATLAS_CELL_MAP.alley;
+    const style = ROAD_STYLE[roadType] || ROAD_STYLE.alley;
     const { u0, u1, v0, v1 } = getAtlasUvs(atlasCell);
 
     for (let i = 0; i < coords.length - 1; i++) {
@@ -217,9 +238,9 @@ function buildRoadAtlasGeometry(features, roadType = 'minor', roadWidthMajor = 2
   try { return mergeGeometries(geos, false); } catch (_) { return null; }
 }
 
-const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, isRoad = false, roadType = 'minor', texture = null, useStencil = false }) => {
+const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, isRoad = false, roadType = 'alley', texture = null, useStencil = false }) => {
   if (!geometry) return null;
-  const roadStyle = ROAD_STYLE[roadType] || ROAD_STYLE.minor;
+  const roadStyle = ROAD_STYLE[roadType] || ROAD_STYLE.alley;
   const materialProps = isWater ? {
     color: color, transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.3, emissive: color, emissiveIntensity: 0.3,
   } : isRoad ? {
@@ -294,6 +315,7 @@ const TerrainMask = ({ maskArea, elevation }) => {
 
 const SeoulTerrain = ({
   visible = true, showRoads = true, showNature = true, roadTextureUrl = null,
+  roadTypeFilters = {},
   districtId = null, dongId = null, currentDistrict = null, currentDong = null,
   elevation = 0, shiftX = -450, shiftZ = 320,
   roadWidthMajor = 20, roadWidthMid = 12, roadWidthMinor = 8
@@ -301,6 +323,13 @@ const SeoulTerrain = ({
   const [data, setData] = useState(null);
   const [geos, setGeos] = useState(null);
   const loadingRef = useRef(false);
+  const activeRoadTypes = useMemo(() => ({
+    major: roadTypeFilters.major !== false,
+    mid: roadTypeFilters.mid !== false,
+    alley: roadTypeFilters.alley !== false,
+    pedestrian: roadTypeFilters.pedestrian !== false,
+    service: roadTypeFilters.service !== false,
+  }), [roadTypeFilters]);
   const roadTexture = useMemo(() => {
     if (!roadTextureUrl) return null;
     const texture = new THREE.TextureLoader().load(roadTextureUrl);
@@ -341,10 +370,14 @@ const SeoulTerrain = ({
     if (!data) return;
     const build = async () => {
       const { water, forest, grass, roads } = data.layers;
-      const roadFeatures = dongId ? roads : roads.filter(r => ROAD_CLASS[r.highway] === 'major' || ROAD_CLASS[r.highway] === 'mid');
-      const majorRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'minor') === 'major');
-      const midRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'minor') === 'mid');
-      const minorRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'minor') === 'minor');
+      const roadFeatures = dongId
+        ? roads
+        : roads.filter(r => ['major', 'mid', 'alley'].includes(ROAD_CLASS[r.highway] || 'alley'));
+      const majorRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'major');
+      const midRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'mid');
+      const alleyRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'alley');
+      const pedestrianRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'pedestrian');
+      const serviceRoads = roadFeatures.filter((road) => (ROAD_CLASS[road.highway] || 'alley') === 'service');
 
       setGeos({
         grass: buildPolygonGeometry(grass.filter(f => f.type === 'polygon')),
@@ -353,7 +386,9 @@ const SeoulTerrain = ({
         waterLine: buildSimpleLineGeometry(water.filter(f => f.type === 'line'), 30, 15, 5),
         roadMajor: buildRoadAtlasGeometry(majorRoads, 'major', roadWidthMajor, roadWidthMid, roadWidthMinor),
         roadMid: buildRoadAtlasGeometry(midRoads, 'mid', roadWidthMajor, roadWidthMid, roadWidthMinor),
-        roadMinor: buildRoadAtlasGeometry(minorRoads, 'minor', roadWidthMajor, roadWidthMid, roadWidthMinor),
+        roadAlley: buildRoadAtlasGeometry(alleyRoads, 'alley', roadWidthMajor, roadWidthMid, roadWidthMinor),
+        roadPedestrian: buildRoadAtlasGeometry(pedestrianRoads, 'pedestrian', roadWidthMajor, roadWidthMid, roadWidthMinor),
+        roadService: buildRoadAtlasGeometry(serviceRoads, 'service', roadWidthMajor, roadWidthMid, roadWidthMinor),
         shiftX: 0, shiftZ: 0
       });
     };
@@ -380,9 +415,11 @@ const SeoulTerrain = ({
       )}
       {showRoads && (
         <group name="roads-layer" position={[0, 0.1, 0]}>
-          <MergedMesh geometry={geos.roadMinor} color={COLORS.road_minor} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="minor" />
-          <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="mid" />
-          <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="major" />
+          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="service" />}
+          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="pedestrian" />}
+          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="alley" />}
+          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="mid" />}
+          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTexture} useStencil={!!activeMask} isRoad={true} roadType="major" />}
         </group>
       )}
     </group>

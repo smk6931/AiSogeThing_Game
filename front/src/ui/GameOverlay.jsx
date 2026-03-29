@@ -43,6 +43,13 @@ const LAYER_BUTTONS = [
   { key: 'showCurrentGroupTexture', label: '그룹텍', icon: '◆', colorOn: 'rgba(220,160,30,0.8)' },
   { key: 'showCullRadius',          label: '컬링선', icon: '⊙', colorOn: 'rgba(255,60,60,0.8)'  },
 ];
+const ROAD_TYPE_BUTTONS = [
+  { key: 'major', label: '큰길', icon: '═', colorOn: 'rgba(180,185,195,0.78)' },
+  { key: 'mid', label: '중간길', icon: '━', colorOn: 'rgba(120,130,145,0.78)' },
+  { key: 'alley', label: '골목', icon: '─', colorOn: 'rgba(125,110,90,0.78)' },
+  { key: 'pedestrian', label: '보행', icon: '⋯', colorOn: 'rgba(155,140,100,0.78)' },
+  { key: 'service', label: '서비스', icon: '≋', colorOn: 'rgba(90,85,78,0.78)' },
+];
 
 const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, monsters = {}, mapSettings = {} }) => {
   const { user } = useAuth();
@@ -57,6 +64,7 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   const [sidebarTab, setSidebarTab] = useState(null);
   const [sidebarMode, setSidebarMode] = useState('menu');
   const [showLayerPopup, setShowLayerPopup] = useState(false);
+  const [showRoadPanel, setShowRoadPanel] = useState(false);
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
@@ -362,6 +370,61 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
               );
             })}
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
+            <div style={{ color: GOLD, fontSize: '9px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+              Road Types
+            </div>
+            <button
+              onClick={() => setShowRoadPanel(prev => !prev)}
+              style={{
+                padding: '3px 6px',
+                borderRadius: '6px',
+                border: `1px solid ${showRoadPanel ? ACCENT : 'rgba(80,100,120,0.3)'}`,
+                background: showRoadPanel ? 'rgba(19,50,60,0.9)' : 'rgba(10,18,28,0.6)',
+                color: showRoadPanel ? ACCENT : '#9bb6b0',
+                fontSize: '9px',
+                cursor: 'pointer',
+                fontFamily: GAME_FONT,
+              }}
+            >
+              {showRoadPanel ? '닫기' : '세부'}
+            </button>
+          </div>
+          {showRoadPanel && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '10px' }}>
+              {ROAD_TYPE_BUTTONS.map(({ key, label, icon, colorOn }) => {
+                const roadTypeFilters = mapSettings.roadTypeFilters || {};
+                const isOn = roadTypeFilters[key] !== false;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      const next = { ...roadTypeFilters, [key]: !isOn };
+                      if (mapSettings.setRoadTypeFilters) {
+                        mapSettings.setRoadTypeFilters(next);
+                      }
+                    }}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                      padding: '5px 4px',
+                      borderRadius: '7px',
+                      border: `1px solid ${isOn ? ACCENT : 'rgba(80,100,120,0.3)'}`,
+                      background: isOn ? colorOn : 'rgba(10,18,28,0.6)',
+                      color: isOn ? '#fff' : 'rgba(150,160,170,0.7)',
+                      fontSize: '9px',
+                      cursor: 'pointer',
+                      fontFamily: GAME_FONT,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', lineHeight: 1 }}>{icon}</span>
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* 구분선 */}
           <div style={{ borderTop: `1px solid ${BORDER_COLOR}`, marginBottom: '8px' }} />

@@ -19,6 +19,7 @@ const GameCanvas = ({
   zoomLevel,
   showOsmMap,
   showSeoulRoads,
+  roadTypeFilters,
   showSeoulNature,
   showLanduseTextureLayer,
   showRoadSplitLayer,
@@ -80,6 +81,7 @@ const GameCanvas = ({
           zoomLevel={zoomLevel}
           showOsmMap={showOsmMap}
           showSeoulRoads={showSeoulRoads}
+          roadTypeFilters={roadTypeFilters}
           showSeoulNature={showSeoulNature}
           showLanduseTextureLayer={showLanduseTextureLayer}
           showRoadSplitLayer={showRoadSplitLayer}

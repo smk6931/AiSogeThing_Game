@@ -141,22 +141,24 @@ const getGroupGeometries = (groupKey, allPartitions, texCount) => {
   return result;
 };
 
-const DongMask = ({ currentDong, elevation }) => {
+const DongMask = ({ currentDong, currentDistrict, elevation }) => {
+  // 동이 감지되기 전에는 구 경계를 마스크로 사용 (stencil=1 선공급)
+  const maskSource = currentDong || currentDistrict;
   const geo = useMemo(() => {
-    if (!currentDong?.coords || currentDong.coords.length < 3) return null;
+    if (!maskSource?.coords || maskSource.coords.length < 3) return null;
     try {
       const shape = new THREE.Shape();
-      const first = gpsToGame(currentDong.coords[0][0], currentDong.coords[0][1]);
+      const first = gpsToGame(maskSource.coords[0][0], maskSource.coords[0][1]);
       shape.moveTo(first.x, -first.z);
-      for (let i = 1; i < currentDong.coords.length; i += 1) {
-        const p = gpsToGame(currentDong.coords[i][0], currentDong.coords[i][1]);
+      for (let i = 1; i < maskSource.coords.length; i += 1) {
+        const p = gpsToGame(maskSource.coords[i][0], maskSource.coords[i][1]);
         shape.lineTo(p.x, -p.z);
       }
       return new THREE.ShapeGeometry(shape);
     } catch (_) {
       return null;
     }
-  }, [currentDong]);
+  }, [maskSource]);
 
   if (!geo) return null;
 
@@ -179,6 +181,7 @@ const CityBlockContent = ({
   zoneData,
   dbPartitions,
   currentDong,
+  currentDistrict,
   elevation,
   showOriginalBlocks = true,
   showSectorBlocks = true,
@@ -264,8 +267,8 @@ const CityBlockContent = ({
         const geos = getGroupGeometries(groupKey, dbPartitions, texCount);
         result.push(...geos);
       }
-    } else if (showSectorBlocks && zoneData?.zones?.sectors) {
-      // dbPartitions 없을 때 fallback
+    } else if (showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
+      // dbPartitions 없을 때 fallback (currentGroupOnly는 그룹 단독 렌더 — 전체 sectors 대체 불가)
       const sectors = zoneData.zones.sectors || [];
       sectors.forEach((feature, idx) => {
         if (feature.type !== 'polygon' || !feature.coords?.length) return;
@@ -281,7 +284,7 @@ const CityBlockContent = ({
 
   return (
     <group>
-      <DongMask currentDong={currentDong} elevation={elevation + 0.01} />
+      <DongMask currentDong={currentDong} currentDistrict={currentDistrict} elevation={elevation + 0.01} />
       <group position={[0, elevation, 0]}>
         {blocks.map((block, index) => (
           <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
@@ -307,6 +310,7 @@ const CityBlockContent = ({
 const CityBlockOverlay = ({
   zoneData,
   currentDong,
+  currentDistrict,
   visible = true,
   elevation = 0.05,
   showOriginalBlocks = true,
@@ -367,6 +371,7 @@ const CityBlockOverlay = ({
       zoneData={zoneData}
       dbPartitions={dbPartitions}
       currentDong={currentDong}
+      currentDistrict={currentDistrict}
       elevation={elevation}
       showOriginalBlocks={showOriginalBlocks}
       showSectorBlocks={showSectorBlocks}

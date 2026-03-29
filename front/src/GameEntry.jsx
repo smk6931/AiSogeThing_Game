@@ -61,6 +61,13 @@ const GameEntry = () => {
   const [zoomLevel, setZoomLevel] = useState(16.5);
   const [showOsmMap, setShowOsmMap] = useState(true);
   const [showSeoulRoads, setShowSeoulRoads] = useState(true);
+  const [roadTypeFilters, setRoadTypeFilters] = useState({
+    major: true,
+    mid: true,
+    alley: true,
+    pedestrian: true,
+    service: true,
+  });
   const [showSeoulNature, setShowSeoulNature] = useState(true);
   const [showLanduseTextureLayer, setShowLanduseTextureLayer] = useState(true);
   const [showRoadSplitLayer, setShowRoadSplitLayer] = useState(true);
@@ -148,6 +155,7 @@ const GameEntry = () => {
           zoomLevel={zoomLevel} // [NEW] 줌 레벨 전달
           showOsmMap={showOsmMap}
           showSeoulRoads={showSeoulRoads}
+          roadTypeFilters={roadTypeFilters}
           showSeoulNature={showSeoulNature}
           showLanduseTextureLayer={showLanduseTextureLayer}
           showRoadSplitLayer={showRoadSplitLayer}
@@ -187,6 +195,7 @@ const GameEntry = () => {
         mapSettings={{
           showOsmMap, setShowOsmMap,
           showSeoulRoads, setShowSeoulRoads,
+          roadTypeFilters, setRoadTypeFilters,
           showSeoulNature, setShowSeoulNature,
           showLanduseTextureLayer, setShowLanduseTextureLayer,
           showRoadSplitLayer, setShowRoadSplitLayer,

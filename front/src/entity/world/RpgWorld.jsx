@@ -149,6 +149,7 @@ const RpgWorld = ({
   zoomLevel,
   showOsmMap,
   showSeoulRoads,
+  roadTypeFilters = {},
   showSeoulNature,
   showLanduseTextureLayer,
   showRoadSplitLayer,
@@ -429,6 +430,7 @@ const RpgWorld = ({
       <SeoulTerrain
         visible={showSeoulNature || showSeoulRoads}
         showRoads={showSeoulRoads}
+        roadTypeFilters={roadTypeFilters}
         showNature={showSeoulNature}
         roadTextureUrl={ROAD_ATLAS_URL}
         dongId={currentDongId}
@@ -446,7 +448,7 @@ const RpgWorld = ({
 
       {/* 4. OSM 구역 오버레이 (용도구역 등 실시간 데이터) */}
       <ZoneOverlay
-        visible={(showSeoulRoads || showSeoulNature || showLanduseTextureLayer || showRoadSplitLayer || showLanduseZones)}
+        visible={(showSeoulRoads || showSeoulNature || showLanduseTextureLayer || showLanduseZones)}
         categories={landuseFilters}
         playerPos={playerRef.current ? playerRef.current.position : { x: 0, z: 0 }}
         currentDistrict={currentDistrict}
