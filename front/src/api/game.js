@@ -57,7 +57,6 @@ const gameApi = {
       const payload = {
         type: 'hit_monster',
         monsterId: hitData.monsterId,
-        damage: hitData.damage,
         skillName: hitData.skillName
       };
       socket.send(JSON.stringify(payload));

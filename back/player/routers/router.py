@@ -100,18 +100,52 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
             # --- [HIT] 몬스터 피격 ---
             elif msg_type == "hit_monster":
                 monster_id = data.get("monsterId")
-                damage = data.get("damage", 10)
                 skill_name = data.get("skillName", "basic")
+                player_stats = player_manager.get_player_stats(user_id) or {}
+                player_attack = player_stats.get("attack", 10)
 
-                monster_manager.handle_hit(monster_id, damage)
+                hit_result = monster_manager.handle_hit(monster_id, player_attack, skill_name)
+                if not hit_result or not hit_result.get("ok"):
+                    continue
 
                 await player_manager.broadcast({
                     "type": "monster_hit",
-                    "monsterId": monster_id,
-                    "damage": damage,
+                    "monsterId": hit_result["monsterId"],
+                    "damage": hit_result["damage"],
+                    "hp": hit_result["hp"],
+                    "maxHp": hit_result["maxHp"],
+                    "state": hit_result["state"],
+                    "killed": hit_result["killed"],
                     "skillName": skill_name,
                     "attackerId": user_id
                 })
+
+                if hit_result["killed"]:
+                    reward_result = player_manager.add_rewards(
+                        user_id,
+                        exp_gain=hit_result["expReward"],
+                        gold_gain=hit_result["goldReward"]
+                    )
+
+                    if reward_result:
+                        await player_manager.broadcast({
+                            "type": "monster_dead",
+                            "monsterId": hit_result["monsterId"],
+                            "attackerId": user_id,
+                            "expReward": hit_result["expReward"],
+                            "goldReward": hit_result["goldReward"]
+                        })
+
+                        player = player_manager.get_player(user_id)
+                        if player:
+                            await player["socket"].send_json({
+                                "type": "player_reward",
+                                "monsterId": hit_result["monsterId"],
+                                "expGained": reward_result["expGained"],
+                                "goldGained": reward_result["goldGained"],
+                                "leveledUp": reward_result["leveledUp"],
+                                "stats": reward_result["stats"]
+                            })
 
     except WebSocketDisconnect:
         player_manager.disconnect(user_id)

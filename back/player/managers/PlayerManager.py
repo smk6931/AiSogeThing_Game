@@ -14,6 +14,13 @@ class PlayerManager:
         # 접속 중인 플레이어 목록 {user_id: {socket, nickname, position, ...}}
         self.active_connections: Dict[str, dict] = {}
 
+    @staticmethod
+    def _required_exp_for_level(level: int) -> int:
+        """간단한 누적 경험치 곡선. 추후 DB 레벨 테이블로 교체 가능."""
+        if level <= 1:
+            return 0
+        return (level - 1) * level * 50
+
     async def connect(self, websocket: WebSocket, user_id: str, nickname: str, db=None):
         """새로운 플레이어 접속 처리"""
         await websocket.accept()
@@ -25,7 +32,9 @@ class PlayerManager:
             "maxHp": 100,
             "mp": 50,
             "maxMp": 50,
-            "exp": 0
+            "exp": 0,
+            "gold": 0,
+            "attack": 12
         }
 
         # 초기 상태 설정
@@ -56,6 +65,12 @@ class PlayerManager:
         """전체 플레이어 목록 조회"""
         return self.active_connections
 
+    def get_player_stats(self, user_id: str) -> Optional[dict]:
+        player = self.active_connections.get(user_id)
+        if not player:
+            return None
+        return player.get("stats")
+
     def update_player_state(self, user_id: str, new_state: dict):
         """플레이어 상태(위치, 행동) 업데이트"""
         if user_id in self.active_connections:
@@ -63,6 +78,36 @@ class PlayerManager:
             # 위험한 키(socket) 필터링
             safe_update = {k: v for k, v in new_state.items() if k != "socket"}
             player.update(safe_update)
+
+    def add_rewards(self, user_id: str, exp_gain: int = 0, gold_gain: int = 0) -> Optional[dict]:
+        """플레이어 보상 반영 및 간단 레벨업 처리"""
+        player = self.active_connections.get(user_id)
+        if not player:
+            return None
+
+        stats = player.get("stats")
+        if not stats:
+            return None
+
+        stats["exp"] = stats.get("exp", 0) + max(0, exp_gain)
+        stats["gold"] = stats.get("gold", 0) + max(0, gold_gain)
+
+        leveled_up = False
+        while stats["exp"] >= self._required_exp_for_level(stats["level"] + 1):
+            stats["level"] += 1
+            stats["maxHp"] += 20
+            stats["maxMp"] += 10
+            stats["attack"] = stats.get("attack", 12) + 2
+            stats["hp"] = stats["maxHp"]
+            stats["mp"] = stats["maxMp"]
+            leveled_up = True
+
+        return {
+            "expGained": exp_gain,
+            "goldGained": gold_gain,
+            "leveledUp": leveled_up,
+            "stats": dict(stats),
+        }
 
     async def broadcast(self, message: dict, exclude_user_id: str = None):
         """모든 플레이어에게 메시지 전송 (특정 유저 제외 가능)"""

@@ -15,6 +15,7 @@
   - [`agents/game_design/world_partition_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_partition_rules.md)
   - [`agents/game_design/road_design_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
   - [`agents/auth/auth_flow_rules.md`](C:/GitHub/AiSogeThing_Game/agents/auth/auth_flow_rules.md)
+  - [`agents/planning/game_direction.md`](C:/GitHub/AiSogeThing_Game/agents/planning/game_direction.md)
 
 ## Database
 

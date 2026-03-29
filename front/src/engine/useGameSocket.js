@@ -36,11 +36,31 @@ export const useGameSocket = (addProjectile) => {
                             ...prev,
                             [message.monsterId]: {
                                 ...m,
-                                hp: Math.max(0, m.hp - message.damage),
-                                state: 'hit' // 피격 모션 트리거
+                                hp: message.hp ?? Math.max(0, m.hp - message.damage),
+                                maxHp: message.maxHp ?? m.maxHp,
+                                state: message.state || (message.killed ? 'dead' : 'hit')
                             }
                         };
                     });
+                    break;
+
+                case 'monster_dead':
+                    setMonsters(prev => {
+                        const m = prev[message.monsterId];
+                        if (!m) return prev;
+                        return {
+                            ...prev,
+                            [message.monsterId]: {
+                                ...m,
+                                hp: 0,
+                                state: 'dead'
+                            }
+                        };
+                    });
+                    break;
+
+                case 'player_reward':
+                    setMyStats(message.stats);
                     break;
 
                 // [NEW] 다른 유저의 스킬 사용 수신

@@ -5,7 +5,18 @@ from typing import Dict, Optional
 
 
 class Monster:
-    def __init__(self, id: int, x: float, z: float, hp: int = 100, model_path: Optional[str] = None, tier: str = "normal", template_id: Optional[int] = None):
+    def __init__(
+        self,
+        id: int,
+        x: float,
+        z: float,
+        hp: int = 100,
+        model_path: Optional[str] = None,
+        tier: str = "normal",
+        template_id: Optional[int] = None,
+        exp_reward: int = 0,
+        gold_reward: int = 0,
+    ):
         self.id = id
         self.x = x
         self.z = z
@@ -18,6 +29,8 @@ class Monster:
         self.model_path = model_path
         self.tier = tier  # normal / elite / boss
         self.template_id = template_id
+        self.exp_reward = exp_reward
+        self.gold_reward = gold_reward
 
     def to_dict(self):
         data = {
@@ -28,6 +41,8 @@ class Monster:
             "state": self.state,
             "monsterType": self.monster_type,
             "tier": self.tier,
+            "expReward": self.exp_reward,
+            "goldReward": self.gold_reward,
         }
         if self.model_path:
             data["modelPath"] = self.model_path
@@ -37,14 +52,19 @@ class Monster:
 
 
 MONSTER_TEMPLATES = [
-    {"template_id": 1, "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",      "tier": "boss",   "hp": 5000, "speed": 0.5},
-    {"template_id": 2, "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",       "tier": "normal", "hp": 80,   "speed": 2.0},
-    {"template_id": 3, "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb","tier": "normal", "hp": 60,   "speed": 2.5},
-    {"template_id": 4, "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",     "tier": "elite",  "hp": 350,  "speed": 1.5},
-    {"template_id": 5, "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",  "tier": "normal", "hp": 90,   "speed": 1.2},
-    {"template_id": 6, "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",   "tier": "elite",  "hp": 280,  "speed": 2.0},
-    {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",     "tier": "boss",   "hp": 3000, "speed": 0.8},
+    {"template_id": 1, "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",      "tier": "boss",   "hp": 5000, "speed": 0.5, "exp": 400, "gold": 180},
+    {"template_id": 2, "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",       "tier": "normal", "hp": 80,   "speed": 2.0, "exp": 15,  "gold": 7},
+    {"template_id": 3, "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb","tier": "normal", "hp": 60,   "speed": 2.5, "exp": 18,  "gold": 9},
+    {"template_id": 4, "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",     "tier": "elite",  "hp": 350,  "speed": 1.5, "exp": 65,  "gold": 28},
+    {"template_id": 5, "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",  "tier": "normal", "hp": 90,   "speed": 1.2, "exp": 20,  "gold": 10},
+    {"template_id": 6, "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",   "tier": "elite",  "hp": 280,  "speed": 2.0, "exp": 72,  "gold": 32},
+    {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",     "tier": "boss",   "hp": 3000, "speed": 0.8, "exp": 260, "gold": 140},
 ]
+
+SKILL_POWER = {
+    "basic": 0,
+    "pyramid_punch": 8,
+}
 
 
 class MonsterManager:
@@ -70,6 +90,8 @@ class MonsterManager:
                 model_path=tmpl["model_path"],
                 tier=tmpl["tier"],
                 template_id=tmpl["template_id"],
+                exp_reward=tmpl.get("exp", 0),
+                gold_reward=tmpl.get("gold", 0),
             )
             m.speed = tmpl["speed"]
             self.monsters[m.id] = m
@@ -93,7 +115,9 @@ class MonsterManager:
             m = Monster(start_id + i, x, z, hp=tmpl["hp"],
                         model_path=tmpl["model_path"],
                         tier=tmpl["tier"],
-                        template_id=tmpl["template_id"])
+                        template_id=tmpl["template_id"],
+                        exp_reward=tmpl.get("exp", 0),
+                        gold_reward=tmpl.get("gold", 0))
             m.speed = tmpl["speed"]
             self.monsters[m.id] = m
         self.next_id = start_id + to_spawn
@@ -102,15 +126,44 @@ class MonsterManager:
     def get_all_monsters(self):
         return {mid: m.to_dict() for mid, m in self.monsters.items()}
 
-    def handle_hit(self, monster_id: int, damage: int):
+    def _calc_damage(self, player_attack: int, skill_name: str):
+        return max(1, player_attack + SKILL_POWER.get(skill_name, 0))
+
+    def handle_hit(self, monster_id: int, player_attack: int, skill_name: str = "basic"):
         if monster_id not in self.monsters:
-            return
+            return {"ok": False, "reason": "monster_not_found"}
+
         m = self.monsters[monster_id]
+        if m.state == "dead" or m.hp <= 0:
+            return {"ok": False, "reason": "monster_already_dead"}
+
+        damage = self._calc_damage(player_attack, skill_name)
         m.hp -= damage
         m.state = "hit"
-        print(f"Monster {monster_id} hit! HP: {m.hp}/{m.max_hp}")
+        print(f"Monster {monster_id} hit! Damage: {damage}, HP: {m.hp}/{m.max_hp}")
+
+        result = {
+            "ok": True,
+            "monsterId": monster_id,
+            "damage": damage,
+            "hp": max(0, m.hp),
+            "maxHp": m.max_hp,
+            "state": m.state,
+            "killed": False,
+            "expReward": 0,
+            "goldReward": 0,
+        }
+
         if m.hp <= 0:
+            m.hp = 0
             m.state = "dead"
+            result["hp"] = 0
+            result["state"] = "dead"
+            result["killed"] = True
+            result["expReward"] = m.exp_reward
+            result["goldReward"] = m.gold_reward
+
+        return result
 
     def remove_dead_monsters(self):
         dead_ids = [mid for mid, m in self.monsters.items() if m.state == "dead" and m.hp <= 0]
