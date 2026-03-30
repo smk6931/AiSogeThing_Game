@@ -71,6 +71,13 @@ if ($LASTEXITCODE -eq 0 -and ($dockerState | Select-Object -First 1).Trim() -eq 
 }
 
 if ($dockerContainerRunning) {
+    $ContainerDumpPath = "/tmp/$DbName-$timestamp.sql"
+
+    & docker exec -e "PGPASSWORD=$DbPassword" $DbContainerName sh -c "rm -f '$ContainerDumpPath'"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to remove previous container dump file."
+    }
+
     & docker exec -e "PGPASSWORD=$DbPassword" $DbContainerName pg_dump `
         --clean `
         --if-exists `
@@ -78,11 +85,18 @@ if ($dockerContainerRunning) {
         --no-privileges `
         -U $DbUser `
         -d $DbName `
-        | Out-File -FilePath $DumpFile -Encoding utf8
+        -f $ContainerDumpPath
 
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $DumpFile)) {
+    if ($LASTEXITCODE -ne 0) {
         throw "docker exec pg_dump failed."
     }
+
+    & docker cp "${DbContainerName}:$ContainerDumpPath" $DumpFile
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $DumpFile)) {
+        throw "docker cp dump export failed."
+    }
+
+    & docker exec -e "PGPASSWORD=$DbPassword" $DbContainerName sh -c "rm -f '$ContainerDumpPath'" | Out-Null
 } else {
     $PgDump = Get-Command pg_dump -ErrorAction SilentlyContinue
     if (-not $PgDump) {
