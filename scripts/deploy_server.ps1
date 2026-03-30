@@ -126,6 +126,7 @@ set -e
 
 RESTORE_REQUESTED=0
 REMOTE_DB_BACKUP=''
+APP_STOPPED=0
 
 rollback_db() {
     if [ "$RESTORE_REQUESTED" != "1" ]; then
@@ -134,10 +135,18 @@ rollback_db() {
 
     if [ -n "$REMOTE_DB_BACKUP" ] && [ -f "$REMOTE_DB_BACKUP" ]; then
         echo '[Rollback] Restoring previous server DB backup...'
-        docker exec -e PGPASSWORD="$DB_PASSWORD" -i game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" < "$REMOTE_DB_BACKUP" || true
+        docker exec -e PGPASSWORD="$DB_PASSWORD" game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS public CASCADE;"
+        docker exec -e PGPASSWORD="$DB_PASSWORD" game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "CREATE SCHEMA public;"
+        docker exec -e PGPASSWORD="$DB_PASSWORD" -i game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 < "$REMOTE_DB_BACKUP" || true
         echo '[Rollback] Previous DB restore attempted.'
     else
         echo '[Rollback] No previous DB backup found. Nothing to restore.'
+    fi
+
+    if [ "$APP_STOPPED" = "1" ]; then
+        echo '[Rollback] Restarting PM2 apps after DB restore attempt...'
+        pm2 restart game-back > /dev/null 2>&1 || true
+        pm2 restart game-front > /dev/null 2>&1 || true
     fi
 }
 
@@ -216,11 +225,20 @@ mkdir -p .deploy/server-pre-restore
 REMOTE_DB_BACKUP=".deploy/server-pre-restore/__DB_NAME__-pre-__TIMESTAMP__.sql"
 docker exec -e PGPASSWORD="$DB_PASSWORD" game-sogething-db pg_dump -U "$DB_USER" -d "$DB_NAME" --clean --if-exists --no-owner --no-privileges > "$REMOTE_DB_BACKUP"
 
-echo '[Remote 5.1/6] Restore SQL dump into PostgreSQL...'
-RESTORE_REQUESTED=1
-docker exec -e PGPASSWORD="$DB_PASSWORD" -i game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" < '.deploy/__REMOTE_DUMP__'
+echo '[Remote 5.1/6] Stop PM2 apps before DB reset...'
+pm2 stop game-back > /dev/null 2>&1 || true
+pm2 stop game-front > /dev/null 2>&1 || true
+APP_STOPPED=1
 
-echo '[Remote 5.5/6] Run Alembic migration after restore...'
+echo '[Remote 5.2/6] Reset PostgreSQL public schema...'
+docker exec -e PGPASSWORD="$DB_PASSWORD" game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS public CASCADE;"
+docker exec -e PGPASSWORD="$DB_PASSWORD" game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "CREATE SCHEMA public;"
+
+echo '[Remote 5.3/6] Restore SQL dump into PostgreSQL...'
+RESTORE_REQUESTED=1
+docker exec -e PGPASSWORD="$DB_PASSWORD" -i game-sogething-db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 < '.deploy/__REMOTE_DUMP__'
+
+echo '[Remote 5.4/6] Run Alembic migration after restore...'
 cd back
 source ../venv/bin/activate
 alembic upgrade head
@@ -258,6 +276,7 @@ if [ -f nginx_game_sogething.conf ]; then
 fi
 
 RESTORE_REQUESTED=0
+APP_STOPPED=0
 pm2 status
 echo 'Deployment completed.'
 '@
