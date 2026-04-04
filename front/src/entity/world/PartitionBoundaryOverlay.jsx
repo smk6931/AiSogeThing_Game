@@ -83,15 +83,14 @@ const buildGroupBoundaryGeometry = (partitions, height = 2.5, thickness = 3.0) =
 
 const PartitionBoundaryOverlay = ({
   currentDong,
-  playerPositionRef,
   visibleMicro = false,
   visibleGroup = false,
   highlightCurrentGroup = true,
+  currentPartitionKey = null,
+  currentGroupKey = null,
   elevation = 0.42,
 }) => {
   const [partitions, setPartitions] = useState([]);
-  const [currentGroupKey, setCurrentGroupKey] = useState(null);
-  const [currentPartitionKey, setCurrentPartitionKey] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,41 +114,6 @@ const PartitionBoundaryOverlay = ({
       cancelled = true;
     };
   }, [visibleMicro, visibleGroup, highlightCurrentGroup, currentDong?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadCurrentRegion = async () => {
-      if ((!visibleMicro && !visibleGroup && !highlightCurrentGroup) || !currentDong?.id || !playerPositionRef?.current?.position) {
-        setCurrentGroupKey(null);
-        setCurrentPartitionKey(null);
-        return;
-      }
-
-      try {
-        const { x, z } = playerPositionRef.current.position;
-        const lat = GIS_ORIGIN.lat - (z / LAT_TO_M);
-        const lng = GIS_ORIGIN.lng + (x / LNG_TO_M);
-        const res = await worldApi.getCurrentRegion(lat, lng);
-        if (cancelled) return;
-        const partition = res.data?.current_partition || null;
-        setCurrentGroupKey(partition?.group_key || null);
-        setCurrentPartitionKey(partition?.partition_key || null);
-      } catch (_) {
-        if (!cancelled) {
-          setCurrentGroupKey(null);
-          setCurrentPartitionKey(null);
-        }
-      }
-    };
-
-    loadCurrentRegion();
-    const interval = setInterval(loadCurrentRegion, 700);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [visibleMicro, visibleGroup, highlightCurrentGroup, currentDong?.id, playerPositionRef]);
 
   const microMeshes = useMemo(
     () =>

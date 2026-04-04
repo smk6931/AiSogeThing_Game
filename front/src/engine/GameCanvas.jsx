@@ -35,6 +35,7 @@ const GameCanvas = ({
   showCullRadius,
   cameraMode,
   onMonsterClick,
+  currentRegionInfo,
 }) => {
   const orbitRef = useRef();
 
@@ -97,6 +98,7 @@ const GameCanvas = ({
           showCullRadius={showCullRadius}
           cameraMode={cameraMode}
           onMonsterClick={onMonsterClick}
+          currentRegionInfo={currentRegionInfo}
           orbitRef={orbitRef}
         />
       </Suspense>

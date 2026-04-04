@@ -166,6 +166,7 @@ const RpgWorld = ({
   orbitRef,
   cameraMode,
   onMonsterClick,
+  currentRegionInfo = null,
 }) => {
   const [debugConfig, setDebugConfig] = useState(() => {
     // 1. 브라우저 저장소(localStorage)에서 기존 설정 불러오기 프리뷰
@@ -552,10 +553,11 @@ const RpgWorld = ({
 
       <PartitionBoundaryOverlay
         currentDong={currentDong}
-        playerPositionRef={playerRef}
         visibleMicro={showMicroBoundaries}
         visibleGroup={showGroupBoundaries}
         highlightCurrentGroup={highlightCurrentGroup}
+        currentPartitionKey={currentRegionInfo?.currentPartition?.partition_key || null}
+        currentGroupKey={currentRegionInfo?.currentPartition?.group_key || null}
         elevation={debugConfig.mapElevation + 0.34}
       />
 

@@ -4,6 +4,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useGameInput } from '@engine/useGameInput';
 import { useProjectiles } from '@hooks/useProjectiles';
 import { useGameSocket } from '@engine/useGameSocket';
+import { useCurrentRegionInfo } from '@hooks/useCurrentRegionInfo';
 import GameOverlay from '@ui/GameOverlay';
 import ChatBox from '@ui/ChatBox';
 import WorldMapModal from '@ui/WorldMapModal';
@@ -54,6 +55,7 @@ const GameEntry = () => {
 
   // [최적화] 내 캐릭터 위치를 ref로 관리하여 리렌더링 방지
   const myPositionRef = useRef({ x: 0, z: 0 });
+  const currentRegionInfo = useCurrentRegionInfo(myPositionRef, true);
 
   // 2. 소켓에 addProjectile 함수 전달 (남이 쏜 스킬 그리기용)
   const { otherPlayers, sendPosition: originalSendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, sendSkill, monsters, sendHit } = useGameSocket(addProjectile);
@@ -171,6 +173,7 @@ const GameEntry = () => {
           showCullRadius={showCullRadius}
           cameraMode={cameraMode}
           onMonsterClick={setSelectedMonster}
+          currentRegionInfo={currentRegionInfo}
         />
       </div>
 
@@ -192,6 +195,7 @@ const GameEntry = () => {
         onlineCount={otherPlayers ? Object.keys(otherPlayers).length + 1 : 1}
         myStats={myStats}
         monsters={monsters}
+        currentRegionInfo={currentRegionInfo}
         mapSettings={{
           showOsmMap, setShowOsmMap,
           showSeoulRoads, setShowSeoulRoads,

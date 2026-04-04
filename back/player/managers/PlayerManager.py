@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, List, Optional
 from fastapi import WebSocket
 # [임시 비활성] DB 관련 임포트 (DB 연결 시 복원 필요)
@@ -111,17 +112,28 @@ class PlayerManager:
 
     async def broadcast(self, message: dict, exclude_user_id: str = None):
         """모든 플레이어에게 메시지 전송 (특정 유저 제외 가능)"""
-        # [수정] 런타임 에러 방지하기 위해 리스트로 복사본 생성 후 순회
-        for user_id, player_data in list(self.active_connections.items()):
-            if user_id == exclude_user_id:
-                continue
-            
-            socket = player_data["socket"]
+        stale_user_ids = []
+        tasks = []
+
+        async def _send(user_id: str, socket: WebSocket):
             try:
                 await socket.send_json(message)
             except Exception as e:
                 print(f"[WARN] Broadcast Error to {user_id}: {e}")
-                # 에러 발생 시 처리 (옵션)
+                stale_user_ids.append(user_id)
+
+        for user_id, player_data in list(self.active_connections.items()):
+            if user_id == exclude_user_id:
+                continue
+
+            socket = player_data["socket"]
+            tasks.append(_send(user_id, socket))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        for user_id in stale_user_ids:
+            self.disconnect(user_id)
 
 # 싱글톤 인스턴스
 player_manager = PlayerManager()

@@ -10,6 +10,7 @@ export const useGameSocket = (addProjectile) => {
     const [latestChatMap, setLatestChatMap] = useState({});
     const [myStats, setMyStats] = useState(null);
     const [monsters, setMonsters] = useState({});
+    const lastSentPositionRef = useRef(null);
 
     // 몬스터 배칭: ref로 최신값 유지, RAF로 프레임당 1회 flush
     const monstersRef = useRef({});
@@ -191,6 +192,25 @@ export const useGameSocket = (addProjectile) => {
 
     // 전송 로직도 API 레이어에 위임
     const sendPosition = (positionData) => {
+        const lastSent = lastSentPositionRef.current;
+        if (lastSent) {
+            const dx = (positionData.x || 0) - lastSent.x;
+            const dy = (positionData.y || 0) - lastSent.y;
+            const dz = (positionData.z || 0) - lastSent.z;
+            const drot = Math.abs((positionData.rotation || 0) - lastSent.rotation);
+            const mapId = positionData.mapId || 'map_0';
+            if (mapId === lastSent.mapId && ((dx * dx) + (dy * dy) + (dz * dz)) < 0.04 && drot < 0.02) {
+                return;
+            }
+        }
+
+        lastSentPositionRef.current = {
+            x: positionData.x || 0,
+            y: positionData.y || 0,
+            z: positionData.z || 0,
+            rotation: positionData.rotation || 0,
+            mapId: positionData.mapId || 'map_0',
+        };
         gameApi.sendPosition(socketRef.current, positionData);
     };
 

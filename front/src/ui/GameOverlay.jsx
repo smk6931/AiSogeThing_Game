@@ -3,7 +3,6 @@ import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarC
 import { useNavigate } from 'react-router-dom';
 import GameCodex from './GameCodex';
 
-import worldApi from '@api/world';
 import { useAuth } from '@contexts/AuthContext';
 import { useGameConfig } from '@contexts/GameConfigContext';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
@@ -51,7 +50,15 @@ const ROAD_TYPE_BUTTONS = [
   { key: 'service', label: '서비스', icon: '≋', colorOn: 'rgba(90,85,78,0.78)' },
 ];
 
-const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, monsters = {}, mapSettings = {} }) => {
+const GameOverlay = ({
+  myPositionRef,
+  onSimulateKey,
+  onlineCount = 0,
+  myStats,
+  monsters = {},
+  mapSettings = {},
+  currentRegionInfo: regionState = null,
+}) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();
   const navigate = useNavigate();
@@ -71,8 +78,6 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   const [gpsCoords, setGpsCoords] = useState({ lat: GIS_ORIGIN.lat, lng: GIS_ORIGIN.lng });
   const [currentDistrict, setCurrentDistrict] = useState(null);
   const [currentDong, setCurrentDong] = useState(null);
-  const [currentRegionInfo, setCurrentRegionInfo] = useState(null);
-  const [currentPartition, setCurrentPartition] = useState(null);
   const [showZoneTitle, setShowZoneTitle] = useState(false);
   const [showPartitionTitle, setShowPartitionTitle] = useState(false);
   const [showPartitionPanel, setShowPartitionPanel] = useState(false);
@@ -148,44 +153,13 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
   }, [myPositionRef, getDistrictAt, getDongAt]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadRegionInfo = async () => {
-      if (!currentDong?.id) {
-        setCurrentRegionInfo(null);
-        setCurrentPartition(null);
-        return;
-      }
-
-      try {
-        const response = await worldApi.getCurrentRegion(gpsCoords.lat, gpsCoords.lng);
-        if (cancelled) return;
-
-        const nextRegion = response.data?.db_region || null;
-        const nextPartition = response.data?.current_partition || null;
-        setCurrentRegionInfo(nextRegion);
-        setCurrentPartition(nextPartition);
-
-        const nextPartitionKey = nextPartition?.partition_key || '';
-        if (nextPartitionKey && nextPartitionKey !== lastPartitionRef.current) {
-          lastPartitionRef.current = nextPartitionKey;
-          setShowPartitionTitle(true);
-          if (partitionTimerRef.current) clearTimeout(partitionTimerRef.current);
-          partitionTimerRef.current = setTimeout(() => setShowPartitionTitle(false), 2200);
-        }
-      } catch (error) {
-        if (cancelled) return;
-        setCurrentRegionInfo(null);
-        setCurrentPartition(null);
-      }
-    };
-
-    const timer = setTimeout(loadRegionInfo, 150);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [currentDong?.id, gpsCoords.lat, gpsCoords.lng]);
+    const nextPartitionKey = regionState?.currentPartition?.partition_key || '';
+    if (!nextPartitionKey || nextPartitionKey === lastPartitionRef.current) return;
+    lastPartitionRef.current = nextPartitionKey;
+    setShowPartitionTitle(true);
+    if (partitionTimerRef.current) clearTimeout(partitionTimerRef.current);
+    partitionTimerRef.current = setTimeout(() => setShowPartitionTitle(false), 2200);
+  }, [regionState?.currentPartition?.partition_key]);
 
   useEffect(() => {
     if (window.__worldGui) {
@@ -205,6 +179,8 @@ const GameOverlay = ({ myPositionRef, onSimulateKey, onlineCount = 0, myStats, m
 
   const hpPct = Math.max(0, Math.min(100, (playerStats.hp / playerStats.maxHp) * 100));
   const mpPct = Math.max(0, Math.min(100, (playerStats.mp / playerStats.maxMp) * 100));
+  const currentRegionInfo = regionState?.dbRegion || null;
+  const currentPartition = regionState?.currentPartition || null;
   const currentPartitionTitle = currentPartition?.group_display_name || currentPartition?.display_name || '';
   const currentPartitionTheme = currentPartition?.group_theme_code || currentPartition?.theme_code || '-';
 
