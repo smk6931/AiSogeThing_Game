@@ -21,6 +21,40 @@ from player.managers.PlayerManager import player_manager
 
 app = FastAPI()
 
+
+async def broadcast_monster_delta_to_visible_players(message: dict):
+    upsert = message.get("upsert") or {}
+    remove = [int(mid) for mid in (message.get("remove") or [])]
+
+    for user_id, player in list(player_manager.get_all_players().items()):
+        position = player.get("position") or {}
+        current_visible_ids = monster_manager.get_monster_ids_in_radius(
+            position.get("x", 0) or 0,
+            position.get("z", 0) or 0,
+        )
+        previous_visible_ids = set(player.get("visibleMonsterIds") or set())
+
+        visible_upsert = {
+            str(mid): data
+            for mid, data in upsert.items()
+            if int(mid) in current_visible_ids
+        }
+        lost_visibility_ids = previous_visible_ids - current_visible_ids
+        visible_remove = sorted(
+            lost_visibility_ids.union({mid for mid in remove if mid in previous_visible_ids})
+        )
+
+        player["visibleMonsterIds"] = current_visible_ids
+
+        if not visible_upsert and not visible_remove:
+            continue
+
+        await player_manager.send_to_user(user_id, {
+            "type": "monster_delta",
+            "upsert": visible_upsert,
+            "remove": visible_remove,
+        })
+
 # ========================================================
 #  Logging Configuration (Filter Heartbeat/Stats)
 # ========================================================
@@ -38,7 +72,7 @@ async def startup_event():
     # 몬스터 스폰 및 AI 루프 시작
     if not monster_manager.monsters:
         monster_manager.spawn_random(count=5)
-    asyncio.create_task(monster_manager.game_loop(player_manager.broadcast, player_manager.get_all_players))
+    asyncio.create_task(monster_manager.game_loop(broadcast_monster_delta_to_visible_players, player_manager.get_all_players))
     print("Monster AI loop started via app startup.")
 
 origins = [

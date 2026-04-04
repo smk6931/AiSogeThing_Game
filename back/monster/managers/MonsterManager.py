@@ -72,6 +72,7 @@ class MonsterManager:
         self.monsters: Dict[int, Monster] = {}
         self.next_id = 1
         self.is_running = False
+        self.sync_radius = 180.0
         self._spawn_all_at_start()
 
     def _spawn_all_at_start(self):
@@ -102,10 +103,11 @@ class MonsterManager:
         """죽은 일반 몬스터 보충 스폰"""
         normal_count = sum(1 for m in self.monsters.values() if m.tier == "normal")
         if normal_count >= 5:
-            return
+            return []
         to_spawn = min(count, 5 - normal_count)
         start_id = max(self.monsters.keys()) + 1 if self.monsters else self.next_id
         normal_templates = [t for t in MONSTER_TEMPLATES if t["tier"] == "normal"]
+        spawned_ids = []
         for i in range(to_spawn):
             tmpl = random.choice(normal_templates)
             angle = random.uniform(0, math.pi * 2)
@@ -120,11 +122,35 @@ class MonsterManager:
                         gold_reward=tmpl.get("gold", 0))
             m.speed = tmpl["speed"]
             self.monsters[m.id] = m
+            spawned_ids.append(m.id)
         self.next_id = start_id + to_spawn
         print(f"Respawn: {to_spawn} normal monsters.")
+        return spawned_ids
 
     def get_all_monsters(self):
         return {mid: m.to_dict() for mid, m in self.monsters.items()}
+
+    def get_monsters_in_radius(self, center_x: float, center_z: float, radius: float | None = None):
+        use_radius = radius if radius is not None else self.sync_radius
+        radius_sq = use_radius * use_radius
+        visible = {}
+        for mid, monster in self.monsters.items():
+            dx = monster.x - center_x
+            dz = monster.z - center_z
+            if (dx * dx) + (dz * dz) <= radius_sq:
+                visible[mid] = monster.to_dict()
+        return visible
+
+    def get_monster_ids_in_radius(self, center_x: float, center_z: float, radius: float | None = None) -> set[int]:
+        use_radius = radius if radius is not None else self.sync_radius
+        radius_sq = use_radius * use_radius
+        visible_ids: set[int] = set()
+        for mid, monster in self.monsters.items():
+            dx = monster.x - center_x
+            dz = monster.z - center_z
+            if (dx * dx) + (dz * dz) <= radius_sq:
+                visible_ids.add(mid)
+        return visible_ids
 
     def _calc_damage(self, player_attack: int, skill_name: str):
         return max(1, player_attack + SKILL_POWER.get(skill_name, 0))
@@ -176,7 +202,8 @@ class MonsterManager:
         print("Monster AI loop started.")
 
         while self.is_running:
-            has_update = False
+            changed_monsters = {}
+            removed_monster_ids = []
 
             # 접속 중인 플레이어 위치 수집
             player_positions = []
@@ -188,8 +215,9 @@ class MonsterManager:
             # 일반 몬스터 부족하면 보충 (드래곤/보스 제외)
             normal_count = sum(1 for m in self.monsters.values() if m.tier != "boss")
             if normal_count < 5:
-                self.spawn_random(count=5 - normal_count)
-                has_update = True
+                spawned_ids = self.spawn_random(count=5 - normal_count)
+                for mid in spawned_ids:
+                    changed_monsters[mid] = self.monsters[mid].to_dict()
                 await asyncio.sleep(1)
 
             to_delete = []
@@ -200,11 +228,10 @@ class MonsterManager:
                 if monster.state == "dead":
                     if not hasattr(monster, 'dead_tick'):
                         monster.dead_tick = 0
-                        has_update = True
+                        changed_monsters[m_id] = monster.to_dict()
                     monster.dead_tick += 1
                     if monster.dead_tick > 5:
                         to_delete.append(m_id)
-                        has_update = True
                     continue
 
                 if monster.state == "hit":
@@ -214,7 +241,7 @@ class MonsterManager:
                     if monster.hit_tick > 5:
                         monster.state = "idle"
                         del monster.hit_tick
-                        has_update = True
+                        changed_monsters[m_id] = monster.to_dict()
                     continue
 
                 if monster.state == "idle":
@@ -237,22 +264,25 @@ class MonsterManager:
 
                         monster.dx = math.cos(angle) * monster.speed * 0.1
                         monster.dz = math.sin(angle) * monster.speed * 0.1
+                        changed_monsters[m_id] = monster.to_dict()
 
                 elif monster.state == "move":
                     monster.x += getattr(monster, 'dx', 0)
                     monster.z += getattr(monster, 'dz', 0)
-                    has_update = True
+                    changed_monsters[m_id] = monster.to_dict()
                     if random.random() < 0.1:
                         monster.state = "idle"
+                        changed_monsters[m_id] = monster.to_dict()
 
             for mid in to_delete:
                 self.monsters.pop(mid, None)
-                has_update = True
+                removed_monster_ids.append(mid)
 
-            if has_update and broadcast_func:
+            if (changed_monsters or removed_monster_ids) and broadcast_func:
                 await broadcast_func({
-                    "type": "sync_monsters",
-                    "monsters": self.get_all_monsters()
+                    "type": "monster_delta",
+                    "upsert": changed_monsters,
+                    "remove": removed_monster_ids
                 })
 
             await asyncio.sleep(0.1)

@@ -14,6 +14,8 @@ class PlayerManager:
     def __init__(self):
         # 접속 중인 플레이어 목록 {user_id: {socket, nickname, position, ...}}
         self.active_connections: Dict[str, dict] = {}
+        self.player_sync_radius = 120.0
+        self.skill_sync_radius = 160.0
 
     @staticmethod
     def _required_exp_for_level(level: int) -> int:
@@ -45,7 +47,8 @@ class PlayerManager:
             "position": {"x": 0, "y": 0, "z": 0}, 
             "rotation": 0,
             "animation": "Idle",
-            "stats": stats  # 메모리에 스탯 보유
+            "stats": stats,  # 메모리에 스탯 보유
+            "visibleMonsterIds": set(),
         }
         
         self.active_connections[user_id] = initial_state
@@ -61,6 +64,74 @@ class PlayerManager:
     def get_player(self, user_id: str) -> Optional[dict]:
         """특정 플레이어 정보 조회"""
         return self.active_connections.get(user_id)
+
+    @staticmethod
+    def _distance_sq(player_a: dict, player_b: dict) -> float:
+        pos_a = player_a.get("position") or {}
+        pos_b = player_b.get("position") or {}
+        dx = (pos_a.get("x", 0) or 0) - (pos_b.get("x", 0) or 0)
+        dz = (pos_a.get("z", 0) or 0) - (pos_b.get("z", 0) or 0)
+        return (dx * dx) + (dz * dz)
+
+    @staticmethod
+    def _same_map(player_a: dict, player_b: dict) -> bool:
+        return player_a.get("mapId", "map_0") == player_b.get("mapId", "map_0")
+
+    def get_nearby_user_ids(self, origin_user_id: str, radius: float, include_self: bool = False) -> list[str]:
+        origin = self.active_connections.get(origin_user_id)
+        if not origin:
+            return []
+
+        radius_sq = radius * radius
+        nearby_user_ids: list[str] = []
+        for user_id, player_data in self.active_connections.items():
+            if not include_self and user_id == origin_user_id:
+                continue
+            if not self._same_map(origin, player_data):
+                continue
+            if self._distance_sq(origin, player_data) <= radius_sq:
+                nearby_user_ids.append(user_id)
+        return nearby_user_ids
+
+    async def send_to_user(self, user_id: str, message: dict):
+        player = self.active_connections.get(user_id)
+        if not player:
+            return
+        try:
+            await player["socket"].send_json(message)
+        except Exception as e:
+            print(f"[WARN] Send Error to {user_id}: {e}")
+            self.disconnect(user_id)
+
+    async def broadcast_to_users(self, message: dict, user_ids: list[str]):
+        if not user_ids:
+            return
+
+        stale_user_ids = []
+        tasks = []
+
+        async def _send(user_id: str, socket: WebSocket):
+            try:
+                await socket.send_json(message)
+            except Exception as e:
+                print(f"[WARN] Broadcast Error to {user_id}: {e}")
+                stale_user_ids.append(user_id)
+
+        for user_id in user_ids:
+            player = self.active_connections.get(user_id)
+            if not player:
+                continue
+            tasks.append(_send(user_id, player["socket"]))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        for user_id in stale_user_ids:
+            self.disconnect(user_id)
+
+    async def broadcast_nearby(self, message: dict, origin_user_id: str, radius: float, include_self: bool = False):
+        user_ids = self.get_nearby_user_ids(origin_user_id, radius, include_self=include_self)
+        await self.broadcast_to_users(message, user_ids)
 
     def get_all_players(self) -> Dict[str, dict]:
         """전체 플레이어 목록 조회"""

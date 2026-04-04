@@ -43,6 +43,20 @@ export const useGameSocket = (addProjectile) => {
                     setMonsters(message.monsters); // 전체 동기화는 즉시 반영
                     break;
 
+                case 'monster_delta': {
+                    const nextMonsters = { ...monstersRef.current };
+                    Object.entries(message.upsert || {}).forEach(([monsterId, monsterData]) => {
+                        nextMonsters[monsterId] = monsterData;
+                    });
+                    (message.remove || []).forEach((monsterId) => {
+                        delete nextMonsters[String(monsterId)];
+                        delete nextMonsters[monsterId];
+                    });
+                    monstersRef.current = nextMonsters;
+                    scheduleMonsterFlush();
+                    break;
+                }
+
                 case 'monster_hit': {
                     const m = monstersRef.current[message.monsterId];
                     if (!m) break;

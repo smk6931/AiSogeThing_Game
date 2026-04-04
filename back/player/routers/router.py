@@ -5,6 +5,19 @@ from monster.managers.MonsterManager import monster_manager
 
 router = APIRouter(prefix="/api/game", tags=["Game Player & WebSocket"])
 
+
+async def _send_visible_monsters(websocket: WebSocket, player_state: dict):
+    position = player_state.get("position") or {}
+    monsters_data = monster_manager.get_monsters_in_radius(
+        position.get("x", 0) or 0,
+        position.get("z", 0) or 0,
+    )
+    player_state["visibleMonsterIds"] = {int(mid) for mid in monsters_data.keys()}
+    await websocket.send_json({
+        "type": "sync_monsters",
+        "monsters": monsters_data
+    })
+
 @router.get("/status")
 async def get_game_status():
     return {"status": "online", "active_players": len(player_manager.active_connections)}
@@ -48,11 +61,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
     if not monster_manager.monsters:
         monster_manager.spawn_random(count=5)
     
-    monsters_data = monster_manager.get_all_monsters()
-    await websocket.send_json({
-        "type": "sync_monsters",
-        "monsters": monsters_data
-    })
+    player = player_manager.get_player(user_id)
+    if player:
+        await _send_visible_monsters(websocket, player)
 
     try:
         while True:
@@ -76,7 +87,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                     "animation": data.get("animation"),
                     "mapId": data.get("mapId", "map_0")
                 }
-                await player_manager.broadcast(broadcast_msg, exclude_user_id=user_id)
+                await player_manager.broadcast_nearby(
+                    broadcast_msg,
+                    origin_user_id=user_id,
+                    radius=player_manager.player_sync_radius,
+                    include_self=False,
+                )
+
+                player = player_manager.get_player(user_id)
+                if player:
+                    await _send_visible_monsters(websocket, player)
             
             # --- [CHAT] 채팅 메시지 ---
             elif msg_type == "chat":
@@ -90,12 +110,12 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
 
             # --- [SKILL] 스킬 사용 (중계) ---
             elif msg_type == "skill":
-                await player_manager.broadcast({
+                await player_manager.broadcast_nearby({
                     "type": "skill",
                     "userId": user_id,
                     "nickname": nickname,
                     "data": data.get("data")
-                }, exclude_user_id=user_id)
+                }, origin_user_id=user_id, radius=player_manager.skill_sync_radius, include_self=False)
 
             # --- [HIT] 몬스터 피격 ---
             elif msg_type == "hit_monster":
@@ -108,7 +128,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                 if not hit_result or not hit_result.get("ok"):
                     continue
 
-                await player_manager.broadcast({
+                await player_manager.broadcast_nearby({
                     "type": "monster_hit",
                     "monsterId": hit_result["monsterId"],
                     "damage": hit_result["damage"],
@@ -118,7 +138,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                     "killed": hit_result["killed"],
                     "skillName": skill_name,
                     "attackerId": user_id
-                })
+                }, origin_user_id=user_id, radius=player_manager.skill_sync_radius, include_self=True)
 
                 if hit_result["killed"]:
                     reward_result = player_manager.add_rewards(
@@ -128,13 +148,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                     )
 
                     if reward_result:
-                        await player_manager.broadcast({
+                        await player_manager.broadcast_nearby({
                             "type": "monster_dead",
                             "monsterId": hit_result["monsterId"],
                             "attackerId": user_id,
                             "expReward": hit_result["expReward"],
                             "goldReward": hit_result["goldReward"]
-                        })
+                        }, origin_user_id=user_id, radius=player_manager.skill_sync_radius, include_self=True)
 
                         player = player_manager.get_player(user_id)
                         if player:
