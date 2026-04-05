@@ -3,6 +3,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from player.managers.PlayerManager import player_manager
 from monster.managers.MonsterManager import monster_manager
 from item.service import roll_drops, grant_items_to_user
+import player.repository as char_repo
 
 router = APIRouter(prefix="/api/game", tags=["Game Player & WebSocket"])
 
@@ -167,6 +168,14 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                                 "leveledUp": reward_result["leveledUp"],
                                 "stats": reward_result["stats"]
                             })
+
+                        # 등록 유저만 스탯 DB 저장
+                        try:
+                            uid_int = int(user_id)
+                            if uid_int < 50000:
+                                await char_repo.save_character(uid_int, reward_result["stats"])
+                        except Exception as e:
+                            print(f"[WARN] save_character failed for {user_id}: {e}")
 
                     # 아이템 드롭 처리
                     drop_table = hit_result.get("dropTable", [])

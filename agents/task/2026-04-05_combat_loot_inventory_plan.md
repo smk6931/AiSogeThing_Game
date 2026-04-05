@@ -296,8 +296,12 @@ Phase 1-D (DB 연결) ← Phase 1-A 완료 후 별도 진행 가능
 - [x] `main.py` item_router 등록
 
 ### Phase 1-D — game_character DB 연결
-- [ ] 접속 시 DB에서 스탯 로드 (guest는 메모리 유지)
-- [ ] 레벨업/EXP/골드 변경 시 DB 업데이트
+- [x] `game_character` 모델에 gold, attack 컬럼 추가 + migration (e2f3a4b5c6d7)
+- [x] `player/repository.py` 생성 (get_character, upsert_character, save_character)
+- [x] 접속 시 DB에서 스탯 로드 (guest는 메모리 유지)
+- [x] 레벨업/EXP/골드 변경 시 DB 업데이트
+- [x] 골드 획득 알림 UI (💰 상단 중앙 팝업)
+- [x] 인벤토리 모달 상단 골드 잔액 표시
 
 ### Phase 1-E — EXP바 UI
 - [x] `GameOverlay.jsx` — EXP 게이지 바 추가 (레벨 기반 maxExp 계산)

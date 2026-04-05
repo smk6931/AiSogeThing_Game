@@ -87,6 +87,15 @@ export const useGameSocket = (addProjectile) => {
 
                 case 'player_reward':
                     setMyStats(message.stats);
+                    if (message.goldGained > 0) {
+                        setDroppedItems(prev => [...prev, {
+                            notifId: `gold_${Date.now()}`,
+                            name_ko: `${message.goldGained} Gold`,
+                            rarity: 'gold',
+                            quantity: null,
+                            isGold: true,
+                        }]);
+                    }
                     break;
 
                 // [NEW] 다른 유저의 스킬 사용 수신

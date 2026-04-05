@@ -66,6 +66,7 @@ const RARITY_COLOR = {
   rare: '#4488ff',
   epic: '#aa44ff',
   legendary: '#ffaa00',
+  gold: '#d0b16b',
 };
 
 const GameOverlay = ({
@@ -365,7 +366,10 @@ const GameOverlay = ({
               letterSpacing: '0.3px',
             }}
           >
-            🎁 {item.name_ko} <span style={{ color: '#888', fontWeight: 400, fontSize: '11px' }}>×{item.quantity}</span>
+            {item.isGold ? `💰 ${item.name_ko}` : `🎁 ${item.name_ko}`}
+            {!item.isGold && item.quantity != null && (
+              <span style={{ color: '#888', fontWeight: 400, fontSize: '11px' }}> ×{item.quantity}</span>
+            )}
           </div>
         ))}
       </div>

@@ -329,7 +329,7 @@ const GameEntry = () => {
       {/* ================= Inventory Modal ================= */}
       {inventoryOpen && (
         <Suspense fallback={null}>
-          <InventoryModal onClose={() => setInventoryOpen(false)} />
+          <InventoryModal onClose={() => setInventoryOpen(false)} myStats={myStats} />
         </Suspense>
       )}
 

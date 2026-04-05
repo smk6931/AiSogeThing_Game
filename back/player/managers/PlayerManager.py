@@ -1,10 +1,7 @@
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from fastapi import WebSocket
-# [임시 비활성] DB 관련 임포트 (DB 연결 시 복원 필요)
-# from sqlalchemy.future import select
-# from sqlalchemy.ext.asyncio import AsyncSession
-# from player.models.models import GameCharacter
+import player.repository as char_repo
 
 class PlayerManager:
     """
@@ -25,20 +22,40 @@ class PlayerManager:
         return (level - 1) * level * 50
 
     async def connect(self, websocket: WebSocket, user_id: str, nickname: str, db=None):
-        """새로운 플레이어 접속 처리"""
+        """새로운 플레이어 접속 처리 — 등록 유저는 DB에서 스탯 로드"""
         await websocket.accept()
-        
-        # [임시] DB 없이 기본 스탯 사용 (DB 연결 시 복원 필요)
-        stats = {
-            "level": 1,
-            "hp": 100,
-            "maxHp": 100,
-            "mp": 50,
-            "maxMp": 50,
-            "exp": 0,
-            "gold": 0,
-            "attack": 300
-        }
+
+        # 등록 유저(< 50000)는 DB 로드, guest는 기본 스탯
+        db_stats = None
+        try:
+            uid_int = int(user_id)
+            if uid_int < 50000:
+                db_stats = await char_repo.upsert_character(uid_int)
+        except Exception as e:
+            print(f"[WARN] character load failed for {user_id}: {e}")
+
+        if db_stats:
+            stats = {
+                "level": db_stats["level"],
+                "hp": db_stats["hp"],
+                "maxHp": db_stats["max_hp"],
+                "mp": db_stats["mp"],
+                "maxMp": db_stats["max_mp"],
+                "exp": db_stats["exp"],
+                "gold": db_stats["gold"],
+                "attack": db_stats["attack"] if db_stats["attack"] > 12 else 300,
+            }
+        else:
+            stats = {
+                "level": 1,
+                "hp": 100,
+                "maxHp": 100,
+                "mp": 50,
+                "maxMp": 50,
+                "exp": 0,
+                "gold": 0,
+                "attack": 300,
+            }
 
         # 초기 상태 설정
         initial_state = {

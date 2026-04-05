@@ -16,6 +16,8 @@ class GameCharacter(Base):
     max_hp = Column(Integer, default=100)
     mp = Column(Integer, default=50)
     max_mp = Column(Integer, default=50)
+    gold = Column(Integer, default=0)
+    attack = Column(Integer, default=12)
 
     user = relationship("user.models.User", backref="character")
 

@@ -181,7 +181,7 @@ const DetailPanel = ({ item, onClose }) => {
   );
 };
 
-const InventoryModal = ({ onClose }) => {
+const InventoryModal = ({ onClose, myStats }) => {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -247,7 +247,7 @@ const InventoryModal = ({ onClose }) => {
         }}
       >
         {/* 헤더 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <span style={{ color: '#d0b16b', fontWeight: 700, fontSize: '15px', letterSpacing: '0.5px' }}>
             인벤토리
           </span>
@@ -266,6 +266,24 @@ const InventoryModal = ({ onClose }) => {
               }}
             >×</button>
           </div>
+        </div>
+
+        {/* 골드 표시 */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          background: 'rgba(208,177,107,0.07)',
+          border: '1px solid rgba(208,177,107,0.2)',
+          borderRadius: '7px',
+          padding: '5px 10px',
+          marginBottom: '12px',
+        }}>
+          <span style={{ fontSize: '15px' }}>💰</span>
+          <span style={{ color: '#d0b16b', fontWeight: 700, fontSize: '13px' }}>
+            {(myStats?.gold ?? 0).toLocaleString()}
+          </span>
+          <span style={{ color: '#5a4a2a', fontSize: '11px' }}>Gold</span>
         </div>
 
         {/* 아이템 격자 */}
