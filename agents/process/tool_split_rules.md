@@ -1,4 +1,4 @@
-# Title: Claude와 Codex 역할 분리 규칙
+﻿# Title: Claude and Codex Role Split Rules
 Description: Claude와 Codex를 함께 사용할 때 어떤 작업을 어느 쪽에 맡길지 공통 기준을 정리한다.
 When-To-Read: Claude와 Codex를 함께 쓰는 세션, 작업 분담 기준이 필요한 요청, 툴 혼선이 생긴 경우
 Keywords: claude, codex, tool split, role, workflow, planning, implementation
@@ -37,3 +37,4 @@ Priority: high
 - 한 세션에서 주력 툴을 먼저 정한다.
 - 문서 수정은 공통 규칙이면 `agents/`에만 반영한다.
 - Claude 전용 사용법은 `CLAUDE.md`에서만, Codex 전용 사용법은 `CODEX.md`에서만 관리한다.
+

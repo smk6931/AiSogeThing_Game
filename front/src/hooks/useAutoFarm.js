@@ -3,13 +3,14 @@ import { useRef, useEffect, useCallback } from 'react';
 
 const AUTO_RETARGET_MS = 1500;  // 타겟 없을 때 재탐색 주기
 
-export const useAutoFarm = ({ isAutoMode, monstersRef, playerRef, setTargetMonsterId }) => {
+export const useAutoFarm = ({ isAutoMode, monstersRef, playerRef, setTargetMonsterId, range = 60 }) => {
   const retargetRef = useRef(null);
 
   const findNearestMonster = useCallback(() => {
     if (!playerRef.current || !monstersRef.current) return null;
     const px = playerRef.current.position.x;
     const pz = playerRef.current.position.z;
+    const rangeSq = range * range;
 
     let nearest = null;
     let nearestDistSq = Infinity;
@@ -19,13 +20,13 @@ export const useAutoFarm = ({ isAutoMode, monstersRef, playerRef, setTargetMonst
       const mx = m.position?.x ?? 0;
       const mz = m.position?.z ?? 0;
       const distSq = (px - mx) ** 2 + (pz - mz) ** 2;
-      if (distSq < nearestDistSq) {
+      if (distSq <= rangeSq && distSq < nearestDistSq) {
         nearestDistSq = distSq;
         nearest = id;
       }
     }
     return nearest;
-  }, [monstersRef, playerRef]);
+  }, [monstersRef, playerRef, range]);
 
   useEffect(() => {
     if (retargetRef.current) {

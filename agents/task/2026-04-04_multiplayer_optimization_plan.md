@@ -1,4 +1,4 @@
-# Title: 멀티플레이 최적화 작업 계획
+﻿# Title: Multiplayer Optimization Plan
 Description: 실시간 이동, 스킬, 몬스터, 지역 조회, 프론트 로딩 최적화를 단계별로 진행하기 위한 작업 문서.
 When-To-Read: 멀티플레이 성능 최적화, websocket 부하 감소, AOI 전송, 프론트 번들 분할 작업 시
 Keywords: multiplayer, websocket, optimization, aoi, monster, region, polling, lazy-loading, bundle
@@ -59,3 +59,4 @@ Priority: high
 - 완료: 몬스터 delta 동기화 적용
 - 완료: 몬스터 delta의 플레이어별 가시 범위 분배
 - 완료: 프론트 lazy loading과 manual chunk 분할 적용
+

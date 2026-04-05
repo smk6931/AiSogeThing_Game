@@ -1,4 +1,4 @@
-﻿# Title: 인트로 회원가입 UI 규칙
+﻿# Title: Intro Signup UI Rules
 Description: 게임 인트로형 로그인 화면과 회원가입 화면의 톤, 레이아웃, 모바일 우선 기준을 정리한다.
 When-To-Read: 로그인 화면 리디자인, 회원가입 페이지 추가, 인증 화면의 비주얼 방향을 잡을 때
 Keywords: frontend, auth ui, intro, signup, login, mobile, landing
@@ -22,3 +22,4 @@ Priority: high
 - 서울 기반 어반 판타지
 - 생활권과 탐험의 긴장감
 - 흔한 보라색 화이트 SaaS 스타일 지양
+

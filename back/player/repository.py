@@ -25,6 +25,24 @@ async def upsert_character(user_id: int) -> dict:
     return row or {"level": 1, "exp": 0, "hp": 100, "max_hp": 100, "mp": 50, "max_mp": 50, "gold": 0, "attack": 12}
 
 
+async def get_ui_settings(user_id: int) -> dict | None:
+    """게임 UI/전투 설정 로드"""
+    row = await fetch_one(
+        "SELECT ui_settings FROM game_character WHERE user_id = :uid",
+        {"uid": user_id}
+    )
+    return row["ui_settings"] if row and row["ui_settings"] else None
+
+
+async def save_ui_settings(user_id: int, settings: dict) -> None:
+    """게임 UI/전투 설정 저장"""
+    import json
+    await execute(
+        "UPDATE game_character SET ui_settings = CAST(:s AS jsonb) WHERE user_id = :uid",
+        {"uid": user_id, "s": json.dumps(settings)}
+    )
+
+
 async def save_character(user_id: int, stats: dict) -> None:
     """레벨/EXP/골드/스탯 변경 시 DB 업데이트"""
     await execute(

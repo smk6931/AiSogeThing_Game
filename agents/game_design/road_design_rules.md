@@ -1,4 +1,4 @@
-# Title: 도로 설계 규칙
+﻿# Title: Road Design Rules
 Description: 도로를 단순 시각선이 아니라 이동, 병목, 분위기, 구역 인지에 쓰는 월드 설계 규칙.
 When-To-Read: 도로 레이어 수정, 도로 텍스처 적용, 도로 폭 조정, road DB 이관 설계 전.
 Keywords: road, road_major, road_minor, traversal, bottleneck, decal, texture, width, path
@@ -36,3 +36,4 @@ Priority: high
 
 - 초기 튜닝은 JSON/zone 레이어에서 먼저 한다.
 - 폭, 타입, 재질 규칙이 안정되면 이후 `world_road_segment` 같은 DB 테이블로 이관한다.
+

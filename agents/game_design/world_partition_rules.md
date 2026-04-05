@@ -1,4 +1,4 @@
-# Title: 월드 파티션 규칙
+﻿# Title: World Partition Rules
 Description: 서울 월드를 구/동/파티션/그룹 구조로 나누고 이름, 분위기, 렌더 역할을 부여하는 규칙.
 When-To-Read: 월드 파티션 설계, 그룹 묶기, 지역 이름/설명 생성, 레벨 데이터 구조 변경 전.
 Keywords: world, partition, group, district, dong, theme, persona, landuse, level design
@@ -32,3 +32,4 @@ Priority: high
 - 최종 셀은 도로 기준 분할을 우선한다.
 - landuse는 최종 분할 셀의 성격 분석 입력으로 쓴다.
 - 작은 셀을 UI에 그대로 다 노출하지 않고 그룹으로 묶어 읽기성을 확보한다.
+

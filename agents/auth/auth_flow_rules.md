@@ -1,4 +1,4 @@
-﻿# Title: 인증 흐름 규칙
+﻿# Title: Auth Flow Rules
 Description: 로그인, 회원가입, 게스트 진입, 가입 직후 캐릭터 생성 같은 인증 흐름 규칙을 정리한다.
 When-To-Read: 로그인 페이지 수정, 회원가입 UX 수정, 인증 API 연결, 가입 후 초기 캐릭터 생성 흐름을 다룰 때
 Keywords: auth, login, signup, register, guest, account, character creation
@@ -26,3 +26,4 @@ Priority: high
 - 회원가입 성공 후 바로 플레이 가능한 흐름을 우선한다.
 - 가능하면 가입 후 자동 로그인으로 이어간다.
 - 게스트 로그인도 빠른 진입 경로로 유지한다.
+

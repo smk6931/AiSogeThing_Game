@@ -1,4 +1,4 @@
-# Title: 전투·보상·인벤토리 1차 구현 계획
+﻿# Title: Combat Loot Inventory Plan
 Description: 몬스터 처치 → 경험치/골드/아이템 획득 → EXP바/인벤토리 UI까지 전체 프로세스 설계 및 구현 순서
 When-To-Read: 전투 시스템, 아이템 드롭, 인벤토리, 경험치/레벨업, DB 스키마 작업 시
 Keywords: combat, item, drop, inventory, exp, levelup, ui, db, websocket, target, magic_orb, auto_attack
@@ -354,3 +354,4 @@ Phase 1-D (DB 연결) ← Phase 1-A 완료 후 별도 진행 가능
 - 2026-04-05: 계획 수립 (현재 구현 상태 파악 완료)
 - 2026-04-05: 타겟 기반 자동 공격 + 마법 구체 설계 추가
 - 2026-04-05: 체크리스트 추가, Phase 0 구현 시작
+

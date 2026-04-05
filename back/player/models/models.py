@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer
+from sqlalchemy import Column, ForeignKey, Integer, JSON
 from sqlalchemy.orm import relationship
 
 from core.database import Base
@@ -18,6 +18,7 @@ class GameCharacter(Base):
     max_mp = Column(Integer, default=50)
     gold = Column(Integer, default=0)
     attack = Column(Integer, default=12)
+    ui_settings = Column(JSON, nullable=True)
 
     user = relationship("user.models.User", backref="character")
 

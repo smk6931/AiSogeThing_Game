@@ -161,6 +161,8 @@ const RpgWorld = ({
   onAutoModeChange,
   playerDamageEvents = [],
   clearPlayerDamageEvent,
+  autoFarmRange = 60,
+  autoAttackRange = 30,
 }) => {
   const [debugConfig, setDebugConfig] = useState(() => {
     const saved = localStorage.getItem('world_debug_config');
@@ -226,6 +228,8 @@ const RpgWorld = ({
   const monstersRef = useRef(monsters);
   // 이전 몬스터 HP 추적 (데미지 숫자 감지용)
   const prevMonstersRef = useRef({});
+  // 플레이어 피격 이벤트 중복 방지 (stale closure 방어)
+  const processedPlayerHitIds = useRef(new Set());
 
   const { user } = useAuth();
   const { districts, getDistrictAt } = useSeoulDistricts();
@@ -269,25 +273,30 @@ const RpgWorld = ({
   const removeDamageNumber = useCallback((id) => {
     setDamageNumbers(prev => prev.filter(d => d.id !== id));
     clearPlayerDamageEvent?.(id);
+    processedPlayerHitIds.current.delete(id);
   }, [clearPlayerDamageEvent]);
 
   // 플레이어 피격 데미지 숫자 — playerRef 위치에 빨간 숫자 표시
+  // processedPlayerHitIds ref로 중복 방지 (damageNumbers 클로저 stale 문제 회피)
   useEffect(() => {
     if (!playerDamageEvents.length) return;
     const newDamages = playerDamageEvents
-      .filter(e => !damageNumbers.find(d => d.id === e.id))
-      .map(e => ({
-        id: e.id,
-        damage: e.damage,
-        position: playerRef.current
-          ? { x: playerRef.current.position.x, y: 0, z: playerRef.current.position.z }
-          : { x: 0, y: 0, z: 0 },
-        isPlayerDamage: true,
-      }));
+      .filter(e => !processedPlayerHitIds.current.has(e.id))
+      .map(e => {
+        processedPlayerHitIds.current.add(e.id);
+        return {
+          id: e.id,
+          damage: e.damage,
+          position: playerRef.current
+            ? { x: playerRef.current.position.x, y: 0, z: playerRef.current.position.z }
+            : { x: 0, y: 0, z: 0 },
+          isPlayerDamage: true,
+        };
+      });
     if (newDamages.length > 0) {
       setDamageNumbers(prev => [...prev, ...newDamages]);
     }
-  }, [playerDamageEvents]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [playerDamageEvents]);
 
   // 타겟 몬스터 사망 시 자동 해제
   useEffect(() => {
@@ -322,6 +331,7 @@ const RpgWorld = ({
     monstersRef,
     playerRef,
     setTargetMonsterId: setSelectedTargetId,
+    range: autoFarmRange,
   });
 
   // 자동 공격 훅
@@ -330,6 +340,7 @@ const RpgWorld = ({
     monstersRef,
     playerRef,
     addProjectile,
+    attackRange: autoAttackRange,
   });
 
   useEffect(() => {

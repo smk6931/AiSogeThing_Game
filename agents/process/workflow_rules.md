@@ -1,4 +1,4 @@
-# Title: 공통 작업 프로세스 규칙
+﻿# Title: Workflow Rules
 Description: Claude와 Codex가 공통으로 따라야 하는 작업 시작, 계획, 구현, 검증, 리뷰 흐름을 정의한다.
 When-To-Read: 새 기능 구현, 구조 변경, 버그 수정, 문서 정리, 검증 절차 정리가 필요한 모든 작업 전
 Keywords: workflow, process, plan, implement, verify, review, handoff
@@ -96,3 +96,4 @@ Priority: high
 - 같은 공통 규칙을 `AGENTS.md`, `CLAUDE.md`, `CODEX.md`에 복붙하기
 - 프로젝트 설계 규칙을 사용자 홈 전역 설정에 쓰기
 - 툴별 편의 기능 때문에 공통 규칙을 무시하기
+

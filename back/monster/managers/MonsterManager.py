@@ -277,11 +277,12 @@ class MonsterManager:
                         changed_monsters[m_id] = monster.to_dict()
                     continue
 
-                # 가장 가까운 플레이어 탐색
+                # 가장 가까운 플레이어 탐색 (감지 범위 내에서만)
+                DETECT_RANGE = 25.0
                 nearest_uid, nearest_dist, nearest_px, nearest_pz, nearest_def = None, float('inf'), 0, 0, 0
                 for uid, px, pz, defense in player_list:
                     d = math.sqrt((monster.x - px) ** 2 + (monster.z - pz) ** 2)
-                    if d < nearest_dist:
+                    if d <= DETECT_RANGE and d < nearest_dist:
                         nearest_dist = d
                         nearest_uid = uid
                         nearest_px, nearest_pz = px, pz

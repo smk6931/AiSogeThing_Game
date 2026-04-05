@@ -1,10 +1,9 @@
 // 타겟 선택 시 일정 주기로 마법 구체를 자동 발사하는 훅
 import { useRef, useEffect } from 'react';
 
-const ATTACK_RANGE_SQ = 30 * 30;
 const ATTACK_INTERVAL_MS = 1200;
 
-export const useAutoAttack = ({ targetMonsterId, monstersRef, playerRef, addProjectile }) => {
+export const useAutoAttack = ({ targetMonsterId, monstersRef, playerRef, addProjectile, attackRange = 30 }) => {
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -24,7 +23,7 @@ export const useAutoAttack = ({ targetMonsterId, monstersRef, playerRef, addProj
       const mx = monster.position.x;
       const mz = monster.position.z;
       const distSq = (px - mx) ** 2 + (pz - mz) ** 2;
-      if (distSq > ATTACK_RANGE_SQ) return;
+      if (distSq > attackRange * attackRange) return;
 
       playerRef.current.rotation.y = Math.atan2(mx - px, mz - pz);
 
@@ -40,5 +39,5 @@ export const useAutoAttack = ({ targetMonsterId, monstersRef, playerRef, addProj
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     };
-  }, [targetMonsterId, monstersRef, playerRef, addProjectile]);
+  }, [targetMonsterId, monstersRef, playerRef, addProjectile, attackRange]);
 };

@@ -1,4 +1,4 @@
-import { getWebSocketUrl } from '@api/client';
+import client, { getWebSocketUrl } from '@api/client';
 
 /**
  * 게임 관련 실시간 및 데이터 API
@@ -48,6 +48,16 @@ const gameApi = {
       socket.send(JSON.stringify(payload));
     }
   },
+
+  /**
+   * 유저 설정 조회
+   */
+  getSettings: (userId) => client.get(`/api/game/settings/${userId}`),
+
+  /**
+   * 유저 설정 저장
+   */
+  saveSettings: (userId, settings) => client.put(`/api/game/settings/${userId}`, { settings }),
 
   /**
    * 몬스터 피격 데이터 전송

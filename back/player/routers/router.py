@@ -1,4 +1,6 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from pydantic import BaseModel
+from typing import Any
 
 from player.managers.PlayerManager import player_manager
 from monster.managers.MonsterManager import monster_manager
@@ -7,6 +9,30 @@ import player.repository as char_repo
 import item.repository as item_repo
 
 router = APIRouter(prefix="/api/game", tags=["Game Player & WebSocket"])
+
+
+class SettingsBody(BaseModel):
+    settings: dict[str, Any]
+
+
+@router.get("/settings/{user_id}")
+async def get_settings(user_id: int):
+    """유저 UI/전투 설정 조회 — 컬럼 미존재 시 빈 객체 반환"""
+    try:
+        data = await char_repo.get_ui_settings(user_id)
+        return {"settings": data or {}}
+    except Exception:
+        return {"settings": {}}
+
+
+@router.put("/settings/{user_id}")
+async def save_settings(user_id: int, body: SettingsBody):
+    """유저 UI/전투 설정 저장 — migration 미실행 시 무시"""
+    try:
+        await char_repo.save_ui_settings(user_id, body.settings)
+    except Exception:
+        pass
+    return {"ok": True}
 
 
 async def _send_visible_monsters(websocket: WebSocket, player_state: dict):

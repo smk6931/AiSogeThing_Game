@@ -1,4 +1,4 @@
-# Title: 코어 개발 규칙
+﻿# Title: Core Development Rules
 Description: 데이터 구조, 배포, 민감정보, 파일 생성 규칙에 대한 기본 엔지니어링 정책.
 When-To-Read: DB 수정, 배포 스크립트 수정, 프로젝트 구조 변경, 민감정보 처리 작업 전.
 Keywords: database, deploy, env, backup, migration, gitignore, structure, security
@@ -33,3 +33,4 @@ Priority: high
 - 백엔드(Python) print/log 문에 이모지를 절대 사용하지 않는다.
 - 이유: Windows 기본 인코딩(cp949)이 이모지(유니코드 고번위)를 처리 못해 UnicodeEncodeError 발생 → WebSocket 등 ASGI 핸들러가 크래시됨.
 - 대체: `[OK]`, `[WARN]`, `[ERROR]`, `[LEAVE]` 같은 ASCII 태그 사용.
+

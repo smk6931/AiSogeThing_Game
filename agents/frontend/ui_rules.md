@@ -1,4 +1,4 @@
-# Title: 프론트 UI 규칙
+﻿# Title: Frontend UI Rules
 Description: 모바일 우선 UI, 레이어 패널, 게임 오버레이 배치와 표현 규칙.
 When-To-Read: 프론트 UI 수정, 오버레이 조정, 모바일 대응, HUD 개선 작업 전.
 Keywords: frontend, ui, mobile, overlay, hud, minimap, panel, responsive
@@ -26,3 +26,4 @@ Priority: high
 
 - 기본 바닥과 파티션 바닥이 동시에 강하게 겹치지 않게 한다.
 - 디버그 레이어는 플레이 레이어보다 시각적으로 뒤에 두거나 더 연하게 둔다.
+

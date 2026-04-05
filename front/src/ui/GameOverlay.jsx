@@ -10,6 +10,7 @@ import { useSeoulDongs } from '@hooks/useSeoulDongs';
 
 const GameCodex = lazy(() => import('./GameCodex'));
 const LeafletMapBackground = lazy(() => import('./LeafletMapBackground'));
+const GameSettingsModal = lazy(() => import('./GameSettingsModal'));
 
 const GAME_FONT = "'Cinzel', 'Noto Sans KR', serif";
 const PANEL_BG = 'linear-gradient(180deg, rgba(14, 20, 28, 0.88), rgba(8, 10, 16, 0.86))';
@@ -84,6 +85,10 @@ const GameOverlay = ({
   onInventoryOpen,
   isAutoMode = false,
   onAutoModeToggle,
+  gameSettings = {},
+  onSettingUpdate,
+  onSettingsSave,
+  onSettingsReset,
 }) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -97,6 +102,7 @@ const GameOverlay = ({
   const [sidebarTab, setSidebarTab] = useState(null);
   const [sidebarMode, setSidebarMode] = useState('menu');
   const [showLayerPopup, setShowLayerPopup] = useState(false);
+  const [showSettingsPopup, setShowSettingsPopup] = useState(false);
   const [showWorldToolsPopup, setShowWorldToolsPopup] = useState(false);
   const [showRoadPanel, setShowRoadPanel] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
@@ -247,7 +253,7 @@ const GameOverlay = ({
         fontFamily: GAME_FONT,
       }}
     >
-      <div
+      {gameSettings.showStatPanel !== false && <div
         style={{
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
@@ -315,31 +321,52 @@ const GameOverlay = ({
             <div style={{ width: `${expPct}%`, height: '100%', background: 'linear-gradient(90deg, #6d28d9, #8b5cf6)', transition: 'width 0.4s ease' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-            <button
-              onClick={onInventoryOpen}
-              style={{
-                background: 'rgba(30,50,40,0.8)',
-                border: '1px solid rgba(100,160,120,0.4)',
-                borderRadius: '5px',
-                color: '#67e8d6',
-                fontSize: isMobile ? '8px' : '10px',
-                padding: '2px 6px',
-                cursor: 'pointer',
-                pointerEvents: 'auto',
-                fontFamily: 'inherit',
-              }}
-            >
-              인벤 [I]
-            </button>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button
+                onClick={onInventoryOpen}
+                style={{
+                  background: 'rgba(30,50,40,0.8)',
+                  border: '1px solid rgba(100,160,120,0.4)',
+                  borderRadius: '5px',
+                  color: '#67e8d6',
+                  fontSize: isMobile ? '8px' : '10px',
+                  padding: '2px 6px',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                  fontFamily: 'inherit',
+                }}
+              >
+                인벤 [I]
+              </button>
+              <button
+                onClick={onAutoModeToggle}
+                style={{
+                  background: isAutoMode ? 'rgba(255,120,30,0.25)' : 'rgba(30,30,50,0.8)',
+                  border: `1px solid ${isAutoMode ? 'rgba(255,140,50,0.7)' : 'rgba(80,80,120,0.4)'}`,
+                  borderRadius: '5px',
+                  color: isAutoMode ? '#ffaa44' : '#778',
+                  fontSize: isMobile ? '8px' : '10px',
+                  padding: '2px 6px',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                  fontFamily: 'inherit',
+                  fontWeight: isAutoMode ? 700 : 400,
+                  boxShadow: isAutoMode ? '0 0 6px rgba(255,140,50,0.4)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {isAutoMode ? '⚔ 자동ON' : '자동 [Z]'}
+              </button>
+            </div>
             <span style={{ fontSize: isMobile ? '7px' : '9px', color: GOLD }}>
               {playerStats.gold}G
             </span>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* 아이템 드롭 알림 - 화면 상단 중앙 */}
-      <div style={{
+      {gameSettings.showItemNotif !== false && <div style={{
         position: 'absolute',
         top: '72px',
         left: '50%',
@@ -374,11 +401,50 @@ const GameOverlay = ({
             )}
           </div>
         ))}
+      </div>}
+
+      {/* 환경설정 버튼 — 레이어 버튼 왼쪽 */}
+      <div
+        onClick={() => { setShowSettingsPopup(v => !v); setShowLayerPopup(false); }}
+        title="환경설정"
+        style={{
+          position: 'absolute',
+          top: 'max(10px, env(safe-area-inset-top))',
+          right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 8 + 38)}px)`,
+          width: '30px',
+          height: '30px',
+          borderRadius: '8px',
+          background: showSettingsPopup ? 'rgba(40,30,60,0.95)' : 'rgba(8,14,22,0.88)',
+          border: `1px solid ${showSettingsPopup ? '#a78bfa' : BORDER_COLOR}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+          boxShadow: GLOW,
+          fontSize: '15px',
+          zIndex: 60,
+        }}
+      >
+        ⚙️
       </div>
+
+      {/* 환경설정 팝업 */}
+      {showSettingsPopup && (
+        <Suspense fallback={null}>
+          <GameSettingsModal
+            settings={gameSettings}
+            onUpdate={onSettingUpdate}
+            onSave={onSettingsSave}
+            onReset={onSettingsReset}
+            onClose={() => setShowSettingsPopup(false)}
+          />
+        </Suspense>
+      )}
 
       {/* 레이어 토글 버튼 — 미니맵 왼쪽 */}
       <div
-        onClick={() => setShowLayerPopup(v => !v)}
+        onClick={() => { setShowLayerPopup(v => !v); setShowSettingsPopup(false); }}
         title="레이어 설정"
         style={{
           position: 'absolute',
@@ -543,7 +609,7 @@ const GameOverlay = ({
       )}
 
       {/* 미니맵 */}
-      <div
+      {gameSettings.showMinimap !== false && <div
         style={{
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
@@ -742,6 +808,8 @@ const GameOverlay = ({
           </div>
         )}
       </div>
+
+      }
 
       {isMapExpanded && (
         <div
@@ -946,7 +1014,7 @@ const GameOverlay = ({
         </>
       )}
 
-      {showZoneTitle && (
+      {showZoneTitle && gameSettings.showRegionTitle !== false && (
         <div
           style={{
             position: 'absolute',
@@ -973,7 +1041,7 @@ const GameOverlay = ({
         </div>
       )}
 
-      {showPartitionTitle && currentPartition && (
+      {showPartitionTitle && currentPartition && gameSettings.showRegionTitle !== false && (
         <div
           style={{
             position: 'absolute',

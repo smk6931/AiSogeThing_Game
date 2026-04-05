@@ -30,3 +30,5 @@
 - [`agents/game_design/road_design_rules.md`](c:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
 - [`agents/process/workflow_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/workflow_rules.md)
 - [`agents/process/tool_split_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/tool_split_rules.md)
+- [`agents/process/advisory_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/advisory_rules.md)
+- [`agents/process/communication_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/communication_rules.md)

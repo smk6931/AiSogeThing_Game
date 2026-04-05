@@ -44,6 +44,8 @@ const GameCanvas = ({
   onAutoModeChange,
   playerDamageEvents = [],
   clearPlayerDamageEvent,
+  autoFarmRange = 60,
+  autoAttackRange = 30,
 }) => {
   const orbitRef = useRef();
 
@@ -115,6 +117,8 @@ const GameCanvas = ({
           onAutoModeChange={onAutoModeChange}
           playerDamageEvents={playerDamageEvents}
           clearPlayerDamageEvent={clearPlayerDamageEvent}
+          autoFarmRange={autoFarmRange}
+          autoAttackRange={autoAttackRange}
         />
       </Suspense>
 

@@ -5,6 +5,7 @@ import { useGameInput } from '@engine/useGameInput';
 import { useProjectiles } from '@hooks/useProjectiles';
 import { useGameSocket } from '@engine/useGameSocket';
 import { useCurrentRegionInfo } from '@hooks/useCurrentRegionInfo';
+import { useGameSettings } from '@hooks/useGameSettings';
 import GameOverlay from '@ui/GameOverlay';
 import ChatBox from '@ui/ChatBox';
 import { getMap } from '@entity/world/mapConfig';
@@ -17,6 +18,7 @@ const GameCanvas = lazy(() => import('@engine/GameCanvas'));
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();
+  const { settings, updateSetting, saveToDb, resetSettings } = useGameSettings();
 
   const [selectedMonster, setSelectedMonster] = useState(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
@@ -269,6 +271,8 @@ const GameEntry = () => {
           onAutoModeChange={setIsAutoMode}
           playerDamageEvents={playerDamageEvents}
           clearPlayerDamageEvent={clearPlayerDamageEvent}
+          autoFarmRange={settings.autoFarmRange}
+          autoAttackRange={settings.autoAttackRange}
           />
         </Suspense>
       </div>
@@ -298,6 +302,12 @@ const GameEntry = () => {
         availableRoadTextureFolders={availableRoadTextureFolders}
         droppedItems={droppedItems}
         onInventoryOpen={() => setInventoryOpen(true)}
+        isAutoMode={isAutoMode}
+        onAutoModeToggle={() => setIsAutoMode(prev => !prev)}
+        gameSettings={settings}
+        onSettingUpdate={updateSetting}
+        onSettingsSave={saveToDb}
+        onSettingsReset={resetSettings}
         mapSettings={{
           showOsmMap, setShowOsmMap,
           showSeoulRoads, setShowSeoulRoads,
@@ -345,43 +355,49 @@ const GameEntry = () => {
       )}
 
       {/* ================= Chat Box ================= */}
-      <ChatBox messages={chatMessages} onSend={sendChatMessage} isMobile={isMobile} />
+      {settings.showChat !== false && (
+        <ChatBox messages={chatMessages} onSend={sendChatMessage} isMobile={isMobile} />
+      )}
 
       {/* ================= Joystick ================= */}
-      <div style={{
-        position: 'absolute',
-        bottom: 30,
-        left: isMobile ? 16 : 20,
-        zIndex: 90,
-        opacity: 0.8
-      }}>
-        <Joystick
-          size={isMobile ? 72 : 80}
-          sticky={false}
-          baseColor="rgba(255, 255, 255, 0.2)"
-          stickColor="rgba(255, 255, 255, 0.5)"
-          move={handleJoystickMove}
-          stop={handleJoystickMove}
-        />
-      </div>
+      {settings.showJoystick !== false && (
+        <>
+          <div style={{
+            position: 'absolute',
+            bottom: 30,
+            left: isMobile ? 16 : 20,
+            zIndex: 90,
+            opacity: 0.8
+          }}>
+            <Joystick
+              size={isMobile ? 72 : 80}
+              sticky={false}
+              baseColor="rgba(255, 255, 255, 0.2)"
+              stickColor="rgba(255, 255, 255, 0.5)"
+              move={handleJoystickMove}
+              stop={handleJoystickMove}
+            />
+          </div>
 
-      {/* ================= Right Joystick (Skill) ================= */}
-      <div style={{
-        position: 'absolute',
-        bottom: 30,
-        right: isMobile ? 16 : 20,
-        zIndex: 90,
-        opacity: 0.8
-      }}>
-        <Joystick
-          size={isMobile ? 72 : 80}
-          sticky={false}
-          baseColor="rgba(255, 0, 0, 0.2)"
-          stickColor="rgba(255, 0, 0, 0.5)"
-          move={handleSkillMove}
-          stop={handleSkillStop}
-        />
-      </div>
+          {/* ================= Right Joystick (Skill) ================= */}
+          <div style={{
+            position: 'absolute',
+            bottom: 30,
+            right: isMobile ? 16 : 20,
+            zIndex: 90,
+            opacity: 0.8
+          }}>
+            <Joystick
+              size={isMobile ? 72 : 80}
+              sticky={false}
+              baseColor="rgba(255, 0, 0, 0.2)"
+              stickColor="rgba(255, 0, 0, 0.5)"
+              move={handleSkillMove}
+              stop={handleSkillStop}
+            />
+          </div>
+        </>
+      )}
 
       {/* ================= Game Info (Bottom Center) ================= */}
       <div style={{

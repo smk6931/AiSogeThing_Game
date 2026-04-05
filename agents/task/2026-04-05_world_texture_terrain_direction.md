@@ -1,4 +1,4 @@
-# Title: 월드 텍스처와 지형 표현 방향 정리
+﻿# Title: World Texture Terrain Direction
 Description: 파티션 바닥 텍스처, 도로 텍스처, 노이즈 블렌딩, 고도 적용 방향을 현재 구현 기준으로 정리한 작업 문서.
 When-To-Read: 월드 바닥 텍스처 시스템 개선, 도로 블렌딩, 지형 고도화, 파티션 기반 월드 표현 방식을 정리하거나 리팩터링할 때
 Keywords: world, terrain, ground, road, texture, partition, blend, noise, heightmap, uv, decal
@@ -169,3 +169,4 @@ Priority: high
 
 - 도로: 현재 구조에서 노이즈 블렌딩 개선 먼저 한다.
 - 파티션: 폴리곤별 텍스처 이미지 재생성보다, 연속 지형 위에 파티션 마스크를 얹는 방향이 더 좋다.
+
