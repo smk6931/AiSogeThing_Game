@@ -70,6 +70,7 @@ const GameOverlay = ({
   mapSettings = {},
   currentRegionInfo: regionState = null,
   availableGroundTextureFolders = [],
+  availableRoadTextureFolders = [],
 }) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -192,6 +193,8 @@ const GameOverlay = ({
   const setWorldEditorOpen = mapSettings.setWorldEditorOpen ?? (() => {});
   const groundTextureFolder = mapSettings.groundTextureFolder ?? '';
   const setGroundTextureFolder = mapSettings.setGroundTextureFolder ?? (() => {});
+  const roadTextureFolder = mapSettings.roadTextureFolder ?? '';
+  const setRoadTextureFolder = mapSettings.setRoadTextureFolder ?? (() => {});
 
   const skills = [
     { key: 'Q', icon: Sword, label: 'Slash', cooldown: 0 },
@@ -1130,10 +1133,10 @@ const GameOverlay = ({
         title="world tools"
         style={{
           position: 'absolute',
-          top: '154px',
-          right: '46px',
-          width: '26px',
-          height: '26px',
+          top: 'max(10px, env(safe-area-inset-top))',
+          right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 44)}px)`,
+          width: '30px',
+          height: '30px',
           background: showWorldToolsPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
           border: `1px solid ${showWorldToolsPopup ? ACCENT : BORDER_COLOR}`,
           borderRadius: '8px',
@@ -1143,11 +1146,9 @@ const GameOverlay = ({
           cursor: 'pointer',
           pointerEvents: 'auto',
           boxShadow: GLOW,
-          transformOrigin: 'top right',
-          transform: `scale(${uiScale})`,
           zIndex: 100,
           color: showWorldToolsPopup ? ACCENT : GOLD,
-          fontSize: '11px',
+          fontSize: '12px',
           fontWeight: '700',
         }}
       >
@@ -1157,8 +1158,8 @@ const GameOverlay = ({
         <div
           style={{
             position: 'absolute',
-            top: '188px',
-            right: '46px',
+            top: `calc(max(10px, env(safe-area-inset-top)) + 36px)`,
+            right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 44)}px)`,
             width: '190px',
             background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
             border: `1px solid ${BORDER_COLOR}`,
@@ -1167,8 +1168,6 @@ const GameOverlay = ({
             zIndex: 100,
             pointerEvents: 'auto',
             boxShadow: GLOW,
-            transformOrigin: 'top right',
-            transform: `scale(${uiScale})`,
           }}
         >
           <div style={{ fontSize: '10px', color: GOLD, letterSpacing: '2px', fontWeight: '700', marginBottom: '8px' }}>
@@ -1210,15 +1209,43 @@ const GameOverlay = ({
               fontSize: '11px',
               fontFamily: GAME_FONT,
               outline: 'none',
+              appearance: 'none',
+              WebkitAppearance: 'none',
             }}
           >
-            <option value="">root</option>
+            <option value="" style={{ background: '#111827', color: '#e5e7eb' }}>root</option>
             {availableGroundTextureFolders.map((folder) => (
-              <option key={folder} value={folder}>{folder}</option>
+              <option key={folder} value={folder} style={{ background: '#111827', color: '#e5e7eb' }}>{folder}</option>
             ))}
           </select>
           <div style={{ fontSize: '10px', color: '#6a8a84', marginTop: '6px', lineHeight: 1.5 }}>
             current: {groundTextureFolder || 'root'}
+          </div>
+          <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', margin: '10px 0 6px' }}>ROAD DIR</div>
+          <select
+            value={roadTextureFolder}
+            onChange={(event) => setRoadTextureFolder(event.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '8px',
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${BORDER_COLOR}`,
+              color: '#d7ece8',
+              fontSize: '11px',
+              fontFamily: GAME_FONT,
+              outline: 'none',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+            }}
+          >
+            <option value="" style={{ background: '#111827', color: '#e5e7eb' }}>root</option>
+            {availableRoadTextureFolders.map((folder) => (
+              <option key={folder} value={folder} style={{ background: '#111827', color: '#e5e7eb' }}>{folder}</option>
+            ))}
+          </select>
+          <div style={{ fontSize: '10px', color: '#6a8a84', marginTop: '6px', lineHeight: 1.5 }}>
+            current road: {roadTextureFolder || 'root'}
           </div>
         </div>
       )}

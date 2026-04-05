@@ -93,6 +93,8 @@ const GameEntry = () => {
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [availableGroundTextureFolders, setAvailableGroundTextureFolders] = useState([]);
   const [groundTextureFolder, setGroundTextureFolder] = useState(() => localStorage.getItem('ground_texture_folder') || '');
+  const [availableRoadTextureFolders, setAvailableRoadTextureFolders] = useState([]);
+  const [roadTextureFolder, setRoadTextureFolder] = useState(() => localStorage.getItem('road_texture_folder') || '');
 
 
   // [복구] 위치 동기화 핸들러
@@ -156,6 +158,35 @@ const GameEntry = () => {
     }
   }, [groundTextureFolder]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchTextureFolders = async () => {
+      try {
+        const res = await worldApi.getRoadTextureFolders();
+        const folders = Array.isArray(res.data) ? res.data : [];
+        if (cancelled) return;
+        setAvailableRoadTextureFolders(folders);
+        if (roadTextureFolder && !folders.includes(roadTextureFolder)) {
+          setRoadTextureFolder('');
+        }
+      } catch (_) {
+        if (!cancelled) setAvailableRoadTextureFolders([]);
+      }
+    };
+
+    fetchTextureFolders();
+    return () => { cancelled = true; };
+  }, [roadTextureFolder]);
+
+  useEffect(() => {
+    if (roadTextureFolder) {
+      localStorage.setItem('road_texture_folder', roadTextureFolder);
+    } else {
+      localStorage.removeItem('road_texture_folder');
+    }
+  }, [roadTextureFolder]);
+
   return (
     <div style={{
       position: 'fixed',
@@ -206,6 +237,7 @@ const GameEntry = () => {
           showCurrentGroupTexture={showCurrentGroupTexture}
           showCullRadius={showCullRadius}
           groundTextureFolder={groundTextureFolder}
+          roadTextureFolder={roadTextureFolder}
           cameraMode={cameraMode}
           onMonsterClick={setSelectedMonster}
           currentRegionInfo={currentRegionInfo}
@@ -236,6 +268,7 @@ const GameEntry = () => {
         monsters={monsters}
         currentRegionInfo={currentRegionInfo}
         availableGroundTextureFolders={availableGroundTextureFolders}
+        availableRoadTextureFolders={availableRoadTextureFolders}
         mapSettings={{
           showOsmMap, setShowOsmMap,
           showSeoulRoads, setShowSeoulRoads,
@@ -253,6 +286,7 @@ const GameEntry = () => {
           showCurrentGroupTexture, setShowCurrentGroupTexture,
           showCullRadius, setShowCullRadius,
           groundTextureFolder, setGroundTextureFolder,
+          roadTextureFolder, setRoadTextureFolder,
           cameraMode, setCameraMode,
           worldEditorOpen, setWorldEditorOpen,
           onPlayView: () => { setZoomLevel(18.5); setCameraMode('isometric'); },

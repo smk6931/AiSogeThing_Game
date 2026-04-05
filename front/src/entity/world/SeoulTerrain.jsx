@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import worldApi from '@api/world';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
-const ROAD_ATLAS_TEXTURES = [
+const DEFAULT_ROAD_ATLAS_TEXTURES = [
   '/ground/0697877e-b61e-41a0-8560-05ccbc5c07bb.png',
   '/ground/4628b0ae-fd8d-4497-8edb-338a5edcf82e.png',
   '/ground/ChatGPT%20Image.png',
@@ -178,8 +178,8 @@ const cropAtlasTile = (image, col, row) => {
   return canvas;
 };
 
-const randomAtlasChoice = () => ({
-  atlasUrl: ROAD_ATLAS_TEXTURES[Math.floor(Math.random() * ROAD_ATLAS_TEXTURES.length)],
+const randomAtlasChoice = (atlasUrls) => ({
+  atlasUrl: atlasUrls[Math.floor(Math.random() * atlasUrls.length)],
   col: Math.floor(Math.random() * ROAD_ATLAS_GRID),
   row: Math.floor(Math.random() * ROAD_ATLAS_GRID),
 });
@@ -458,6 +458,7 @@ const GroupTerrainMask = ({ partitions, groupKey, elevation }) => {
 const SeoulTerrain = ({
   visible = true, showRoads = true, showNature = true, roadTextureUrl = null,
   roadTypeFilters = {},
+  roadTextureFolder = '',
   districtId = null, dongId = null, currentDistrict = null, currentDong = null,
   clipToCurrentGroup = false, playerPositionRef = null,
   elevation = 0, shiftX = -450, shiftZ = 320,
@@ -467,6 +468,7 @@ const SeoulTerrain = ({
   const [geos, setGeos] = useState(null);
   const [groupPartitions, setGroupPartitions] = useState([]);
   const [currentGroupKey, setCurrentGroupKey] = useState(null);
+  const [roadTexturePaths, setRoadTexturePaths] = useState(DEFAULT_ROAD_ATLAS_TEXTURES);
   const loadingRef = useRef(false);
   const activeRoadTypes = useMemo(() => ({
     major: roadTypeFilters.major !== false,
@@ -476,12 +478,12 @@ const SeoulTerrain = ({
     service: roadTypeFilters.service !== false,
   }), [roadTypeFilters]);
   const roadAtlasChoices = useMemo(() => ({
-    major: randomAtlasChoice(),
-    mid: randomAtlasChoice(),
-    alley: randomAtlasChoice(),
-    pedestrian: randomAtlasChoice(),
-    service: randomAtlasChoice(),
-  }), []);
+    major: randomAtlasChoice(roadTexturePaths),
+    mid: randomAtlasChoice(roadTexturePaths),
+    alley: randomAtlasChoice(roadTexturePaths),
+    pedestrian: randomAtlasChoice(roadTexturePaths),
+    service: randomAtlasChoice(roadTexturePaths),
+  }), [roadTexturePaths]);
   const roadTextures = useMemo(() => {
     const loader = new THREE.TextureLoader();
     const loadTexture = (atlasUrl, tile) => {
@@ -508,6 +510,25 @@ const SeoulTerrain = ({
       service: loadTexture(roadAtlasChoices.service.atlasUrl, roadAtlasChoices.service),
     };
   }, [roadAtlasChoices]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRoadTextures = async () => {
+      try {
+        const res = await worldApi.getRoadTextures(roadTextureFolder);
+        const paths = Array.isArray(res.data) && res.data.length > 0
+          ? res.data
+          : DEFAULT_ROAD_ATLAS_TEXTURES;
+        if (!cancelled) setRoadTexturePaths(paths);
+      } catch (_) {
+        if (!cancelled) setRoadTexturePaths(DEFAULT_ROAD_ATLAS_TEXTURES);
+      }
+    };
+
+    loadRoadTextures();
+    return () => { cancelled = true; };
+  }, [roadTextureFolder]);
 
   useEffect(() => {
     let cancelled = false;

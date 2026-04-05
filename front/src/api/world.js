@@ -82,6 +82,16 @@ const worldApi = {
     return await client.get('/api/world/block-texture-folders');
   },
 
+  getRoadTextures: async (folder = '') => {
+    return await client.get('/api/world/road-textures', {
+      params: { folder }
+    });
+  },
+
+  getRoadTextureFolders: async () => {
+    return await client.get('/api/world/road-texture-folders');
+  },
+
   // 용산구 월드 디자인 메타데이터 초안 조회
   getYongsanDesignProfile: async () => {
     return await client.get('/api/world/design/yongsan');

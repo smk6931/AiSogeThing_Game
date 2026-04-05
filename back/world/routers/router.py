@@ -117,22 +117,25 @@ def _resolve_ground_root() -> str:
     return os.path.join(base_path, "front", "public", "ground")
 
 
-@router.get("/block-textures")
-async def get_block_textures(folder: str | None = None):
-    ground_root = _resolve_ground_root()
-    if not os.path.exists(ground_root):
+def _resolve_road_root() -> str:
+    base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    return os.path.join(base_path, "front", "public", "road")
+
+
+def _list_texture_files(asset_root: str, folder: str | None = None, url_prefix: str = "") -> list[str]:
+    if not os.path.exists(asset_root):
         return []
 
     normalized_folder = (folder or "").strip().strip("/\\")
-    images_dir = os.path.join(ground_root, normalized_folder) if normalized_folder else ground_root
+    images_dir = os.path.join(asset_root, normalized_folder) if normalized_folder else asset_root
 
     try:
-        resolved_ground_root = os.path.realpath(ground_root)
+        resolved_asset_root = os.path.realpath(asset_root)
         resolved_images_dir = os.path.realpath(images_dir)
-        if os.path.commonpath([resolved_ground_root, resolved_images_dir]) != resolved_ground_root:
-            raise HTTPException(status_code=400, detail="Invalid ground texture folder")
+        if os.path.commonpath([resolved_asset_root, resolved_images_dir]) != resolved_asset_root:
+            raise HTTPException(status_code=400, detail=f"Invalid {url_prefix.strip('/')} texture folder")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid ground texture folder") from exc
+        raise HTTPException(status_code=400, detail=f"Invalid {url_prefix.strip('/')} texture folder") from exc
 
     if not os.path.exists(images_dir):
         return []
@@ -142,20 +145,38 @@ async def get_block_textures(folder: str | None = None):
         if os.path.isfile(os.path.join(images_dir, entry))
         and entry.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
     )
-    prefix = f"/ground/{normalized_folder}".rstrip("/")
+    prefix = f"{url_prefix}/{normalized_folder}".rstrip("/")
     return [f"{prefix}/{entry}" for entry in files]
+
+
+def _list_texture_folders(asset_root: str) -> list[str]:
+    if not os.path.exists(asset_root):
+        return []
+
+    return sorted(
+        entry for entry in os.listdir(asset_root)
+        if os.path.isdir(os.path.join(asset_root, entry))
+    )
+
+
+@router.get("/block-textures")
+async def get_block_textures(folder: str | None = None):
+    return _list_texture_files(_resolve_ground_root(), folder, "/ground")
 
 
 @router.get("/block-texture-folders")
 async def get_block_texture_folders():
-    ground_root = _resolve_ground_root()
-    if not os.path.exists(ground_root):
-        return []
+    return _list_texture_folders(_resolve_ground_root())
 
-    return sorted(
-        entry for entry in os.listdir(ground_root)
-        if os.path.isdir(os.path.join(ground_root, entry))
-    )
+
+@router.get("/road-textures")
+async def get_road_textures(folder: str | None = None):
+    return _list_texture_files(_resolve_road_root(), folder, "/road")
+
+
+@router.get("/road-texture-folders")
+async def get_road_texture_folders():
+    return _list_texture_folders(_resolve_road_root())
 
 
 @router.get("/design/yongsan")

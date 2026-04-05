@@ -147,6 +147,7 @@ const RpgWorld = ({
   showCurrentGroupTexture = false,
   showCullRadius = false,
   groundTextureFolder = '',
+  roadTextureFolder = '',
   orbitRef,
   cameraMode,
   onMonsterClick,
@@ -381,6 +382,7 @@ const RpgWorld = ({
             visible={showSeoulNature || showSeoulRoads}
             showRoads={showSeoulRoads}
             roadTypeFilters={roadTypeFilters}
+            roadTextureFolder={roadTextureFolder}
             showNature={showSeoulNature}
             roadTextureUrl={ROAD_ATLAS_URL}
             dongId={currentDongId}
