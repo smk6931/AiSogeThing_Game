@@ -83,6 +83,7 @@ const GameOverlay = ({
   const [sidebarTab, setSidebarTab] = useState(null);
   const [sidebarMode, setSidebarMode] = useState('menu');
   const [showLayerPopup, setShowLayerPopup] = useState(false);
+  const [showWorldToolsPopup, setShowWorldToolsPopup] = useState(false);
   const [showRoadPanel, setShowRoadPanel] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
