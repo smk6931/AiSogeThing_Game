@@ -82,9 +82,9 @@ const GameEntry = () => {
     pedestrian: true,
     service: true,
   });
-  const [showSeoulNature, setShowSeoulNature] = useState(true);
-  const [showLanduseTextureLayer, setShowLanduseTextureLayer] = useState(true);
-  const [showRoadSplitLayer, setShowRoadSplitLayer] = useState(true);
+  const [showSeoulNature, setShowSeoulNature] = useState(false);
+  const [showLanduseTextureLayer, setShowLanduseTextureLayer] = useState(false);
+  const [showRoadSplitLayer, setShowRoadSplitLayer] = useState(false);
   const [showLanduseZones, setShowLanduseZones] = useState(false);
   const [landuseFilters, setLanduseFilters] = useState({
     residential: true, commercial: true, industrial: true,
@@ -93,12 +93,12 @@ const GameEntry = () => {
     cemetery: true, transport: true, port: true, unexplored: true
   });
   const [showHeightMap, setShowHeightMap] = useState(false); // [OFF] 등고선 비활성화 (나중에 true로 복원 가능)
-  const [showGroundMesh, setShowGroundMesh] = useState(true);
+  const [showGroundMesh, setShowGroundMesh] = useState(false);
   const [showDistrictBoundaries, setShowDistrictBoundaries] = useState(false);
   const [showMicroBoundaries, setShowMicroBoundaries] = useState(false);
   const [showGroupBoundaries, setShowGroupBoundaries] = useState(true);
   const [highlightCurrentGroup, setHighlightCurrentGroup] = useState(true);
-  const [showCurrentGroupTexture, setShowCurrentGroupTexture] = useState(false);
+  const [showCurrentGroupTexture, setShowCurrentGroupTexture] = useState(true);
   const [showCullRadius, setShowCullRadius] = useState(false);
   const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
