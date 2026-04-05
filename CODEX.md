@@ -6,6 +6,22 @@
 - This file is only for Codex-specific workflow guidance.
 - Do not duplicate shared architecture or domain rules here.
 
+## Codex Scope
+
+- Codex-specific:
+  - local code edits
+  - file exploration
+  - bounded refactor
+  - local verification
+- Project-specific:
+  - backend structure
+  - DB and world rules
+  - UI placement
+  - editing/encoding safety
+  - deployment flow
+
+Project-specific items must stay in `agents/`.
+
 ## Best Use Cases
 
 - 실제 코드 수정

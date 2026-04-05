@@ -6,6 +6,22 @@
 - This file is only for Claude-specific workflow guidance.
 - Do not duplicate shared architecture or domain rules here.
 
+## Claude Scope
+
+- Claude-specific:
+  - planning
+  - design comparison
+  - review checklist
+  - documentation draft
+- Project-specific:
+  - backend structure
+  - UI layout
+  - DB source of truth
+  - editing/encoding safety
+  - world and partition rules
+
+Project-specific items must stay in `agents/`.
+
 ## Best Use Cases
 
 - 큰 기능 계획

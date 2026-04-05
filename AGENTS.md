@@ -25,10 +25,20 @@
 
 - [`agents/README.md`](c:/GitHub/AiSogeThing_Game/agents/README.md)
 - [`agents/development/core_rules.md`](c:/GitHub/AiSogeThing_Game/agents/development/core_rules.md)
+- [`agents/development/backend_structure_rules.md`](c:/GitHub/AiSogeThing_Game/agents/development/backend_structure_rules.md)
+- [`agents/development/editing_safety_rules.md`](c:/GitHub/AiSogeThing_Game/agents/development/editing_safety_rules.md)
 - [`agents/frontend/ui_rules.md`](c:/GitHub/AiSogeThing_Game/agents/frontend/ui_rules.md)
 - [`agents/game_design/world_partition_rules.md`](c:/GitHub/AiSogeThing_Game/agents/game_design/world_partition_rules.md)
 - [`agents/game_design/road_design_rules.md`](c:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
 - [`agents/process/workflow_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/workflow_rules.md)
 - [`agents/process/tool_split_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/tool_split_rules.md)
+- [`agents/process/global_tooling_scope_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/global_tooling_scope_rules.md)
 - [`agents/process/advisory_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/advisory_rules.md)
 - [`agents/process/communication_rules.md`](c:/GitHub/AiSogeThing_Game/agents/process/communication_rules.md)
+
+## Shared Vs Tool-Specific
+
+- 프로젝트 구조, DB, 백엔드 계층, 프론트 배치, 편집 안전 규칙은 `agents/`에 둔다.
+- `CLAUDE.md`, `CODEX.md`에는 툴 사용법, 역할, 작업 스타일만 둔다.
+- `.claude/skills`나 전역 Codex 설정에는 여러 프로젝트에 공통으로 써도 안전한 내용만 둔다.
+- 프로젝트별 규칙을 툴별 문서나 전역 skill에 중복 작성하지 않는다.
