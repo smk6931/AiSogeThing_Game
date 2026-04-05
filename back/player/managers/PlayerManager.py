@@ -37,7 +37,7 @@ class PlayerManager:
             "maxMp": 50,
             "exp": 0,
             "gold": 0,
-            "attack": 12
+            "attack": 300
         }
 
         # 초기 상태 설정

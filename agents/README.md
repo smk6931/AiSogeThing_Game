@@ -40,3 +40,5 @@ Priority: high | medium | low
   로그인, 회원가입, 계정 생성 흐름 규칙
 - `planning/`
   게임 방향성, 기획서, 콘텐츠 설계 결정 문서
+- `process/`
+  Claude와 Codex가 공통으로 따를 작업 절차, 역할 분리, 검증 흐름 문서

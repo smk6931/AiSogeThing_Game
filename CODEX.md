@@ -1,17 +1,34 @@
-﻿# Project Rules
+# Codex Workflow
 
-## Agents Context Loading Rule
+## Project Rule Entry
 
-- 코드 실행이나 수정 전에 먼저 `agents/` 폴더 문서의 `Title`, `Description`, `When-To-Read`, `Keywords`를 본다.
-- 유저 요청, 수정 대상 파일, 실행 명령 목적과 대조해서 필요한 문서만 추가 컨텍스트로 읽는다.
-- `agents/`에 없는 규칙은 새 문서로 추가하거나 기존 문서로 옮긴 뒤 사용한다.
-- 구현 시 `agents/` 안 규칙과 코드베이스 기존 패턴을 우선 따른다.
-- 시작 문서:
-  - [`agents/README.md`](C:/GitHub/AiSogeThing_Game/agents/README.md)
-  - [`agents/development/core_rules.md`](C:/GitHub/AiSogeThing_Game/agents/development/core_rules.md)
-  - [`agents/development/player_leveling_rules.md`](C:/GitHub/AiSogeThing_Game/agents/development/player_leveling_rules.md)
-  - [`agents/frontend/ui_rules.md`](C:/GitHub/AiSogeThing_Game/agents/frontend/ui_rules.md)
-  - [`agents/frontend/intro_signup_rules.md`](C:/GitHub/AiSogeThing_Game/agents/frontend/intro_signup_rules.md)
-  - [`agents/game_design/world_partition_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_partition_rules.md)
-  - [`agents/game_design/road_design_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
-  - [`agents/auth/auth_flow_rules.md`](C:/GitHub/AiSogeThing_Game/agents/auth/auth_flow_rules.md)
+- Shared project rules live in [`AGENTS.md`](C:/GitHub/AiSogeThing_Game/AGENTS.md) and [`agents/`](C:/GitHub/AiSogeThing_Game/agents/README.md).
+- This file is only for Codex-specific workflow guidance.
+- Do not duplicate shared architecture or domain rules here.
+
+## Best Use Cases
+
+- 실제 코드 수정
+- 로컬 파일 탐색
+- 범위가 명확한 리팩터링
+- diff 기반 점검과 수정
+- 구현 후 로컬 검증
+
+## Working Style
+
+- 작업 전 관련 파일과 관련 `agents/` 문서만 읽는다.
+- 수정은 최소 범위로 한다.
+- 기존 패턴과 충돌하지 않게 구현한다.
+- 불필요한 전역 리팩터링을 피한다.
+
+## Execution Rules
+
+- 안전한 조회 명령은 바로 실행할 수 있다.
+- 설치, 서버 실행, 상태 변경, 파괴적 작업은 Codex 승인 정책을 따른다.
+- 승인 정책과 prefix rule은 프로젝트 규칙이 아니라 Codex 로컬 설정에서 관리한다.
+
+## Guardrails
+
+- 새 공통 규칙이 필요하면 `agents/`에 추가한다.
+- Codex 전용 사용법만 여기서 관리한다.
+- 로컬 툴 편의 규칙이 프로젝트 공통 규칙을 덮어쓰지 않는다.

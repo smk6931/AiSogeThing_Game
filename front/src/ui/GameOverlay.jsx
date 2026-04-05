@@ -61,6 +61,13 @@ const ROAD_TYPE_BUTTONS = [
   { key: 'service', label: '서비스', icon: '≋', colorOn: 'rgba(90,85,78,0.78)' },
 ];
 
+const RARITY_COLOR = {
+  common: '#cccccc',
+  rare: '#4488ff',
+  epic: '#aa44ff',
+  legendary: '#ffaa00',
+};
+
 const GameOverlay = ({
   myPositionRef,
   onSimulateKey,
@@ -71,6 +78,9 @@ const GameOverlay = ({
   currentRegionInfo: regionState = null,
   availableGroundTextureFolders = [],
   availableRoadTextureFolders = [],
+  droppedItems = [],
+  onClearDrop,
+  onInventoryOpen,
 }) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -117,6 +127,12 @@ const GameOverlay = ({
           15% { opacity: 1; transform: translate(-50%, -50%); }
           85% { opacity: 1; transform: translate(-50%, -50%); }
           100% { opacity: 0; transform: translate(-50%, -60%); }
+        }
+        @keyframes itemDropIn {
+          0%   { opacity: 0; transform: translateY(8px); }
+          12%  { opacity: 1; transform: translateY(0); }
+          80%  { opacity: 1; transform: translateY(-3px); }
+          100% { opacity: 0; transform: translateY(-10px); }
         }
       `;
       document.head.appendChild(style);
@@ -180,11 +196,16 @@ const GameOverlay = ({
     mp: myStats?.mp || 50,
     maxMp: myStats?.maxMp || 50,
     level: myStats?.level || 1,
+    exp: myStats?.exp || 0,
+    gold: myStats?.gold || 0,
     nickname: user?.nickname || 'Guest',
   };
 
+  const expForLevel = (lv) => lv <= 1 ? 0 : (lv - 1) * lv * 50;
+  const maxExp = expForLevel(playerStats.level + 1);
   const hpPct = Math.max(0, Math.min(100, (playerStats.hp / playerStats.maxHp) * 100));
   const mpPct = Math.max(0, Math.min(100, (playerStats.mp / playerStats.maxMp) * 100));
+  const expPct = maxExp > 0 ? Math.max(0, Math.min(100, (playerStats.exp / maxExp) * 100)) : 0;
   const currentRegionInfo = regionState?.dbRegion || null;
   const currentPartition = regionState?.currentPartition || null;
   const currentPartitionTitle = currentPartition?.group_display_name || currentPartition?.display_name || '';
@@ -272,7 +293,7 @@ const GameOverlay = ({
           </div>
         </div>
 
-        <div>
+        <div style={{ marginBottom: '5px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '8px' : '11px', color: '#aaa' }}>
             <span style={{ color: '#60a5fa' }}>MP</span>
             <span>{playerStats.mp}/{playerStats.maxMp}</span>
@@ -281,6 +302,72 @@ const GameOverlay = ({
             <div style={{ width: `${mpPct}%`, height: '100%', background: 'linear-gradient(90deg, #1d4ed8, #3b82f6)' }} />
           </div>
         </div>
+
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '7px' : '10px', color: '#aaa', marginBottom: '2px' }}>
+            <span style={{ color: '#a78bfa' }}>EXP</span>
+            <span style={{ color: '#c4b5fd' }}>{playerStats.exp}/{maxExp}</span>
+          </div>
+          <div style={{ height: isMobile ? '4px' : '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ width: `${expPct}%`, height: '100%', background: 'linear-gradient(90deg, #6d28d9, #8b5cf6)', transition: 'width 0.4s ease' }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+            <button
+              onClick={onInventoryOpen}
+              style={{
+                background: 'rgba(30,50,40,0.8)',
+                border: '1px solid rgba(100,160,120,0.4)',
+                borderRadius: '5px',
+                color: '#67e8d6',
+                fontSize: isMobile ? '8px' : '10px',
+                padding: '2px 6px',
+                cursor: 'pointer',
+                pointerEvents: 'auto',
+                fontFamily: 'inherit',
+              }}
+            >
+              인벤 [I]
+            </button>
+            <span style={{ fontSize: isMobile ? '7px' : '9px', color: GOLD }}>
+              {playerStats.gold}G
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 아이템 드롭 알림 - 화면 상단 중앙 */}
+      <div style={{
+        position: 'absolute',
+        top: '72px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '5px',
+        pointerEvents: 'none',
+        zIndex: 120,
+        alignItems: 'center',
+      }}>
+        {droppedItems.slice(-5).map((item) => (
+          <div
+            key={item.notifId}
+            style={{
+              background: 'rgba(6,10,18,0.94)',
+              border: `1px solid ${RARITY_COLOR[item.rarity] || '#ccc'}`,
+              borderRadius: '8px',
+              padding: '5px 14px',
+              color: RARITY_COLOR[item.rarity] || '#ccc',
+              fontSize: '13px',
+              fontWeight: '700',
+              boxShadow: `0 0 14px ${RARITY_COLOR[item.rarity] || '#ccc'}55`,
+              animation: 'itemDropIn 3s ease forwards',
+              whiteSpace: 'nowrap',
+              letterSpacing: '0.3px',
+            }}
+          >
+            🎁 {item.name_ko} <span style={{ color: '#888', fontWeight: 400, fontSize: '11px' }}>×{item.quantity}</span>
+          </div>
+        ))}
       </div>
 
       {/* 레이어 토글 버튼 — 미니맵 왼쪽 */}

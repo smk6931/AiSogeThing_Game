@@ -119,3 +119,4 @@ from user.models.models import User
 from player.models.models import GameCharacter, PlayerLevelCurve
 from world.models.models import WorldAdminArea, WorldLevelPartition
 from monster.models.model import MonsterTemplate
+from item.models.model import ItemTemplate, CharacterInventory

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrthographicCamera } from '@react-three/drei/core/OrthographicCamera.js';
 import { PerspectiveCamera } from '@react-three/drei/core/PerspectiveCamera.js';
@@ -8,7 +8,10 @@ import Player from '@entity/player/Player';
 import RemotePlayer from '@entity/player/RemotePlayer';
 import { useAuth } from '@contexts/AuthContext';
 import { PunchProjectile } from '@entity/player/projectile/PunchProjectile';
+import { MagicOrbProjectile } from '@entity/player/projectile/MagicOrbProjectile';
 import Monster from '@entity/monster/Monster';
+import { DamageNumber } from '@entity/monster/DamageNumber';
+import { useAutoAttack } from '@hooks/useAutoAttack';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
@@ -207,11 +210,17 @@ const RpgWorld = ({
   const [currentDong, setCurrentDong] = useState(null);
   const [worldLoadStage, setWorldLoadStage] = useState(0);
   const [, setTick] = useState(0);
+  const [selectedTargetId, setSelectedTargetId] = useState(null);
+  const [damageNumbers, setDamageNumbers] = useState([]);
 
   const playerRef = useRef();
   const projectilePositions = useRef({});
   const projectileHits = useRef({});
   const initialConfig = useRef({ ...debugConfig });
+  // monsters를 interval/ref에서 최신값으로 읽기 위한 ref
+  const monstersRef = useRef(monsters);
+  // 이전 몬스터 HP 추적 (데미지 숫자 감지용)
+  const prevMonstersRef = useRef({});
 
   const { user } = useAuth();
   const { districts, getDistrictAt } = useSeoulDistricts();
@@ -228,6 +237,65 @@ const RpgWorld = ({
     debugConfig.playerScale = debugConfig.playerHeightMeters / 3.2;
     setTick((tick) => tick + 1);
   };
+
+  // monstersRef 최신값 유지
+  useEffect(() => { monstersRef.current = monsters; }, [monsters]);
+
+  // 몬스터 HP 감소 감지 → 데미지 숫자 생성
+  useEffect(() => {
+    const newDamages = [];
+    Object.entries(monsters).forEach(([id, monster]) => {
+      const prev = prevMonstersRef.current[id];
+      if (prev && prev.hp > 0 && monster.hp < prev.hp) {
+        const dmg = prev.hp - monster.hp;
+        newDamages.push({
+          id: `dmg_${id}_${Date.now()}_${Math.random()}`,
+          damage: dmg,
+          position: { x: monster.position.x, y: 0, z: monster.position.z },
+        });
+      }
+    });
+    if (newDamages.length > 0) {
+      setDamageNumbers(prev => [...prev, ...newDamages]);
+    }
+    prevMonstersRef.current = monsters;
+  }, [monsters]);
+
+  const removeDamageNumber = useCallback((id) => {
+    setDamageNumbers(prev => prev.filter(d => d.id !== id));
+  }, []);
+
+  // 타겟 몬스터 사망 시 자동 해제
+  useEffect(() => {
+    if (!selectedTargetId) return;
+    const m = monsters[selectedTargetId];
+    if (!m || m.state === 'dead' || m.hp <= 0) setSelectedTargetId(null);
+  }, [monsters, selectedTargetId]);
+
+  // ESC 키로 타겟 해제
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') setSelectedTargetId(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // 몬스터 본체 클릭은 전투 타겟 선택만 처리
+  const handleMonsterClick = useCallback((monster) => {
+    setSelectedTargetId(prev => String(prev) === String(monster.id) ? null : String(monster.id));
+  }, []);
+
+  // 상세 정보는 이름 옆 정보 버튼으로만 연다
+  const handleMonsterInfoClick = useCallback((monster) => {
+    onMonsterClick?.(monster);
+  }, [onMonsterClick]);
+
+  // 자동 공격 훅
+  useAutoAttack({
+    targetMonsterId: selectedTargetId,
+    monstersRef,
+    playerRef,
+    addProjectile,
+  });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -277,6 +345,8 @@ const RpgWorld = ({
     if (projectiles.length === 0 || Object.keys(monsters).length === 0) return;
 
     projectiles.forEach((projectile) => {
+      // magic_orb는 컴포넌트 내부에서 자체 충돌 처리
+      if (projectile.type === 'magic_orb') return;
       if (projectile.isRemote) return;
       const currentPos = projectilePositions.current[projectile.id] || projectile.position;
       if (!currentPos) return;
@@ -575,7 +645,7 @@ const RpgWorld = ({
           }
 
           return (
-            <group key={monster.id} onClick={(event) => { event.stopPropagation(); onMonsterClick?.(monster); }}>
+            <group key={monster.id} onClick={(event) => { event.stopPropagation(); handleMonsterClick(monster); }}>
               <Monster
                 id={monster.id}
                 position={monster.position}
@@ -585,6 +655,8 @@ const RpgWorld = ({
                 modelPath={monster.modelPath || null}
                 tier={monster.tier || 'normal'}
                 scale={debugConfig.playerScale}
+                isTargeted={String(selectedTargetId) === String(monster.id)}
+                onInfoClick={() => handleMonsterInfoClick(monster)}
               />
             </group>
           );
@@ -592,6 +664,16 @@ const RpgWorld = ({
       })()}
 
       {showCullRadius && <CullRadiusIndicator playerRef={playerRef} />}
+
+      {damageNumbers.map(d => (
+        <DamageNumber
+          key={d.id}
+          id={d.id}
+          damage={d.damage}
+          position={d.position}
+          onRemove={removeDamageNumber}
+        />
+      ))}
 
       <Player
         ref={playerRef}
@@ -615,17 +697,30 @@ const RpgWorld = ({
         chat={user && latestChatMap ? latestChatMap[user.id] : null}
       />
 
-      {projectiles.map((projectile) => (
-        <PunchProjectile
-          key={projectile.id}
-          id={projectile.id}
-          remove={handleRemoveProjectile}
-          onUpdatePosition={(pos) => handleProjectileUpdate(projectile.id, pos)}
-          add={addProjectile}
-          scale={debugConfig.playerScale}
-          {...projectile}
-        />
-      ))}
+      {projectiles.map((projectile) => {
+        if (projectile.type === 'magic_orb') {
+          return (
+            <MagicOrbProjectile
+              key={projectile.id}
+              id={projectile.id}
+              remove={handleRemoveProjectile}
+              sendHit={sendHit}
+              {...projectile}
+            />
+          );
+        }
+        return (
+          <PunchProjectile
+            key={projectile.id}
+            id={projectile.id}
+            remove={handleRemoveProjectile}
+            onUpdatePosition={(pos) => handleProjectileUpdate(projectile.id, pos)}
+            add={addProjectile}
+            scale={debugConfig.playerScale}
+            {...projectile}
+          />
+        );
+      })}
 
       <CameraRig
         target={playerRef}

@@ -2,6 +2,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from player.managers.PlayerManager import player_manager
 from monster.managers.MonsterManager import monster_manager
+from item.service import roll_drops, grant_items_to_user
 
 router = APIRouter(prefix="/api/game", tags=["Game Player & WebSocket"])
 
@@ -166,6 +167,31 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                                 "leveledUp": reward_result["leveledUp"],
                                 "stats": reward_result["stats"]
                             })
+
+                    # 아이템 드롭 처리
+                    drop_table = hit_result.get("dropTable", [])
+                    if drop_table:
+                        try:
+                            dropped = await roll_drops(drop_table)
+                        except Exception as e:
+                            print(f"[WARN] roll_drops failed for monster {hit_result['monsterId']}: {e}")
+                            dropped = []
+                        print(f"[DROP] user={user_id} monster={hit_result['monsterId']} dropTable={drop_table} dropped={dropped}")
+                        if dropped:
+                            # 등록 유저(< 50000)만 DB 저장, guest는 FK 없으므로 스킵
+                            try:
+                                uid_int = int(user_id)
+                                if uid_int < 50000:
+                                    await grant_items_to_user(uid_int, dropped)
+                            except Exception as e:
+                                print(f"[WARN] grant_items failed for user {user_id}: {e}")
+                            player = player_manager.get_player(user_id)
+                            if player:
+                                await player["socket"].send_json({
+                                    "type": "item_drop",
+                                    "monsterId": hit_result["monsterId"],
+                                    "items": dropped
+                                })
 
     except WebSocketDisconnect:
         player_manager.disconnect(user_id)

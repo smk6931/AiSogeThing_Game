@@ -62,10 +62,10 @@ const MonsterGLB = ({ modelPath, scale: playerScale, state }) => {
 };
 
 /** HP바 — geometry는 고정 크기, scale.x로 너비 조절 (geometry 재생성 없음) */
-const HpBar = ({ hp, maxHp, name, hpBarHeight, tier }) => {
+const HpBar = ({ hp, maxHp, name, hpBarHeight, tier, isTargeted, onInfoClick }) => {
   const hpPercent = maxHp > 0 ? Math.max(0, hp / maxHp) : 0;
   const hpColor = hpPercent > 0.5 ? 'green' : hpPercent > 0.2 ? 'orange' : 'red';
-  const nameColor = tier === 'boss' ? '#ff4444' : tier === 'elite' ? '#ff9900' : 'white';
+  const nameColor = isTargeted ? '#ffdd00' : tier === 'boss' ? '#ff4444' : tier === 'elite' ? '#ff9900' : 'white';
   return (
     <Billboard position={[0, hpBarHeight, 0]}>
       <mesh>
@@ -83,12 +83,40 @@ const HpBar = ({ hp, maxHp, name, hpBarHeight, tier }) => {
       <Text position={[0, 0.8, 0]} fontSize={0.8} color={nameColor} anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="black">
         {name}
       </Text>
+      <group position={[2.6, 0.8, 0.02]} onClick={(event) => {
+        event.stopPropagation();
+        onInfoClick?.();
+      }}>
+        <mesh>
+          <planeGeometry args={[0.52, 0.52]} />
+          <meshBasicMaterial color="#08111b" transparent opacity={0.9} />
+        </mesh>
+        <Text
+          position={[0, 0, 0.02]}
+          fontSize={0.42}
+          color="#67e8d6"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.016}
+          outlineColor="black"
+        >
+          i
+        </Text>
+      </group>
     </Billboard>
   );
 };
 
+/** 타겟 선택 링 — 바닥에 표시 */
+const TargetRing = () => (
+  <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+    <ringGeometry args={[1.2, 1.6, 32]} />
+    <meshBasicMaterial color="#ffdd00" transparent opacity={0.7} depthWrite={false} />
+  </mesh>
+);
+
 /** 몬스터 컴포넌트 — GLB 전용 (modelPath 없으면 렌더링 안 함) */
-const Monster = ({ id, position, hp, maxHp, state, modelPath, tier = 'normal', scale = 1 }) => {
+const Monster = ({ id, position, hp, maxHp, state, modelPath, tier = 'normal', scale = 1, isTargeted = false, onInfoClick }) => {
   if (hp <= 0 || state === 'dead' || !modelPath) return null;
   const pos = [position.x, 0, position.z];
   const name = modelPath.split('_').pop()?.replace('.glb', '') || `#${id}`;
@@ -97,8 +125,17 @@ const Monster = ({ id, position, hp, maxHp, state, modelPath, tier = 'normal', s
 
   return (
     <group position={pos}>
+      {isTargeted && <TargetRing />}
       <MonsterGLB modelPath={modelPath} scale={scale} state={state} />
-      <HpBar hp={hp} maxHp={maxHp} name={name} hpBarHeight={hpBarHeight} tier={tier} />
+      <HpBar
+        hp={hp}
+        maxHp={maxHp}
+        name={name}
+        hpBarHeight={hpBarHeight}
+        tier={tier}
+        isTargeted={isTargeted}
+        onInfoClick={onInfoClick}
+      />
     </group>
   );
 };

@@ -31,6 +31,7 @@ class Monster:
         self.template_id = template_id
         self.exp_reward = exp_reward
         self.gold_reward = gold_reward
+        self.drops: list = []  # [{"item_id": 1, "rate": 0.5, "quantity": 1}]
 
     def to_dict(self):
         data = {
@@ -52,18 +53,26 @@ class Monster:
 
 
 MONSTER_TEMPLATES = [
-    {"template_id": 1, "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",      "tier": "boss",   "hp": 5000, "speed": 0.5, "exp": 400, "gold": 180},
-    {"template_id": 2, "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",       "tier": "normal", "hp": 80,   "speed": 2.0, "exp": 15,  "gold": 7},
-    {"template_id": 3, "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb","tier": "normal", "hp": 60,   "speed": 2.5, "exp": 18,  "gold": 9},
-    {"template_id": 4, "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",     "tier": "elite",  "hp": 350,  "speed": 1.5, "exp": 65,  "gold": 28},
-    {"template_id": 5, "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",  "tier": "normal", "hp": 90,   "speed": 1.2, "exp": 20,  "gold": 10},
-    {"template_id": 6, "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",   "tier": "elite",  "hp": 280,  "speed": 2.0, "exp": 72,  "gold": 32},
-    {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",     "tier": "boss",   "hp": 3000, "speed": 0.8, "exp": 260, "gold": 140},
+    {"template_id": 1, "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",      "tier": "boss",   "hp": 5000, "speed": 0.5, "exp": 400, "gold": 180,
+     "drops": [{"item_id": 9, "rate": 0.8, "quantity": 1}]},  # 용의 비늘
+    {"template_id": 2, "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",       "tier": "normal", "hp": 80,   "speed": 2.0, "exp": 15,  "gold": 7,
+     "drops": [{"item_id": 6, "rate": 0.6, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},  # 슬라임 젤, HP포션소
+    {"template_id": 3, "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb","tier": "normal", "hp": 60,   "speed": 2.5, "exp": 18,  "gold": 9,
+     "drops": [{"item_id": 4, "rate": 0.7, "quantity": 1}, {"item_id": 1, "rate": 0.15, "quantity": 1}]},  # 고블린 귀, HP포션소
+    {"template_id": 4, "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",     "tier": "elite",  "hp": 350,  "speed": 1.5, "exp": 65,  "gold": 28,
+     "drops": [{"item_id": 5, "rate": 0.65, "quantity": 1}, {"item_id": 2, "rate": 0.3, "quantity": 1}, {"item_id": 11, "rate": 0.1, "quantity": 1}]},  # 오크 가죽, HP포션중, 목검
+    {"template_id": 5, "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",  "tier": "normal", "hp": 90,   "speed": 1.2, "exp": 20,  "gold": 10,
+     "drops": [{"item_id": 8, "rate": 0.6, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},  # 좀비 뼛가루, HP포션소
+    {"template_id": 6, "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",   "tier": "elite",  "hp": 280,  "speed": 2.0, "exp": 72,  "gold": 32,
+     "drops": [{"item_id": 7, "rate": 0.5, "quantity": 1}, {"item_id": 13, "rate": 0.15, "quantity": 1}]},  # 마녀의 뿔, 마법사 모자
+    {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",     "tier": "boss",   "hp": 3000, "speed": 0.8, "exp": 260, "gold": 140,
+     "drops": [{"item_id": 10, "rate": 0.9, "quantity": 1}, {"item_id": 12, "rate": 0.4, "quantity": 1}, {"item_id": 3, "rate": 0.5, "quantity": 1}]},  # 오우거 심장, 가죽갑옷, HP포션대
 ]
 
 SKILL_POWER = {
     "basic": 0,
     "pyramid_punch": 8,
+    "magic_orb": 10,
 }
 
 
@@ -95,6 +104,7 @@ class MonsterManager:
                 gold_reward=tmpl.get("gold", 0),
             )
             m.speed = tmpl["speed"]
+            m.drops = tmpl.get("drops", [])
             self.monsters[m.id] = m
             self.next_id += 1
         print(f"Monster spawn complete: {len(MONSTER_TEMPLATES)} monsters spawned.")
@@ -188,6 +198,7 @@ class MonsterManager:
             result["killed"] = True
             result["expReward"] = m.exp_reward
             result["goldReward"] = m.gold_reward
+            result["dropTable"] = m.drops  # 드롭 확률 테이블 전달
 
         return result
 

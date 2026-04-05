@@ -10,6 +10,7 @@ export const useGameSocket = (addProjectile) => {
     const [latestChatMap, setLatestChatMap] = useState({});
     const [myStats, setMyStats] = useState(null);
     const [monsters, setMonsters] = useState({});
+    const [droppedItems, setDroppedItems] = useState([]);  // 아이템 드롭 알림
     const lastSentPositionRef = useRef(null);
 
     // 몬스터 배칭: ref로 최신값 유지, RAF로 프레임당 1회 flush
@@ -189,6 +190,17 @@ export const useGameSocket = (addProjectile) => {
                     setMyStats(message.stats);
                     break;
 
+                case 'item_drop':
+                    console.log('[item_drop] received:', message.items);
+                    if (message.items?.length > 0) {
+                        const newDrops = message.items.map(item => ({
+                            ...item,
+                            notifId: `${Date.now()}_${Math.random()}`,
+                        }));
+                        setDroppedItems(prev => [...prev, ...newDrops]);
+                    }
+                    break;
+
                 default:
                     break;
             }
@@ -247,5 +259,5 @@ export const useGameSocket = (addProjectile) => {
         gameApi.sendHit(socketRef.current, hitData);
     };
 
-    return { otherPlayers, sendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, sendSkill, monsters, sendHit };
+    return { otherPlayers, sendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, sendSkill, monsters, sendHit, droppedItems, setDroppedItems };
 };

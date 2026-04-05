@@ -12,12 +12,14 @@ import { useGameConfig } from '@contexts/GameConfigContext';
 import worldApi from '@api/world';
 const WorldMapModal = lazy(() => import('@ui/WorldMapModal'));
 const MonsterInfoPanel = lazy(() => import('@entity/monster/MonsterInfoPanel'));
+const InventoryModal = lazy(() => import('@ui/InventoryModal'));
 const GameCanvas = lazy(() => import('@engine/GameCanvas'));
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();
 
   const [selectedMonster, setSelectedMonster] = useState(null);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
 
   // Map & Spawn State
   const [currentMapId, setCurrentMapId] = useState('map_0');
@@ -59,7 +61,16 @@ const GameEntry = () => {
   const currentRegionInfo = useCurrentRegionInfo(myPositionRef, true);
 
   // 2. 소켓에 addProjectile 함수 전달 (남이 쏜 스킬 그리기용)
-  const { otherPlayers, sendPosition: originalSendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, sendSkill, monsters, sendHit } = useGameSocket(addProjectile);
+  const { otherPlayers, sendPosition: originalSendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, sendSkill, monsters, sendHit, droppedItems, setDroppedItems } = useGameSocket(addProjectile);
+
+  // 알림 자동 제거 (3초 후)
+  useEffect(() => {
+    if (droppedItems.length === 0) return;
+    const timer = setTimeout(() => {
+      setDroppedItems(prev => prev.slice(1));
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [droppedItems, setDroppedItems]);
 
   const [zoomLevel, setZoomLevel] = useState(16.5);
   const [showOsmMap, setShowOsmMap] = useState(true);
@@ -104,6 +115,16 @@ const GameEntry = () => {
       originalSendPosition(pos);
     }
   };
+
+  // I키 — 인벤토리 열기/닫기
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'i' || e.key === 'I') setInventoryOpen(prev => !prev);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // 마우스 휠 줌 핸들러
   useEffect(() => {
@@ -269,6 +290,8 @@ const GameEntry = () => {
         currentRegionInfo={currentRegionInfo}
         availableGroundTextureFolders={availableGroundTextureFolders}
         availableRoadTextureFolders={availableRoadTextureFolders}
+        droppedItems={droppedItems}
+        onInventoryOpen={() => setInventoryOpen(true)}
         mapSettings={{
           showOsmMap, setShowOsmMap,
           showSeoulRoads, setShowSeoulRoads,
@@ -300,6 +323,13 @@ const GameEntry = () => {
             monster={selectedMonster}
             onClose={() => setSelectedMonster(null)}
           />
+        </Suspense>
+      )}
+
+      {/* ================= Inventory Modal ================= */}
+      {inventoryOpen && (
+        <Suspense fallback={null}>
+          <InventoryModal onClose={() => setInventoryOpen(false)} />
         </Suspense>
       )}
 

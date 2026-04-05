@@ -267,6 +267,58 @@ Phase 1-D (DB 연결) ← Phase 1-A 완료 후 별도 진행 가능
 
 ---
 
+## 진행 체크리스트
+
+### Phase 0 — 타겟 선택 + 마법 구체 자동 공격
+- [x] `useAutoAttack.js` 훅 생성
+- [x] `MagicOrbProjectile.jsx` 컴포넌트 생성
+- [x] `RpgWorld.jsx` — 타겟 state + 타겟 강조 + useAutoAttack 연결 + 투사체 분기 렌더링
+- [x] `Monster.jsx` — isTargeted 링/하이라이트 추가
+- [x] `MonsterManager.py` — magic_orb 스킬 파워 추가
+- [x] ESC 타겟 해제, 몬스터 사망 시 자동 해제
+- [x] `DamageNumber.jsx` — 데미지 숫자 플로팅 컴포넌트
+- [x] `RpgWorld.jsx` — 몬스터 HP 변화 감지 → 데미지 숫자 렌더링
+
+### Phase 1-A — DB 스키마
+- [x] `item_template` ORM 모델 작성
+- [x] `character_inventory` ORM 모델 작성
+- [x] alembic migration 생성 및 실행 (d1e2f3a4b5c6)
+
+### Phase 1-B — 시드 데이터
+- [x] `item_template` 시드 스크립트 작성 (포션/소재/장비 13개)
+- [x] `monster_template` drops 연결 (MonsterManager MONSTER_TEMPLATES에 직접 추가)
+- [ ] `player_level_curve` 시드 스크립트 (1~50레벨) — 추후
+
+### Phase 1-C — 아이템 드롭 백엔드
+- [x] `back/item/` 모듈 생성 (model, repository, service, router)
+- [x] `MonsterManager` — drops 필드 + handle_hit() dropTable 포함
+- [x] WebSocket `hit_monster` 핸들러 — roll_drops → grant_items → `item_drop` 이벤트
+- [x] `main.py` item_router 등록
+
+### Phase 1-D — game_character DB 연결
+- [ ] 접속 시 DB에서 스탯 로드 (guest는 메모리 유지)
+- [ ] 레벨업/EXP/골드 변경 시 DB 업데이트
+
+### Phase 1-E — EXP바 UI
+- [x] `GameOverlay.jsx` — EXP 게이지 바 추가 (레벨 기반 maxExp 계산)
+- [x] `GameOverlay.jsx` — 골드 표시 추가
+
+### Phase 1-F — 아이템 획득 알림 UI
+- [x] `useGameSocket.js` — `item_drop` 이벤트 수신 → droppedItems state
+- [x] `GameOverlay.jsx` — rarity별 색상 알림 (3초 노출 후 자동 제거)
+- [x] `GameEntry.jsx` — droppedItems 전달 + 자동 제거 타이머
+
+### Phase 1-G — 인벤토리 창 UI
+- [x] `InventoryModal.jsx` 신규 생성 (격자 슬롯 5×6, rarity 테두리/글로우, 툴팁)
+- [x] `api/item.js` 생성 → `GET /api/item/inventory/{userId}` 연결
+- [x] 단축키(I) 열기/닫기 (GameEntry + InventoryModal 양쪽)
+- [x] `GameOverlay.jsx` — 인벤 [I] 버튼 추가
+- [x] `GameEntry.jsx` — InventoryModal lazy import + onInventoryOpen 연결
+
+---
+
 ## 진행 기록
 
 - 2026-04-05: 계획 수립 (현재 구현 상태 파악 완료)
+- 2026-04-05: 타겟 기반 자동 공격 + 마법 구체 설계 추가
+- 2026-04-05: 체크리스트 추가, Phase 0 구현 시작
