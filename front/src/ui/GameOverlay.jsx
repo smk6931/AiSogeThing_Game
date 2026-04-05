@@ -1125,6 +1125,103 @@ const GameOverlay = ({
         </div>
       )}
       {/* ===== 게임 도감 오버레이 ===== */}
+      <div
+        onClick={() => setShowWorldToolsPopup(v => !v)}
+        title="world tools"
+        style={{
+          position: 'absolute',
+          top: '154px',
+          right: '46px',
+          width: '26px',
+          height: '26px',
+          background: showWorldToolsPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
+          border: `1px solid ${showWorldToolsPopup ? ACCENT : BORDER_COLOR}`,
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+          boxShadow: GLOW,
+          transformOrigin: 'top right',
+          transform: `scale(${uiScale})`,
+          zIndex: 100,
+          color: showWorldToolsPopup ? ACCENT : GOLD,
+          fontSize: '11px',
+          fontWeight: '700',
+        }}
+      >
+        W
+      </div>
+      {showWorldToolsPopup && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '188px',
+            right: '46px',
+            width: '190px',
+            background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
+            border: `1px solid ${BORDER_COLOR}`,
+            borderRadius: '12px',
+            padding: '10px',
+            zIndex: 100,
+            pointerEvents: 'auto',
+            boxShadow: GLOW,
+            transformOrigin: 'top right',
+            transform: `scale(${uiScale})`,
+          }}
+        >
+          <div style={{ fontSize: '10px', color: GOLD, letterSpacing: '2px', fontWeight: '700', marginBottom: '8px' }}>
+            WORLD TOOLS
+          </div>
+          <button
+            onClick={() => setWorldEditorOpen(v => !v)}
+            style={{
+              width: '100%',
+              padding: '9px',
+              marginBottom: '8px',
+              background: worldEditorOpen ? 'rgba(103,232,214,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${worldEditorOpen ? ACCENT : BORDER_COLOR}`,
+              borderRadius: '8px',
+              color: worldEditorOpen ? ACCENT : '#8ca6a0',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '7px',
+              fontFamily: GAME_FONT,
+            }}
+          >
+            <Wrench size={13} />
+            {worldEditorOpen ? 'Editor ON' : 'Editor OFF'}
+          </button>
+          <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '6px' }}>GROUND DIR</div>
+          <select
+            value={groundTextureFolder}
+            onChange={(event) => setGroundTextureFolder(event.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '8px',
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${BORDER_COLOR}`,
+              color: '#d7ece8',
+              fontSize: '11px',
+              fontFamily: GAME_FONT,
+              outline: 'none',
+            }}
+          >
+            <option value="">root</option>
+            {availableGroundTextureFolders.map((folder) => (
+              <option key={folder} value={folder}>{folder}</option>
+            ))}
+          </select>
+          <div style={{ fontSize: '10px', color: '#6a8a84', marginTop: '6px', lineHeight: 1.5 }}>
+            current: {groundTextureFolder || 'root'}
+          </div>
+        </div>
+      )}
       {showCodex && (
         <Suspense fallback={null}>
           <GameCodex onClose={() => setShowCodex(false)} />
