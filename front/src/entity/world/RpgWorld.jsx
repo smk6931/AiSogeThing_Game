@@ -12,6 +12,7 @@ import { MagicOrbProjectile } from '@entity/player/projectile/MagicOrbProjectile
 import Monster from '@entity/monster/Monster';
 import { DamageNumber } from '@entity/monster/DamageNumber';
 import { useAutoAttack } from '@hooks/useAutoAttack';
+import { useAutoFarm } from '@hooks/useAutoFarm';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
@@ -156,6 +157,10 @@ const RpgWorld = ({
   onMonsterClick,
   currentRegionInfo = null,
   worldEditorOpen = false,
+  isAutoMode = false,
+  onAutoModeChange,
+  playerDamageEvents = [],
+  clearPlayerDamageEvent,
 }) => {
   const [debugConfig, setDebugConfig] = useState(() => {
     const saved = localStorage.getItem('world_debug_config');
@@ -263,7 +268,26 @@ const RpgWorld = ({
 
   const removeDamageNumber = useCallback((id) => {
     setDamageNumbers(prev => prev.filter(d => d.id !== id));
-  }, []);
+    clearPlayerDamageEvent?.(id);
+  }, [clearPlayerDamageEvent]);
+
+  // 플레이어 피격 데미지 숫자 — playerRef 위치에 빨간 숫자 표시
+  useEffect(() => {
+    if (!playerDamageEvents.length) return;
+    const newDamages = playerDamageEvents
+      .filter(e => !damageNumbers.find(d => d.id === e.id))
+      .map(e => ({
+        id: e.id,
+        damage: e.damage,
+        position: playerRef.current
+          ? { x: playerRef.current.position.x, y: 0, z: playerRef.current.position.z }
+          : { x: 0, y: 0, z: 0 },
+        isPlayerDamage: true,
+      }));
+    if (newDamages.length > 0) {
+      setDamageNumbers(prev => [...prev, ...newDamages]);
+    }
+  }, [playerDamageEvents]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 타겟 몬스터 사망 시 자동 해제
   useEffect(() => {
@@ -272,12 +296,15 @@ const RpgWorld = ({
     if (!m || m.state === 'dead' || m.hp <= 0) setSelectedTargetId(null);
   }, [monsters, selectedTargetId]);
 
-  // ESC 키로 타겟 해제
+  // ESC: 타겟 해제 + 자동사냥 OFF
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') setSelectedTargetId(null); };
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'Escape') { setSelectedTargetId(null); onAutoModeChange?.(false); }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [onAutoModeChange]);
 
   // 몬스터 본체 클릭은 전투 타겟 선택만 처리
   const handleMonsterClick = useCallback((monster) => {
@@ -288,6 +315,14 @@ const RpgWorld = ({
   const handleMonsterInfoClick = useCallback((monster) => {
     onMonsterClick?.(monster);
   }, [onMonsterClick]);
+
+  // 자동사냥 모드 — 가장 가까운 몬스터 자동 타겟
+  useAutoFarm({
+    isAutoMode,
+    monstersRef,
+    playerRef,
+    setTargetMonsterId: setSelectedTargetId,
+  });
 
   // 자동 공격 훅
   useAutoAttack({
@@ -672,6 +707,8 @@ const RpgWorld = ({
           damage={d.damage}
           position={d.position}
           onRemove={removeDamageNumber}
+          color={d.isPlayerDamage ? '#ff4444' : undefined}
+          outlineColor={d.isPlayerDamage ? '#660000' : undefined}
         />
       ))}
 

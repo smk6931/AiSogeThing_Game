@@ -82,6 +82,8 @@ const GameOverlay = ({
   droppedItems = [],
   onClearDrop,
   onInventoryOpen,
+  isAutoMode = false,
+  onAutoModeToggle,
 }) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();

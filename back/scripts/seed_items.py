@@ -19,10 +19,19 @@ ITEMS = [
     {"id": 8,  "name_ko": "좀비 뼛가루",  "name_en": "Zombie Bone",   "item_type": "material","rarity": "common",    "stat_bonus": None,                "description": "좀비의 뼈를 갈아 만든 가루.", "icon_key": "mat_zombie_bone"},
     {"id": 9,  "name_ko": "용의 비늘",    "name_en": "Dragon Scale",  "item_type": "material","rarity": "legendary", "stat_bonus": None,                "description": "드래곤에게서 얻은 비늘. 극히 희귀하다.", "icon_key": "mat_dragon_scale"},
     {"id": 10, "name_ko": "오우거 심장",  "name_en": "Ogre Heart",    "item_type": "material","rarity": "epic",      "stat_bonus": None,                "description": "오우거의 심장. 강한 생명력이 느껴진다.", "icon_key": "mat_ogre_heart"},
-    # 장비류
+    # 장비류 — 무기/갑옷 (기존)
     {"id": 11, "name_ko": "목검",         "name_en": "Wooden Sword",  "item_type": "weapon",  "rarity": "common",    "stat_bonus": {"attack": 5},       "description": "초보자용 목검.", "icon_key": "weapon_wood_sword"},
     {"id": 12, "name_ko": "가죽 갑옷",    "name_en": "Leather Armor", "item_type": "armor",   "rarity": "common",    "stat_bonus": {"defense": 4},      "description": "가죽으로 만든 갑옷.", "icon_key": "armor_leather"},
     {"id": 13, "name_ko": "마법사 모자",  "name_en": "Mage Hat",      "item_type": "armor",   "rarity": "rare",      "stat_bonus": {"mp": 30, "attack": 3}, "description": "마법 공격력이 높아지는 모자.", "icon_key": "armor_mage_hat"},
+    # 장비류 — 투구/장갑/각반 (신규)
+    {"id": 14, "name_ko": "가죽 투구",    "name_en": "Leather Helm",  "item_type": "helmet",  "rarity": "common",    "stat_bonus": {"defense": 2},      "description": "가죽으로 만든 투구.", "icon_key": "helmet_leather"},
+    {"id": 15, "name_ko": "가죽 장갑",    "name_en": "Leather Gloves","item_type": "gloves",  "rarity": "common",    "stat_bonus": {"attack": 2},       "description": "손을 보호하는 가죽 장갑.", "icon_key": "gloves_leather"},
+    {"id": 16, "name_ko": "가죽 각반",    "name_en": "Leather Boots", "item_type": "boots",   "rarity": "common",    "stat_bonus": {"defense": 1},      "description": "이동에 편리한 가죽 각반.", "icon_key": "boots_leather"},
+    {"id": 17, "name_ko": "철 단검",      "name_en": "Iron Dagger",   "item_type": "weapon",  "rarity": "rare",      "stat_bonus": {"attack": 15},      "description": "날카로운 철 단검.", "icon_key": "weapon_iron_dagger"},
+    {"id": 18, "name_ko": "사슬 갑옷",    "name_en": "Chain Armor",   "item_type": "armor",   "rarity": "rare",      "stat_bonus": {"defense": 12},     "description": "쇠사슬로 엮은 갑옷.", "icon_key": "armor_chain"},
+    {"id": 19, "name_ko": "강철 투구",    "name_en": "Steel Helm",    "item_type": "helmet",  "rarity": "rare",      "stat_bonus": {"defense": 7, "hp": 20}, "description": "단단한 강철 투구.", "icon_key": "helmet_steel"},
+    {"id": 20, "name_ko": "마법 장갑",    "name_en": "Magic Gloves",  "item_type": "gloves",  "rarity": "epic",      "stat_bonus": {"attack": 8, "mp": 15}, "description": "마법이 깃든 장갑.", "icon_key": "gloves_magic"},
+    {"id": 21, "name_ko": "질풍 각반",    "name_en": "Wind Boots",    "item_type": "boots",   "rarity": "rare",      "stat_bonus": {"defense": 4, "hp": 10}, "description": "바람처럼 빠른 각반.", "icon_key": "boots_wind"},
 ]
 
 MONSTER_DROP_UPDATES = [

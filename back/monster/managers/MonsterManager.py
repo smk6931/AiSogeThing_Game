@@ -1,6 +1,7 @@
 import random
 import math
 import asyncio
+import time
 from typing import Dict, Optional
 
 
@@ -16,6 +17,9 @@ class Monster:
         template_id: Optional[int] = None,
         exp_reward: int = 0,
         gold_reward: int = 0,
+        attack_power: int = 10,
+        attack_range: float = 2.8,
+        attack_cooldown: float = 2.0,
     ):
         self.id = id
         self.x = x
@@ -27,11 +31,15 @@ class Monster:
         self.state = "idle"
         self.monster_type = random.randint(0, 13)
         self.model_path = model_path
-        self.tier = tier  # normal / elite / boss
+        self.tier = tier
         self.template_id = template_id
         self.exp_reward = exp_reward
         self.gold_reward = gold_reward
-        self.drops: list = []  # [{"item_id": 1, "rate": 0.5, "quantity": 1}]
+        self.drops: list = []
+        self.attack_power = attack_power
+        self.attack_range = attack_range
+        self.attack_cooldown = attack_cooldown
+        self.last_attack_time: float = 0.0
 
     def to_dict(self):
         data = {
@@ -53,20 +61,20 @@ class Monster:
 
 
 MONSTER_TEMPLATES = [
-    {"template_id": 1, "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",      "tier": "boss",   "hp": 5000, "speed": 0.5, "exp": 400, "gold": 180,
-     "drops": [{"item_id": 9, "rate": 0.8, "quantity": 1}]},  # 용의 비늘
-    {"template_id": 2, "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",       "tier": "normal", "hp": 80,   "speed": 2.0, "exp": 15,  "gold": 7,
-     "drops": [{"item_id": 6, "rate": 0.6, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},  # 슬라임 젤, HP포션소
-    {"template_id": 3, "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb","tier": "normal", "hp": 60,   "speed": 2.5, "exp": 18,  "gold": 9,
-     "drops": [{"item_id": 4, "rate": 0.7, "quantity": 1}, {"item_id": 1, "rate": 0.15, "quantity": 1}]},  # 고블린 귀, HP포션소
-    {"template_id": 4, "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",     "tier": "elite",  "hp": 350,  "speed": 1.5, "exp": 65,  "gold": 28,
-     "drops": [{"item_id": 5, "rate": 0.65, "quantity": 1}, {"item_id": 2, "rate": 0.3, "quantity": 1}, {"item_id": 11, "rate": 0.1, "quantity": 1}]},  # 오크 가죽, HP포션중, 목검
-    {"template_id": 5, "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",  "tier": "normal", "hp": 90,   "speed": 1.2, "exp": 20,  "gold": 10,
-     "drops": [{"item_id": 8, "rate": 0.6, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},  # 좀비 뼛가루, HP포션소
-    {"template_id": 6, "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",   "tier": "elite",  "hp": 280,  "speed": 2.0, "exp": 72,  "gold": 32,
-     "drops": [{"item_id": 7, "rate": 0.5, "quantity": 1}, {"item_id": 13, "rate": 0.15, "quantity": 1}]},  # 마녀의 뿔, 마법사 모자
-    {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",     "tier": "boss",   "hp": 3000, "speed": 0.8, "exp": 260, "gold": 140,
-     "drops": [{"item_id": 10, "rate": 0.9, "quantity": 1}, {"item_id": 12, "rate": 0.4, "quantity": 1}, {"item_id": 3, "rate": 0.5, "quantity": 1}]},  # 오우거 심장, 가죽갑옷, HP포션대
+    {"template_id": 1, "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",       "tier": "boss",   "hp": 5000, "speed": 0.5, "exp": 400, "gold": 180, "attack_power": 55, "attack_range": 5.0, "attack_cooldown": 3.0,
+     "drops": [{"item_id": 9, "rate": 0.8, "quantity": 1}]},
+    {"template_id": 2, "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",        "tier": "normal", "hp": 80,   "speed": 2.0, "exp": 15,  "gold": 7,   "attack_power": 8,  "attack_range": 2.5, "attack_cooldown": 2.0,
+     "drops": [{"item_id": 6, "rate": 0.6, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},
+    {"template_id": 3, "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb", "tier": "normal", "hp": 60,   "speed": 2.5, "exp": 18,  "gold": 9,   "attack_power": 10, "attack_range": 2.5, "attack_cooldown": 1.8,
+     "drops": [{"item_id": 4, "rate": 0.7, "quantity": 1}, {"item_id": 1, "rate": 0.15, "quantity": 1}]},
+    {"template_id": 4, "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",      "tier": "elite",  "hp": 350,  "speed": 1.5, "exp": 65,  "gold": 28,  "attack_power": 22, "attack_range": 3.0, "attack_cooldown": 1.8,
+     "drops": [{"item_id": 5, "rate": 0.65, "quantity": 1}, {"item_id": 2, "rate": 0.3, "quantity": 1}, {"item_id": 11, "rate": 0.1, "quantity": 1}]},
+    {"template_id": 5, "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",   "tier": "normal", "hp": 90,   "speed": 1.2, "exp": 20,  "gold": 10,  "attack_power": 12, "attack_range": 2.5, "attack_cooldown": 2.2,
+     "drops": [{"item_id": 8, "rate": 0.6, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},
+    {"template_id": 6, "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",    "tier": "elite",  "hp": 280,  "speed": 2.0, "exp": 72,  "gold": 32,  "attack_power": 20, "attack_range": 4.0, "attack_cooldown": 2.0,
+     "drops": [{"item_id": 7, "rate": 0.5, "quantity": 1}, {"item_id": 13, "rate": 0.15, "quantity": 1}]},
+    {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",      "tier": "boss",   "hp": 3000, "speed": 0.8, "exp": 260, "gold": 140, "attack_power": 45, "attack_range": 4.5, "attack_cooldown": 2.5,
+     "drops": [{"item_id": 10, "rate": 0.9, "quantity": 1}, {"item_id": 12, "rate": 0.4, "quantity": 1}, {"item_id": 3, "rate": 0.5, "quantity": 1}]},
 ]
 
 SKILL_POWER = {
@@ -102,6 +110,9 @@ class MonsterManager:
                 template_id=tmpl["template_id"],
                 exp_reward=tmpl.get("exp", 0),
                 gold_reward=tmpl.get("gold", 0),
+                attack_power=tmpl.get("attack_power", 10),
+                attack_range=tmpl.get("attack_range", 2.8),
+                attack_cooldown=tmpl.get("attack_cooldown", 2.0),
             )
             m.speed = tmpl["speed"]
             m.drops = tmpl.get("drops", [])
@@ -124,12 +135,18 @@ class MonsterManager:
             dist = random.uniform(5, 20)
             x = center_x + math.cos(angle) * dist
             z = center_z + math.sin(angle) * dist
-            m = Monster(start_id + i, x, z, hp=tmpl["hp"],
-                        model_path=tmpl["model_path"],
-                        tier=tmpl["tier"],
-                        template_id=tmpl["template_id"],
-                        exp_reward=tmpl.get("exp", 0),
-                        gold_reward=tmpl.get("gold", 0))
+            m = Monster(
+                start_id + i, x, z,
+                hp=tmpl["hp"],
+                model_path=tmpl["model_path"],
+                tier=tmpl["tier"],
+                template_id=tmpl["template_id"],
+                exp_reward=tmpl.get("exp", 0),
+                gold_reward=tmpl.get("gold", 0),
+                attack_power=tmpl.get("attack_power", 10),
+                attack_range=tmpl.get("attack_range", 2.8),
+                attack_cooldown=tmpl.get("attack_cooldown", 2.0),
+            )
             m.speed = tmpl["speed"]
             m.drops = tmpl.get("drops", [])
             self.monsters[m.id] = m
@@ -199,7 +216,7 @@ class MonsterManager:
             result["killed"] = True
             result["expReward"] = m.exp_reward
             result["goldReward"] = m.gold_reward
-            result["dropTable"] = m.drops  # 드롭 확률 테이블 전달
+            result["dropTable"] = m.drops
 
         return result
 
@@ -208,7 +225,7 @@ class MonsterManager:
         for mid in dead_ids:
             self.monsters.pop(mid, None)
 
-    async def game_loop(self, broadcast_func, get_players_func=None):
+    async def game_loop(self, broadcast_func, get_players_func=None, send_to_player_func=None):
         """몬스터 AI 루프 (0.1초마다 실행, 10 FPS)"""
         self.is_running = True
         print("Monster AI loop started.")
@@ -216,15 +233,19 @@ class MonsterManager:
         while self.is_running:
             changed_monsters = {}
             removed_monster_ids = []
+            now = time.time()
 
-            # 접속 중인 플레이어 위치 수집
-            player_positions = []
+            # 플레이어 위치 + ID 수집
+            player_list = []  # [(user_id, x, z, defense)]
             if get_players_func:
-                for pdata in get_players_func().values():
+                for uid, pdata in get_players_func().items():
                     pos = pdata.get("position", {})
-                    player_positions.append((pos.get("x", 0), pos.get("z", 0)))
+                    defense = pdata.get("stats", {}).get("defense", 0)
+                    player_list.append((uid, pos.get("x", 0), pos.get("z", 0), defense))
 
-            # 일반 몬스터 부족하면 보충 (드래곤/보스 제외)
+            player_positions = [(px, pz) for _, px, pz, _ in player_list]
+
+            # 일반 몬스터 보충
             normal_count = sum(1 for m in self.monsters.values() if m.tier != "boss")
             if normal_count < 5:
                 spawned_ids = self.spawn_random(count=5 - normal_count)
@@ -256,24 +277,40 @@ class MonsterManager:
                         changed_monsters[m_id] = monster.to_dict()
                     continue
 
+                # 가장 가까운 플레이어 탐색
+                nearest_uid, nearest_dist, nearest_px, nearest_pz, nearest_def = None, float('inf'), 0, 0, 0
+                for uid, px, pz, defense in player_list:
+                    d = math.sqrt((monster.x - px) ** 2 + (monster.z - pz) ** 2)
+                    if d < nearest_dist:
+                        nearest_dist = d
+                        nearest_uid = uid
+                        nearest_px, nearest_pz = px, pz
+                        nearest_def = defense
+
+                # 공격 범위 내 플레이어가 있으면 공격
+                if nearest_uid and nearest_dist <= monster.attack_range:
+                    if now - monster.last_attack_time >= monster.attack_cooldown:
+                        monster.last_attack_time = now
+                        raw_dmg = monster.attack_power + random.randint(-2, 2)
+                        damage = max(1, raw_dmg - nearest_def)
+                        if send_to_player_func:
+                            await send_to_player_func(nearest_uid, {
+                                "type": "player_hit",
+                                "monsterId": m_id,
+                                "damage": damage,
+                            })
+                        monster.state = "idle"
+                        changed_monsters[m_id] = monster.to_dict()
+                    continue
+
+                # 이동 AI
                 if monster.state == "idle":
                     if random.random() < 0.05:
                         monster.state = "move"
-
-                        # 가장 가까운 플레이어 찾기 — 100m 이상 멀면 해당 방향으로 이동
-                        nearest = None
-                        nearest_dist = float('inf')
-                        for px, pz in player_positions:
-                            d = math.sqrt((monster.x - px) ** 2 + (monster.z - pz) ** 2)
-                            if d < nearest_dist:
-                                nearest_dist = d
-                                nearest = (px, pz)
-
-                        if nearest and nearest_dist > 100:
-                            angle = math.atan2(nearest[1] - monster.z, nearest[0] - monster.x)
+                        if nearest_uid and nearest_dist > 3:
+                            angle = math.atan2(nearest_pz - monster.z, nearest_px - monster.x)
                         else:
                             angle = random.uniform(0, math.pi * 2)
-
                         monster.dx = math.cos(angle) * monster.speed * 0.1
                         monster.dz = math.sin(angle) * monster.speed * 0.1
                         changed_monsters[m_id] = monster.to_dict()

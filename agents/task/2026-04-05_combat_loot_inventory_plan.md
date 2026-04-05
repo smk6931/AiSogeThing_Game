@@ -268,12 +268,30 @@ Phase 1-D (DB 연결) ← Phase 1-A 완료 후 별도 진행 가능
 - [x] `InventoryModal.jsx` — 장착 슬롯 패널 + 장착/해제 버튼 + 장착중(E) 뱃지
 - [x] `api/item.js` — equip/unequip/getEquipment 추가
 
-## 다음 단계 (2차 예정 — 미완)
+## Phase 2-B — 장비창 고도화 + 플레이어 피격 데미지 표시
+
+### 장비 슬롯 5종 확장
+- [x] `back/item/repository.py` — EQUIPPABLE_TYPES/get_slot_for_type에 helmet/gloves/boots 추가
+- [x] `back/scripts/seed_items.py` — 가죽투구/가죽장갑/가죽각반/철단검/사슬갑옷/강철투구/마법장갑/질풍각반 (id 14~21) 추가
+- [x] `front/src/ui/InventoryModal.jsx` — 디아블로 스타일 장비창 (투구/무기·갑옷·장갑/각반), EquipSlotCell 컴포넌트 분리
+- [x] `front/src/ui/InventoryModal.jsx` — ICON_MAP/TYPE_LABEL/SLOT_LABEL/TYPE_TO_SLOT 5슬롯 대응
+
+### 플레이어 피격 데미지 숫자
+- [x] `front/src/entity/monster/DamageNumber.jsx` — color/outlineColor prop 추가 (재사용성)
+- [x] `front/src/engine/useGameSocket.js` — player_hit 수신 시 playerDamageEvents state에 push
+- [x] `front/src/GameEntry.jsx` → `GameCanvas.jsx` → `RpgWorld.jsx` props 파이프라인 연결
+- [x] `front/src/entity/world/RpgWorld.jsx` — playerDamageEvents 수신 → 플레이어 위치에 빨간 데미지 숫자 렌더링
+
+### 버그 수정
+- [x] `front/src/engine/GameCanvas.jsx` — isAutoMode/onAutoModeChange props 누락 수정 (ReferenceError)
+- [x] `back/player/routers/router.py` — WebSocket 초기 send 구간 try/except 추가 (연결 끊김 에러)
+
+## 다음 단계 (3차 예정 — 미완)
 
 - 포션 사용 시스템 (HP 회복)
 - 경매장 (거래 시스템)
 - 스킬 트리 / 추가 스킬
-- 리스폰 몬스터 drops 미설정 버그 수정 ✓ (완료)
+- 새 시드 아이템 DB INSERT (`python back/scripts/seed_items.py` 실행 필요)
 
 ---
 

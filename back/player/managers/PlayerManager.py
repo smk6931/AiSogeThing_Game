@@ -185,6 +185,28 @@ class PlayerManager:
             safe_update = {k: v for k, v in new_state.items() if k != "socket"}
             player.update(safe_update)
 
+    def apply_damage(self, user_id: str, damage: int) -> dict:
+        """플레이어 피격 처리 — HP 감소 및 사망 여부 반환"""
+        player = self.active_connections.get(user_id)
+        if not player:
+            return {"ok": False}
+        stats = player.get("stats", {})
+        stats["hp"] = max(0, stats.get("hp", 100) - damage)
+        died = stats["hp"] <= 0
+        if died:
+            stats["hp"] = stats.get("maxHp", 100)  # 즉시 풀회복 후 리스폰
+        return {"ok": True, "hp": stats["hp"], "maxHp": stats.get("maxHp", 100), "died": died}
+
+    def apply_heal(self, user_id: str, amount: int) -> dict:
+        """HP 회복 처리"""
+        player = self.active_connections.get(user_id)
+        if not player:
+            return {"ok": False}
+        stats = player.get("stats", {})
+        max_hp = stats.get("maxHp", 100)
+        stats["hp"] = min(max_hp, stats.get("hp", max_hp) + amount)
+        return {"ok": True, "hp": stats["hp"], "maxHp": max_hp}
+
     def add_rewards(self, user_id: str, exp_gain: int = 0, gold_gain: int = 0) -> Optional[dict]:
         """플레이어 보상 반영 및 간단 레벨업 처리"""
         player = self.active_connections.get(user_id)

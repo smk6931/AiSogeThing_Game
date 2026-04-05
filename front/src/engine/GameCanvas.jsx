@@ -40,6 +40,10 @@ const GameCanvas = ({
   onMonsterClick,
   currentRegionInfo,
   worldEditorOpen = false,
+  isAutoMode = false,
+  onAutoModeChange,
+  playerDamageEvents = [],
+  clearPlayerDamageEvent,
 }) => {
   const orbitRef = useRef();
 
@@ -107,6 +111,10 @@ const GameCanvas = ({
           currentRegionInfo={currentRegionInfo}
           worldEditorOpen={worldEditorOpen}
           orbitRef={orbitRef}
+          isAutoMode={isAutoMode}
+          onAutoModeChange={onAutoModeChange}
+          playerDamageEvents={playerDamageEvents}
+          clearPlayerDamageEvent={clearPlayerDamageEvent}
         />
       </Suspense>
 

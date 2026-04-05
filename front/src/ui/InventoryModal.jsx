@@ -14,13 +14,20 @@ const ICON_MAP = {
   potion_hp_s: '🧪', potion_hp_m: '🫙', potion_hp_l: '⚗️',
   mat_goblin_ear: '👂', mat_orc_hide: '🐗', mat_slime_gel: '💧',
   mat_witch_horn: '🌙', mat_zombie_bone: '🦴', mat_dragon_scale: '🐉',
-  mat_ogre_heart: '❤️', weapon_wood_sword: '🗡️', armor_leather: '🛡️',
-  armor_mage_hat: '🎩',
+  mat_ogre_heart: '❤️',
+  weapon_wood_sword: '🗡️', weapon_iron_dagger: '🔪',
+  armor_leather: '🛡️', armor_mage_hat: '🎩', armor_chain: '⛓️',
+  helmet_leather: '🪖', helmet_steel: '⛑️',
+  gloves_leather: '🧤', gloves_magic: '✨',
+  boots_leather: '👟', boots_wind: '👢',
 };
-const TYPE_LABEL = { weapon: '무기', armor: '방어구', potion: '포션', material: '소재' };
+const TYPE_LABEL = { weapon: '무기', armor: '갑옷', helmet: '투구', gloves: '장갑', boots: '각반', potion: '포션', material: '소재' };
 const STAT_LABEL = { hp: 'HP', attack: '공격력', defense: '방어력', speed: '이동속도', mp: 'MP' };
-const SLOT_LABEL = { weapon: '⚔️ 무기', armor: '🛡️ 방어구' };
-const EQUIPPABLE = new Set(['weapon', 'armor']);
+const SLOT_LABEL = { helmet: '투구', weapon: '무기', armor: '갑옷', gloves: '장갑', boots: '각반' };
+const SLOT_ICON  = { helmet: '🪖', weapon: '⚔️', armor: '🛡️', gloves: '🧤', boots: '👢' };
+// item_type → 장착 슬롯명 매핑 (백엔드와 동일)
+const TYPE_TO_SLOT = { weapon: 'weapon', armor: 'armor', helmet: 'helmet', gloves: 'gloves', boots: 'boots' };
+const EQUIPPABLE = new Set(Object.keys(TYPE_TO_SLOT));
 
 const COLS = 5;
 const TOTAL_SLOTS = 30;
@@ -69,45 +76,64 @@ const Slot = ({ item, isSelected, isEquipped, onClick }) => {
   );
 };
 
-/** 장비 슬롯 패널 (상단 착용 현황) */
+/** 장비 슬롯 단일 셀 */
+const EquipSlotCell = ({ slot, item, onUnequip }) => {
+  const icon = item ? (ICON_MAP[item.icon_key] || '📦') : null;
+  const r = item ? (RARITY_COLOR[item.rarity] || RARITY_COLOR.common) : null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+      <div style={{ color: '#3a4555', fontSize: '9px' }}>{SLOT_LABEL[slot]}</div>
+      <div
+        onClick={() => item && onUnequip(slot)}
+        title={item ? `${item.name_ko} — 클릭해서 해제` : '비어있음'}
+        style={{
+          width: '44px', height: '44px', borderRadius: '7px',
+          border: `1px solid ${item ? (r.border + '99') : '#1e2530'}`,
+          background: item ? 'rgba(20,40,50,0.9)' : 'rgba(8,12,18,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: item ? 'pointer' : 'default', fontSize: '22px',
+          position: 'relative',
+          boxShadow: item && r.glow !== 'none' ? r.glow : 'none',
+        }}
+      >
+        {item
+          ? <span style={{ userSelect: 'none' }}>{icon}</span>
+          : <span style={{ color: '#1e2530', fontSize: '16px' }}>{SLOT_ICON[slot]}</span>
+        }
+        {item && (
+          <span style={{
+            position: 'absolute', bottom: '2px', right: '3px',
+            fontSize: '8px', color: '#67e8d6', fontWeight: 700,
+          }}>E</span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/** 장비 슬롯 패널 — 디아블로 스타일 (투구/무기·갑옷·장갑/각반) */
 const EquipmentPanel = ({ equipment, onUnequip }) => (
-  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-    {['weapon', 'armor'].map(slot => {
-      const item = equipment[slot];
-      const icon = item ? (ICON_MAP[item.icon_key] || '📦') : null;
-      return (
-        <div key={slot} style={{ flex: 1 }}>
-          <div style={{ color: '#444', fontSize: '10px', marginBottom: '3px' }}>
-            {SLOT_LABEL[slot]}
-          </div>
-          <div
-            onClick={() => item && onUnequip(slot)}
-            title={item ? `${item.name_ko} — 클릭해서 해제` : '비어있음'}
-            style={{
-              height: '44px', borderRadius: '7px',
-              border: `1px solid ${item ? '#67e8d655' : '#1e2530'}`,
-              background: item ? 'rgba(20,40,50,0.9)' : 'rgba(8,12,18,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: item ? 'pointer' : 'default', fontSize: '22px',
-              position: 'relative',
-            }}
-          >
-            {item ? icon : <span style={{ color: '#2a3040', fontSize: '13px' }}>—</span>}
-            {item && (
-              <span style={{
-                position: 'absolute', bottom: '2px', right: '4px',
-                fontSize: '9px', color: '#67e8d6',
-              }}>착용중</span>
-            )}
-          </div>
-        </div>
-      );
-    })}
+  <div style={{ marginBottom: '12px' }}>
+    <div style={{ color: '#3a4555', fontSize: '10px', marginBottom: '6px' }}>장착 장비</div>
+    {/* Row 1: 투구 (가운데) */}
+    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+      <EquipSlotCell slot="helmet" item={equipment.helmet} onUnequip={onUnequip} />
+    </div>
+    {/* Row 2: 무기 / 갑옷 / 장갑 */}
+    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '6px' }}>
+      <EquipSlotCell slot="weapon" item={equipment.weapon} onUnequip={onUnequip} />
+      <EquipSlotCell slot="armor"  item={equipment.armor}  onUnequip={onUnequip} />
+      <EquipSlotCell slot="gloves" item={equipment.gloves} onUnequip={onUnequip} />
+    </div>
+    {/* Row 3: 각반 (가운데) */}
+    <div style={{ display: 'flex', justifyContent: 'center' }}>
+      <EquipSlotCell slot="boots" item={equipment.boots} onUnequip={onUnequip} />
+    </div>
   </div>
 );
 
 /** 상세 + 장착 버튼 패널 */
-const DetailPanel = ({ item, equipment, onEquip, onUnequip }) => {
+const DetailPanel = ({ item, equipment, onEquip, onUnequip, onUseItem }) => {
   if (!item) return (
     <div style={{
       height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -121,7 +147,8 @@ const DetailPanel = ({ item, equipment, onEquip, onUnequip }) => {
   const icon = ICON_MAP[item.icon_key] || '📦';
   const statEntries = item.stat_bonus ? Object.entries(item.stat_bonus) : [];
   const canEquip = EQUIPPABLE.has(item.item_type);
-  const slot = item.item_type === 'weapon' ? 'weapon' : item.item_type === 'armor' ? 'armor' : null;
+  const isPotion = item.item_type === 'potion';
+  const slot = TYPE_TO_SLOT[item.item_type] || null;
   const isEquipped = slot && equipment[slot]?.item_id === item.item_id;
 
   return (
@@ -149,6 +176,21 @@ const DetailPanel = ({ item, equipment, onEquip, onUnequip }) => {
             </span>
           </div>
         </div>
+        {/* 포션 사용 버튼 */}
+        {isPotion && (
+          <button
+            onClick={() => onUseItem?.(item.item_id)}
+            style={{
+              background: 'rgba(74,222,128,0.12)',
+              border: '1px solid rgba(74,222,128,0.35)',
+              borderRadius: '6px', color: '#4ade80',
+              fontSize: '11px', fontWeight: 700,
+              padding: '5px 10px', cursor: 'pointer',
+            }}
+          >
+            사용
+          </button>
+        )}
         {/* 장착/해제 버튼 */}
         {canEquip && (
           isEquipped ? (
@@ -207,7 +249,7 @@ const DetailPanel = ({ item, equipment, onEquip, onUnequip }) => {
   );
 };
 
-const InventoryModal = ({ onClose, myStats, onStatsUpdate }) => {
+const InventoryModal = ({ onClose, myStats, onStatsUpdate, onUseItem }) => {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [equipment, setEquipment] = useState({});
@@ -325,7 +367,7 @@ const InventoryModal = ({ onClose, myStats, onStatsUpdate }) => {
             gap: '6px', justifyContent: 'center',
           }}>
             {slots.map((item, i) => {
-              const slot = item?.item_type === 'weapon' ? 'weapon' : item?.item_type === 'armor' ? 'armor' : null;
+              const slot = item ? (TYPE_TO_SLOT[item.item_type] || null) : null;
               const isEquipped = slot ? equipment[slot]?.item_id === item?.item_id : false;
               return (
                 <Slot
@@ -352,6 +394,7 @@ const InventoryModal = ({ onClose, myStats, onStatsUpdate }) => {
             equipment={equipment}
             onEquip={handleEquip}
             onUnequip={handleUnequip}
+            onUseItem={onUseItem}
           />
         )}
       </div>

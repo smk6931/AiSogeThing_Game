@@ -36,6 +36,27 @@ async def add_item(user_id: int, item_id: int, quantity: int = 1) -> dict | None
     )
 
 
+async def consume_item(user_id: int, item_id: int, quantity: int = 1) -> bool:
+    """포션 등 소모성 아이템 사용 — 수량 감소, 0이면 삭제"""
+    existing = await fetch_one(
+        "SELECT id, quantity FROM character_inventory WHERE user_id = :uid AND item_id = :iid",
+        {"uid": user_id, "iid": item_id}
+    )
+    if not existing or existing["quantity"] <= 0:
+        return False
+    if existing["quantity"] <= quantity:
+        await execute(
+            "DELETE FROM character_inventory WHERE id = :id",
+            {"id": existing["id"]}
+        )
+    else:
+        await execute(
+            "UPDATE character_inventory SET quantity = quantity - :qty WHERE id = :id",
+            {"qty": quantity, "id": existing["id"]}
+        )
+    return True
+
+
 async def get_item_template(item_id: int) -> dict | None:
     """아이템 템플릿 단건 조회"""
     return await fetch_one(
@@ -48,15 +69,18 @@ async def get_item_template(item_id: int) -> dict | None:
 # 장비 착용 관련
 # ──────────────────────────────────────────────
 
-EQUIPPABLE_TYPES = {"weapon", "armor"}
+EQUIPPABLE_TYPES = {"weapon", "armor", "helmet", "gloves", "boots"}
 
 def get_slot_for_type(item_type: str) -> str | None:
     """item_type으로 장착 슬롯 결정"""
-    if item_type == "weapon":
-        return "weapon"
-    if item_type == "armor":
-        return "armor"
-    return None
+    slot_map = {
+        "weapon": "weapon",
+        "armor": "armor",
+        "helmet": "helmet",
+        "gloves": "gloves",
+        "boots": "boots",
+    }
+    return slot_map.get(item_type)
 
 
 async def get_equipment(user_id: int) -> dict:

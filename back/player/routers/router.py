@@ -4,6 +4,7 @@ from player.managers.PlayerManager import player_manager
 from monster.managers.MonsterManager import monster_manager
 from item.service import roll_drops, grant_items_to_user
 import player.repository as char_repo
+import item.repository as item_repo
 
 router = APIRouter(prefix="/api/game", tags=["Game Player & WebSocket"])
 
@@ -29,43 +30,47 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
     # 1. 연결 수락 및 등록 (DB 임시 비활성)
     stats = await player_manager.connect(websocket, user_id, nickname)
     
-    # 1.5. 내 정보(스탯) 전송
-    await websocket.send_json({"type": "init_stats", "stats": stats})
+    try:
+        # 1.5. 내 정보(스탯) 전송
+        await websocket.send_json({"type": "init_stats", "stats": stats})
 
-    # 2. 입장 알림 (나를 제외한 모두에게)
-    join_msg = {
-        "type": "join",
-        "userId": user_id,
-        "nickname": nickname,
-        "position": {"x": 0, "y": 0, "z": 0},
-        "mapId": "map_0" # [NEW] 초기 맵
-    }
-    await player_manager.broadcast(join_msg, exclude_user_id=user_id)
-    
-    # 3. 현재 접속자 목록 나에게 전송 (Sync)
-    existing_players = player_manager.get_all_players()
-    sync_data = {
-        "type": "sync_players",
-        "players": {
-            uid: {
-                "nickname": data["nickname"],
-                "position": data["position"],
-                "rotation": data.get("rotation", 0),
-                "animation": data.get("animation", "Idle"),
-                "mapId": data.get("mapId", "map_0") # [NEW] 맵 정보 포함
-            }
-            for uid, data in existing_players.items() if uid != user_id
+        # 2. 입장 알림 (나를 제외한 모두에게)
+        join_msg = {
+            "type": "join",
+            "userId": user_id,
+            "nickname": nickname,
+            "position": {"x": 0, "y": 0, "z": 0},
+            "mapId": "map_0" # [NEW] 초기 맵
         }
-    }
-    await websocket.send_json(sync_data)
+        await player_manager.broadcast(join_msg, exclude_user_id=user_id)
 
-    # 3.5 몬스터 목록 전송 (Sync Monsters)
-    if not monster_manager.monsters:
-        monster_manager.spawn_random(count=5)
-    
-    player = player_manager.get_player(user_id)
-    if player:
-        await _send_visible_monsters(websocket, player)
+        # 3. 현재 접속자 목록 나에게 전송 (Sync)
+        existing_players = player_manager.get_all_players()
+        sync_data = {
+            "type": "sync_players",
+            "players": {
+                uid: {
+                    "nickname": data["nickname"],
+                    "position": data["position"],
+                    "rotation": data.get("rotation", 0),
+                    "animation": data.get("animation", "Idle"),
+                    "mapId": data.get("mapId", "map_0") # [NEW] 맵 정보 포함
+                }
+                for uid, data in existing_players.items() if uid != user_id
+            }
+        }
+        await websocket.send_json(sync_data)
+
+        # 3.5 몬스터 목록 전송 (Sync Monsters)
+        if not monster_manager.monsters:
+            monster_manager.spawn_random(count=5)
+
+        player = player_manager.get_player(user_id)
+        if player:
+            await _send_visible_monsters(websocket, player)
+    except WebSocketDisconnect:
+        player_manager.disconnect(user_id)
+        return
 
     try:
         while True:
@@ -202,9 +207,38 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                                     "items": dropped
                                 })
 
+            # --- [USE_ITEM] 포션 사용 ---
+            elif msg_type == "use_item":
+                item_id = data.get("itemId")
+                if item_id:
+                    try:
+                        item = await item_repo.get_item_template(item_id)
+                        if item and item["item_type"] == "potion":
+                            stat_bonus = item.get("stat_bonus") or {}
+                            heal_amount = stat_bonus.get("hp", 0)
+                            if heal_amount > 0:
+                                heal_result = player_manager.apply_heal(user_id, heal_amount)
+                                if heal_result["ok"]:
+                                    # 인벤토리 수량 감소
+                                    try:
+                                        uid_int = int(user_id)
+                                        if uid_int < 50000:
+                                            await item_repo.consume_item(uid_int, item_id, 1)
+                                    except Exception:
+                                        pass
+                                    await websocket.send_json({
+                                        "type": "player_healed",
+                                        "itemId": item_id,
+                                        "healAmount": heal_amount,
+                                        "hp": heal_result["hp"],
+                                        "maxHp": heal_result["maxHp"],
+                                    })
+                    except Exception as e:
+                        print(f"[WARN] use_item failed: {e}")
+
     except WebSocketDisconnect:
         player_manager.disconnect(user_id)
-        
+
         leave_msg = {
             "type": "leave",
             "userId": user_id

@@ -20,6 +20,7 @@ const GameEntry = () => {
 
   const [selectedMonster, setSelectedMonster] = useState(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [isAutoMode, setIsAutoMode] = useState(false);
 
   // Map & Spawn State
   const [currentMapId, setCurrentMapId] = useState('map_0');
@@ -61,7 +62,7 @@ const GameEntry = () => {
   const currentRegionInfo = useCurrentRegionInfo(myPositionRef, true);
 
   // 2. 소켓에 addProjectile 함수 전달 (남이 쏜 스킬 그리기용)
-  const { otherPlayers, sendPosition: originalSendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, setMyStats, sendSkill, monsters, sendHit, droppedItems, setDroppedItems } = useGameSocket(addProjectile);
+  const { otherPlayers, sendPosition: originalSendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, setMyStats, sendSkill, monsters, sendHit, sendUseItem, droppedItems, setDroppedItems, playerDamageEvents, clearPlayerDamageEvent } = useGameSocket(addProjectile);
 
   // 알림 자동 제거 (3초 후)
   useEffect(() => {
@@ -116,11 +117,12 @@ const GameEntry = () => {
     }
   };
 
-  // I키 — 인벤토리 열기/닫기
+  // I키: 인벤토리 / Z키: 자동사냥 토글
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'i' || e.key === 'I') setInventoryOpen(prev => !prev);
+      if (e.key === 'z' || e.key === 'Z') setIsAutoMode(prev => !prev);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -263,6 +265,10 @@ const GameEntry = () => {
           onMonsterClick={setSelectedMonster}
           currentRegionInfo={currentRegionInfo}
           worldEditorOpen={worldEditorOpen}
+          isAutoMode={isAutoMode}
+          onAutoModeChange={setIsAutoMode}
+          playerDamageEvents={playerDamageEvents}
+          clearPlayerDamageEvent={clearPlayerDamageEvent}
           />
         </Suspense>
       </div>
@@ -333,6 +339,7 @@ const GameEntry = () => {
             onClose={() => setInventoryOpen(false)}
             myStats={myStats}
             onStatsUpdate={setMyStats}
+            onUseItem={sendUseItem}
           />
         </Suspense>
       )}

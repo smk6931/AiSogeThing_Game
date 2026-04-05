@@ -11,6 +11,7 @@ export const useGameSocket = (addProjectile) => {
     const [myStats, setMyStats] = useState(null);
     const [monsters, setMonsters] = useState({});
     const [droppedItems, setDroppedItems] = useState([]);  // 아이템 드롭 알림
+    const [playerDamageEvents, setPlayerDamageEvents] = useState([]);  // 플레이어 피격 데미지 숫자
     const lastSentPositionRef = useRef(null);
 
     // 몬스터 배칭: ref로 최신값 유지, RAF로 프레임당 1회 flush
@@ -84,6 +85,23 @@ export const useGameSocket = (addProjectile) => {
                     scheduleMonsterFlush();
                     break;
                 }
+
+                case 'player_hit':
+                    setMyStats(prev => {
+                        if (!prev) return prev;
+                        const newHp = Math.max(0, prev.hp - message.damage);
+                        const died = newHp <= 0;
+                        return { ...prev, hp: died ? prev.maxHp : newHp };
+                    });
+                    setPlayerDamageEvents(prev => [...prev, {
+                        id: `phit_${Date.now()}_${Math.random()}`,
+                        damage: message.damage,
+                    }]);
+                    break;
+
+                case 'player_healed':
+                    setMyStats(prev => prev ? { ...prev, hp: message.hp } : prev);
+                    break;
 
                 case 'player_reward':
                     setMyStats(message.stats);
@@ -268,5 +286,15 @@ export const useGameSocket = (addProjectile) => {
         gameApi.sendHit(socketRef.current, hitData);
     };
 
-    return { otherPlayers, sendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, setMyStats, sendSkill, monsters, sendHit, droppedItems, setDroppedItems };
+    const sendUseItem = (itemId) => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ type: 'use_item', itemId }));
+        }
+    };
+
+    const clearPlayerDamageEvent = (id) => {
+        setPlayerDamageEvents(prev => prev.filter(e => e.id !== id));
+    };
+
+    return { otherPlayers, sendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, setMyStats, sendSkill, monsters, sendHit, sendUseItem, droppedItems, setDroppedItems, playerDamageEvents, clearPlayerDamageEvent };
 };
