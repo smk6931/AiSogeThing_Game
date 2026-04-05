@@ -1,4 +1,4 @@
-# 아이템 정의 및 플레이어 인벤토리 테이블
+# 아이템 정의, 플레이어 인벤토리, 장비 테이블
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.sql import func
 from core.database import Base
@@ -29,3 +29,14 @@ class CharacterInventory(Base):
     quantity = Column(Integer, nullable=False, default=1)
     slot_index = Column(Integer, nullable=True)
     acquired_at = Column(DateTime, server_default=func.now())
+
+
+class CharacterEquipment(Base):
+    """플레이어 착용 장비 — 슬롯당 1개"""
+    __tablename__ = "character_equipment"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    slot = Column(String(32), nullable=False)    # weapon / armor
+    item_id = Column(Integer, ForeignKey("item_template.id"), nullable=False)
+    equipped_at = Column(DateTime, server_default=func.now())

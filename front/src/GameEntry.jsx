@@ -61,7 +61,7 @@ const GameEntry = () => {
   const currentRegionInfo = useCurrentRegionInfo(myPositionRef, true);
 
   // 2. 소켓에 addProjectile 함수 전달 (남이 쏜 스킬 그리기용)
-  const { otherPlayers, sendPosition: originalSendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, sendSkill, monsters, sendHit, droppedItems, setDroppedItems } = useGameSocket(addProjectile);
+  const { otherPlayers, sendPosition: originalSendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, setMyStats, sendSkill, monsters, sendHit, droppedItems, setDroppedItems } = useGameSocket(addProjectile);
 
   // 알림 자동 제거 (3초 후)
   useEffect(() => {
@@ -329,7 +329,11 @@ const GameEntry = () => {
       {/* ================= Inventory Modal ================= */}
       {inventoryOpen && (
         <Suspense fallback={null}>
-          <InventoryModal onClose={() => setInventoryOpen(false)} myStats={myStats} />
+          <InventoryModal
+            onClose={() => setInventoryOpen(false)}
+            myStats={myStats}
+            onStatsUpdate={setMyStats}
+          />
         </Suspense>
       )}
 

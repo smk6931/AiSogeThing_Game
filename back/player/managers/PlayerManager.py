@@ -2,6 +2,7 @@ import asyncio
 from typing import Dict, Optional
 from fastapi import WebSocket
 import player.repository as char_repo
+import item.repository as item_repo
 
 class PlayerManager:
     """
@@ -35,6 +36,7 @@ class PlayerManager:
             print(f"[WARN] character load failed for {user_id}: {e}")
 
         if db_stats:
+            base_attack = db_stats["attack"] if db_stats["attack"] > 12 else 300
             stats = {
                 "level": db_stats["level"],
                 "hp": db_stats["hp"],
@@ -43,8 +45,21 @@ class PlayerManager:
                 "maxMp": db_stats["max_mp"],
                 "exp": db_stats["exp"],
                 "gold": db_stats["gold"],
-                "attack": db_stats["attack"] if db_stats["attack"] > 12 else 300,
+                "attack": base_attack,
+                "_base_attack": base_attack,
+                "defense": 0,
             }
+            # 장비 보너스 반영
+            try:
+                uid_int = int(user_id)
+                equip_bonus = await item_repo.get_equipment_stat_bonus(uid_int)
+                if equip_bonus:
+                    stats["attack"] = base_attack + equip_bonus.get("attack", 0)
+                    stats["defense"] = equip_bonus.get("defense", 0)
+                    if equip_bonus.get("mp"):
+                        stats["mp"] += equip_bonus["mp"]
+            except Exception as e:
+                print(f"[WARN] equip bonus load failed for {user_id}: {e}")
         else:
             stats = {
                 "level": 1,
@@ -55,6 +70,8 @@ class PlayerManager:
                 "exp": 0,
                 "gold": 0,
                 "attack": 300,
+                "_base_attack": 300,
+                "defense": 0,
             }
 
         # 초기 상태 설정

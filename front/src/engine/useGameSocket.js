@@ -268,5 +268,5 @@ export const useGameSocket = (addProjectile) => {
         gameApi.sendHit(socketRef.current, hitData);
     };
 
-    return { otherPlayers, sendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, sendSkill, monsters, sendHit, droppedItems, setDroppedItems };
+    return { otherPlayers, sendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, setMyStats, sendSkill, monsters, sendHit, droppedItems, setDroppedItems };
 };

@@ -258,12 +258,22 @@ Phase 1-D (DB 연결) ← Phase 1-A 완료 후 별도 진행 가능
 
 ---
 
-## 다음 단계 (2차 예정)
+## Phase 2 진행 상황
 
-- 장비 착용 시스템 (equip slot)
-- 스탯 버프 적용 (attack/defense 반영)
+### Phase 2-A — 장비 착용 시스템
+- [x] `character_equipment` DB 테이블 + migration (f3a4b5c6d7e8)
+- [x] `item/repository.py` — equip_item, unequip_item, get_equipment, get_equipment_stat_bonus
+- [x] `item/routers/router.py` — PUT /api/item/equip, DELETE /api/item/equip/{user_id}/{slot}, GET /api/item/equipment/{user_id}
+- [x] PlayerManager.connect() — 장비 스탯 보너스 반영
+- [x] `InventoryModal.jsx` — 장착 슬롯 패널 + 장착/해제 버튼 + 장착중(E) 뱃지
+- [x] `api/item.js` — equip/unequip/getEquipment 추가
+
+## 다음 단계 (2차 예정 — 미완)
+
+- 포션 사용 시스템 (HP 회복)
 - 경매장 (거래 시스템)
 - 스킬 트리 / 추가 스킬
+- 리스폰 몬스터 drops 미설정 버그 수정 ✓ (완료)
 
 ---
 

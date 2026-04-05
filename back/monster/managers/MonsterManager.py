@@ -131,6 +131,7 @@ class MonsterManager:
                         exp_reward=tmpl.get("exp", 0),
                         gold_reward=tmpl.get("gold", 0))
             m.speed = tmpl["speed"]
+            m.drops = tmpl.get("drops", [])
             self.monsters[m.id] = m
             spawned_ids.append(m.id)
         self.next_id = start_id + to_spawn
