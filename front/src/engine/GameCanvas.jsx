@@ -34,6 +34,7 @@ const GameCanvas = ({
   highlightCurrentGroup,
   showCurrentGroupTexture,
   showCullRadius,
+  groundTextureFolder,
   cameraMode,
   onMonsterClick,
   currentRegionInfo,
@@ -98,6 +99,7 @@ const GameCanvas = ({
           highlightCurrentGroup={highlightCurrentGroup}
           showCurrentGroupTexture={showCurrentGroupTexture}
           showCullRadius={showCullRadius}
+          groundTextureFolder={groundTextureFolder}
           cameraMode={cameraMode}
           onMonsterClick={onMonsterClick}
           currentRegionInfo={currentRegionInfo}

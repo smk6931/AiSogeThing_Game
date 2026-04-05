@@ -69,6 +69,7 @@ const GameOverlay = ({
   monsters = {},
   mapSettings = {},
   currentRegionInfo: regionState = null,
+  availableGroundTextureFolders = [],
 }) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -188,6 +189,8 @@ const GameOverlay = ({
   const currentPartitionTheme = currentPartition?.group_theme_code || currentPartition?.theme_code || '-';
   const worldEditorOpen = mapSettings.worldEditorOpen ?? false;
   const setWorldEditorOpen = mapSettings.setWorldEditorOpen ?? (() => {});
+  const groundTextureFolder = mapSettings.groundTextureFolder ?? '';
+  const setGroundTextureFolder = mapSettings.setGroundTextureFolder ?? (() => {});
 
   const skills = [
     { key: 'Q', icon: Sword, label: 'Slash', cooldown: 0 },
@@ -1000,6 +1003,30 @@ const GameOverlay = ({
                   <span style={{ fontSize: '9px', color: '#6a9a94', marginLeft: '3px' }}>m/s</span>
                 </div>
                 <button onClick={() => setMoveSpeed(p => Math.min(50, p + 5))} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER_COLOR}`, color: ACCENT, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              </div>
+              <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', margin: '12px 0 7px' }}>GROUND DIR</div>
+              <select
+                value={groundTextureFolder}
+                onChange={(event) => setGroundTextureFolder(event.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${BORDER_COLOR}`,
+                  color: '#d7ece8',
+                  fontSize: '11px',
+                  fontFamily: GAME_FONT,
+                  outline: 'none',
+                }}
+              >
+                <option value="">root</option>
+                {availableGroundTextureFolders.map((folder) => (
+                  <option key={folder} value={folder}>{folder}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: '10px', color: '#6a8a84', marginTop: '6px', lineHeight: 1.5 }}>
+                use `front/public/ground/{groundTextureFolder || 'root'}` as the active floor texture directory
               </div>
             </div>
           )}

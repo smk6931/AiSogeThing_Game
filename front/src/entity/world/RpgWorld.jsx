@@ -146,6 +146,7 @@ const RpgWorld = ({
   highlightCurrentGroup = true,
   showCurrentGroupTexture = false,
   showCullRadius = false,
+  groundTextureFolder = '',
   orbitRef,
   cameraMode,
   onMonsterClick,
@@ -444,6 +445,7 @@ const RpgWorld = ({
             visible={showLanduseTextureLayer}
             showOriginalBlocks
             showSectorBlocks={false}
+            textureFolder={groundTextureFolder}
             heightScale={debugConfig.terrainHeightScale}
             currentDistrict={currentDistrict}
             dongId={currentDongId}
@@ -460,6 +462,7 @@ const RpgWorld = ({
             visible={showRoadSplitLayer}
             showOriginalBlocks={false}
             showSectorBlocks
+            textureFolder={groundTextureFolder}
             heightScale={debugConfig.terrainHeightScale}
             currentDistrict={currentDistrict}
             dongId={currentDongId}
@@ -478,6 +481,7 @@ const RpgWorld = ({
             showOriginalBlocks={false}
             showSectorBlocks
             currentGroupOnly
+            textureFolder={groundTextureFolder}
             currentDistrict={currentDistrict}
             dongId={currentDongId}
             currentDong={currentDong}

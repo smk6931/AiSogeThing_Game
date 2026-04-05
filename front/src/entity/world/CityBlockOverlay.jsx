@@ -315,6 +315,7 @@ const CityBlockOverlay = ({
   showSectorBlocks = true,
   playerPositionRef,
   currentGroupOnly = false,
+  textureFolder = '',
 }) => {
   const [texturePaths, setTexturePaths] = useState([]);
   const [dbPartitions, setDbPartitions] = useState([]);
@@ -323,8 +324,9 @@ const CityBlockOverlay = ({
   useEffect(() => {
     let cancelled = false;
     const fetchPaths = async () => {
+      if (!cancelled) setLoading(true);
       try {
-        const res = await worldApi.getBlockTextures();
+        const res = await worldApi.getBlockTextures(textureFolder);
         const serverPaths = Array.isArray(res.data) ? res.data : [];
         if (!cancelled) setTexturePaths(serverPaths);
       } catch (_) {
@@ -335,7 +337,7 @@ const CityBlockOverlay = ({
     };
     fetchPaths();
     return () => { cancelled = true; };
-  }, []);
+  }, [textureFolder]);
 
   useEffect(() => {
     let cancelled = false;

@@ -9,6 +9,7 @@ import GameOverlay from '@ui/GameOverlay';
 import ChatBox from '@ui/ChatBox';
 import { getMap } from '@entity/world/mapConfig';
 import { useGameConfig } from '@contexts/GameConfigContext';
+import worldApi from '@api/world';
 const WorldMapModal = lazy(() => import('@ui/WorldMapModal'));
 const MonsterInfoPanel = lazy(() => import('@entity/monster/MonsterInfoPanel'));
 const GameCanvas = lazy(() => import('@engine/GameCanvas'));
@@ -90,6 +91,8 @@ const GameEntry = () => {
   const [showCullRadius, setShowCullRadius] = useState(false);
   const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
+  const [availableGroundTextureFolders, setAvailableGroundTextureFolders] = useState([]);
+  const [groundTextureFolder, setGroundTextureFolder] = useState(() => localStorage.getItem('ground_texture_folder') || '');
 
 
   // [복구] 위치 동기화 핸들러
@@ -123,6 +126,35 @@ const GameEntry = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchTextureFolders = async () => {
+      try {
+        const res = await worldApi.getBlockTextureFolders();
+        const folders = Array.isArray(res.data) ? res.data : [];
+        if (cancelled) return;
+        setAvailableGroundTextureFolders(folders);
+        if (groundTextureFolder && !folders.includes(groundTextureFolder)) {
+          setGroundTextureFolder('');
+        }
+      } catch (_) {
+        if (!cancelled) setAvailableGroundTextureFolders([]);
+      }
+    };
+
+    fetchTextureFolders();
+    return () => { cancelled = true; };
+  }, [groundTextureFolder]);
+
+  useEffect(() => {
+    if (groundTextureFolder) {
+      localStorage.setItem('ground_texture_folder', groundTextureFolder);
+    } else {
+      localStorage.removeItem('ground_texture_folder');
+    }
+  }, [groundTextureFolder]);
 
   return (
     <div style={{
@@ -173,6 +205,7 @@ const GameEntry = () => {
           highlightCurrentGroup={highlightCurrentGroup}
           showCurrentGroupTexture={showCurrentGroupTexture}
           showCullRadius={showCullRadius}
+          groundTextureFolder={groundTextureFolder}
           cameraMode={cameraMode}
           onMonsterClick={setSelectedMonster}
           currentRegionInfo={currentRegionInfo}
@@ -202,6 +235,7 @@ const GameEntry = () => {
         myStats={myStats}
         monsters={monsters}
         currentRegionInfo={currentRegionInfo}
+        availableGroundTextureFolders={availableGroundTextureFolders}
         mapSettings={{
           showOsmMap, setShowOsmMap,
           showSeoulRoads, setShowSeoulRoads,
@@ -218,6 +252,7 @@ const GameEntry = () => {
           highlightCurrentGroup, setHighlightCurrentGroup,
           showCurrentGroupTexture, setShowCurrentGroupTexture,
           showCullRadius, setShowCullRadius,
+          groundTextureFolder, setGroundTextureFolder,
           cameraMode, setCameraMode,
           worldEditorOpen, setWorldEditorOpen,
           onPlayView: () => { setZoomLevel(18.5); setCameraMode('isometric'); },

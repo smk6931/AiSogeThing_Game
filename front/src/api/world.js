@@ -72,8 +72,14 @@ const worldApi = {
   },
   
   // 서버의 images 폴더 내 파일 목록 조회
-  getBlockTextures: async () => {
-    return await client.get('/api/world/block-textures');
+  getBlockTextures: async (folder = '') => {
+    return await client.get('/api/world/block-textures', {
+      params: { folder }
+    });
+  },
+
+  getBlockTextureFolders: async () => {
+    return await client.get('/api/world/block-texture-folders');
   },
 
   // 용산구 월드 디자인 메타데이터 초안 조회
