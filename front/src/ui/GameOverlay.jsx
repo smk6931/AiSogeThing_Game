@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarChart2, Package, Wrench, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import GameCodex from './GameCodex';
 
 import { useAuth } from '@contexts/AuthContext';
 import { useGameConfig } from '@contexts/GameConfigContext';
@@ -9,7 +8,8 @@ import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
 
-import LeafletMapBackground from './LeafletMapBackground';
+const GameCodex = lazy(() => import('./GameCodex'));
+const LeafletMapBackground = lazy(() => import('./LeafletMapBackground'));
 
 const GAME_FONT = "'Cinzel', 'Noto Sans KR', serif";
 const PANEL_BG = 'linear-gradient(180deg, rgba(14, 20, 28, 0.88), rgba(8, 10, 16, 0.86))';
@@ -17,6 +17,17 @@ const BORDER_COLOR = 'rgba(124, 171, 166, 0.45)';
 const GOLD = '#d0b16b';
 const ACCENT = '#67e8d6';
 const GLOW = '0 0 18px rgba(103, 232, 214, 0.18)';
+const MAP_PLACEHOLDER_STYLE = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'radial-gradient(circle at 50% 50%, rgba(20,30,40,0.9), rgba(7,10,14,0.96))',
+  color: '#6a9a94',
+  fontSize: '10px',
+  letterSpacing: '1.2px',
+};
 
 const injectFont = () => {
   if (document.getElementById('game-font-link')) return;
@@ -72,7 +83,6 @@ const GameOverlay = ({
   const [sidebarMode, setSidebarMode] = useState('menu');
   const [showLayerPopup, setShowLayerPopup] = useState(false);
   const [showRoadPanel, setShowRoadPanel] = useState(false);
-  const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
   const [gpsCoords, setGpsCoords] = useState({ lat: GIS_ORIGIN.lat, lng: GIS_ORIGIN.lng });
@@ -161,13 +171,6 @@ const GameOverlay = ({
     partitionTimerRef.current = setTimeout(() => setShowPartitionTitle(false), 2200);
   }, [regionState?.currentPartition?.partition_key]);
 
-  useEffect(() => {
-    if (window.__worldGui) {
-      if (worldEditorOpen) window.__worldGui.show();
-      else window.__worldGui.hide();
-    }
-  }, [worldEditorOpen]);
-
   const playerStats = {
     hp: myStats?.hp || 100,
     maxHp: myStats?.maxHp || 100,
@@ -183,6 +186,8 @@ const GameOverlay = ({
   const currentPartition = regionState?.currentPartition || null;
   const currentPartitionTitle = currentPartition?.group_display_name || currentPartition?.display_name || '';
   const currentPartitionTheme = currentPartition?.group_theme_code || currentPartition?.theme_code || '-';
+  const worldEditorOpen = mapSettings.worldEditorOpen ?? false;
+  const setWorldEditorOpen = mapSettings.setWorldEditorOpen ?? (() => {});
 
   const skills = [
     { key: 'Q', icon: Sword, label: 'Slash', cooldown: 0 },
@@ -467,15 +472,17 @@ const GameOverlay = ({
           onClick={() => setIsMapExpanded(true)}
         >
           <div style={{ position: 'absolute', inset: -5, opacity: 0.85 }}>
-            <LeafletMapBackground
-              playerPositionRef={myPositionRef}
-              zoomLevel={mapZoom}
-              districts={districts}
-              dongs={dongs}
-              currentDistrictId={currentDistrict?.id || null}
-              currentDongId={currentDong?.id || null}
-              monsters={monsters}
-            />
+            <Suspense fallback={<div style={MAP_PLACEHOLDER_STYLE}>MAP LOADING</div>}>
+              <LeafletMapBackground
+                playerPositionRef={myPositionRef}
+                zoomLevel={mapZoom}
+                districts={districts}
+                dongs={dongs}
+                currentDistrictId={currentDistrict?.id || null}
+                currentDongId={currentDong?.id || null}
+                monsters={monsters}
+              />
+            </Suspense>
           </div>
 
 
@@ -661,18 +668,20 @@ const GameOverlay = ({
             }}
           >
             <div style={{ position: 'absolute', inset: 0, opacity: 0.9 }}>
-              <LeafletMapBackground
-                playerPositionRef={myPositionRef}
-                zoomLevel={mapZoom + 1}
-                districts={districts}
-                dongs={dongs}
-                currentDistrictId={currentDistrict?.id || null}
-                currentDongId={currentDong?.id || null}
-                interactive
-                showSeoulMask
-                onZoomChange={(newZoom) => setMapZoom(newZoom - 1)}
-                monsters={monsters}
-              />
+              <Suspense fallback={<div style={MAP_PLACEHOLDER_STYLE}>MAP LOADING</div>}>
+                <LeafletMapBackground
+                  playerPositionRef={myPositionRef}
+                  zoomLevel={mapZoom + 1}
+                  districts={districts}
+                  dongs={dongs}
+                  currentDistrictId={currentDistrict?.id || null}
+                  currentDongId={currentDong?.id || null}
+                  interactive
+                  showSeoulMask
+                  onZoomChange={(newZoom) => setMapZoom(newZoom - 1)}
+                  monsters={monsters}
+                />
+              </Suspense>
             </div>
 
             <div
@@ -1088,7 +1097,11 @@ const GameOverlay = ({
         </div>
       )}
       {/* ===== 게임 도감 오버레이 ===== */}
-      {showCodex && <GameCodex onClose={() => setShowCodex(false)} />}
+      {showCodex && (
+        <Suspense fallback={null}>
+          <GameCodex onClose={() => setShowCodex(false)} />
+        </Suspense>
+      )}
     </div>
   );
 };

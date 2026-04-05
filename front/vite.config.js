@@ -7,6 +7,23 @@ export default defineConfig({
   // 상위폴더 경로 읽어오기 env
   envDir: '../',
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('react-router-dom')) return 'router';
+          if (id.includes('three')) return 'three-core';
+          if (id.includes('react-leaflet') || id.includes('leaflet')) return 'leaflet';
+          if (id.includes('lucide-react')) return 'icons';
+          if (id.includes('lil-gui')) return 'world-debug';
+          if (id.includes('@turf/turf')) return 'geo';
+          if (id.includes('react') || id.includes('scheduler')) return 'react-vendor';
+          return undefined;
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

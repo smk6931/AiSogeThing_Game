@@ -1,9 +1,10 @@
-import React, { Suspense, useRef } from 'react';
+import React, { Suspense, lazy, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import RpgWorld from '@entity/world/RpgWorld';
-import EnvironmentEffects from '@entity/world/EnvironmentEffects';
+import { OrbitControls } from '@react-three/drei/core/OrbitControls.js';
 import ZoomController from '@engine/ZoomController';
+
+const RpgWorld = lazy(() => import('@entity/world/RpgWorld'));
+const EnvironmentEffects = lazy(() => import('@entity/world/EnvironmentEffects'));
 
 // 시점 제어용 줌 컨트롤러 (실제 카메라는 RpgWorld에서 동적 렌더링)
 const ZoomSystem = ({ zoomLevel }) => {
@@ -36,6 +37,7 @@ const GameCanvas = ({
   cameraMode,
   onMonsterClick,
   currentRegionInfo,
+  worldEditorOpen = false,
 }) => {
   const orbitRef = useRef();
 
@@ -99,6 +101,7 @@ const GameCanvas = ({
           cameraMode={cameraMode}
           onMonsterClick={onMonsterClick}
           currentRegionInfo={currentRegionInfo}
+          worldEditorOpen={worldEditorOpen}
           orbitRef={orbitRef}
         />
       </Suspense>

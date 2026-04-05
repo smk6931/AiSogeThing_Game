@@ -518,7 +518,7 @@ const ZoneOverlay = ({
     residential: true, commercial: true, industrial: true, institutional: true,
     educational: true, medical: true, parking: true,
     military: true, religious: true, sports: true, cemetery: true, transport: true, port: true,
-    unexplored: true
+    unexplored: false
   };
   const enabled = { ...defaults, ...enabledZones };
 

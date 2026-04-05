@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Joystick } from 'react-joystick-component';
 import { useAuth } from '@contexts/AuthContext';
 import { useGameInput } from '@engine/useGameInput';
@@ -7,11 +7,11 @@ import { useGameSocket } from '@engine/useGameSocket';
 import { useCurrentRegionInfo } from '@hooks/useCurrentRegionInfo';
 import GameOverlay from '@ui/GameOverlay';
 import ChatBox from '@ui/ChatBox';
-import WorldMapModal from '@ui/WorldMapModal';
 import { getMap } from '@entity/world/mapConfig';
 import { useGameConfig } from '@contexts/GameConfigContext';
-import GameCanvas from '@engine/GameCanvas';
-import MonsterInfoPanel from '@entity/monster/MonsterInfoPanel';
+const WorldMapModal = lazy(() => import('@ui/WorldMapModal'));
+const MonsterInfoPanel = lazy(() => import('@entity/monster/MonsterInfoPanel'));
+const GameCanvas = lazy(() => import('@engine/GameCanvas'));
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -89,6 +89,7 @@ const GameEntry = () => {
   const [showCurrentGroupTexture, setShowCurrentGroupTexture] = useState(false);
   const [showCullRadius, setShowCullRadius] = useState(false);
   const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
+  const [worldEditorOpen, setWorldEditorOpen] = useState(false);
 
 
   // [복구] 위치 동기화 핸들러
@@ -137,7 +138,8 @@ const GameEntry = () => {
 
       {/* ================= 3D Game World ================= */}
       <div style={{ position: 'absolute', inset: 0 }}>
-        <GameCanvas
+        <Suspense fallback={null}>
+          <GameCanvas
           input={input}
           active={true}
           otherPlayers={otherPlayers}
@@ -174,17 +176,21 @@ const GameEntry = () => {
           cameraMode={cameraMode}
           onMonsterClick={setSelectedMonster}
           currentRegionInfo={currentRegionInfo}
-        />
+          worldEditorOpen={worldEditorOpen}
+          />
+        </Suspense>
       </div>
 
       {/* ================= World Map Modal ================= */}
       {isWorldMapOpen && (
         <div style={{ position: 'absolute', zIndex: 200, inset: 0 }}>
-          <WorldMapModal
-            isOpen={isWorldMapOpen}
-            onClose={() => setIsWorldMapOpen(false)}
-            onSelectMap={(mapId) => handleMapChange(mapId)}
-          />
+          <Suspense fallback={null}>
+            <WorldMapModal
+              isOpen={isWorldMapOpen}
+              onClose={() => setIsWorldMapOpen(false)}
+              onSelectMap={(mapId) => handleMapChange(mapId)}
+            />
+          </Suspense>
         </div>
       )}
 
@@ -213,16 +219,19 @@ const GameEntry = () => {
           showCurrentGroupTexture, setShowCurrentGroupTexture,
           showCullRadius, setShowCullRadius,
           cameraMode, setCameraMode,
+          worldEditorOpen, setWorldEditorOpen,
           onPlayView: () => { setZoomLevel(18.5); setCameraMode('isometric'); },
         }}
       />
 
       {/* ================= Monster Info Panel ================= */}
       {selectedMonster && (
-        <MonsterInfoPanel
-          monster={selectedMonster}
-          onClose={() => setSelectedMonster(null)}
-        />
+        <Suspense fallback={null}>
+          <MonsterInfoPanel
+            monster={selectedMonster}
+            onClose={() => setSelectedMonster(null)}
+          />
+        </Suspense>
       )}
 
       {/* ================= Chat Box ================= */}
