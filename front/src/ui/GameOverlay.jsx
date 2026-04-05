@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+﻿import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarChart2, Package, Wrench, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -405,12 +405,16 @@ const GameOverlay = ({
 
       {/* 환경설정 버튼 — 레이어 버튼 왼쪽 */}
       <div
-        onClick={() => { setShowSettingsPopup(v => !v); setShowLayerPopup(false); }}
+        onClick={() => {
+          setShowSettingsPopup(v => !v);
+          setShowLayerPopup(false);
+          setShowWorldToolsPopup(false);
+        }}
         title="환경설정"
         style={{
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
-          right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 8 + 38)}px)`,
+          right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 80)}px)`,
           width: '30px',
           height: '30px',
           borderRadius: '8px',
@@ -426,7 +430,7 @@ const GameOverlay = ({
           zIndex: 60,
         }}
       >
-        ⚙️
+        <Settings size={15} color={showSettingsPopup ? '#c4b5fd' : GOLD} />
       </div>
 
       {/* 환경설정 팝업 */}
@@ -444,7 +448,11 @@ const GameOverlay = ({
 
       {/* 레이어 토글 버튼 — 미니맵 왼쪽 */}
       <div
-        onClick={() => { setShowLayerPopup(v => !v); setShowSettingsPopup(false); }}
+        onClick={() => {
+          setShowLayerPopup(v => !v);
+          setShowSettingsPopup(false);
+          setShowWorldToolsPopup(false);
+        }}
         title="레이어 설정"
         style={{
           position: 'absolute',
@@ -465,7 +473,7 @@ const GameOverlay = ({
           zIndex: 60,
         }}
       >
-        🗺
+        <Menu size={15} color={showLayerPopup ? ACCENT : GOLD} />
       </div>
 
       {/* 레이어 팝업 — 독립 플로팅 패널 (레이어 + 카메라) */}
@@ -1290,8 +1298,12 @@ const GameOverlay = ({
       )}
       {/* ===== 게임 도감 오버레이 ===== */}
       <div
-        onClick={() => setShowWorldToolsPopup(v => !v)}
-        title="world tools"
+        onClick={() => {
+          setShowWorldToolsPopup(v => !v);
+          setShowSettingsPopup(false);
+          setShowLayerPopup(false);
+        }}
+        title="월드 툴"
         style={{
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
