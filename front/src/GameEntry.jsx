@@ -285,7 +285,7 @@ const GameEntry = () => {
     if (Math.abs(delta) < 4) return;
 
     event.preventDefault();
-    setZoomLevel((prev) => clampZoomLevel(prev - delta * 0.015));
+    setZoomLevel((prev) => clampZoomLevel(prev + delta * 0.015));
     pinchDistanceRef.current = nextDistance;
   }, [getTouchDistance]);
 
