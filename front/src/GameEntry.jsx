@@ -451,12 +451,12 @@ const GameEntry = () => {
         <>
           <div style={{
             position: 'absolute',
-            bottom: isMobile ? 22 : 30,
-            left: isMobile ? 12 : 20,
+            bottom: isMobile ? 26 : 30,
+            left: isMobile ? 18 : 20,
             zIndex: 90,
             opacity: 0.95,
-            width: isMobile ? 124 : 'auto',
-            height: isMobile ? 124 : 'auto',
+            width: isMobile ? 128 : 'auto',
+            height: isMobile ? 128 : 'auto',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -464,7 +464,7 @@ const GameEntry = () => {
             background: isMobile ? 'radial-gradient(circle, rgba(255,255,255,0.08), rgba(255,255,255,0.01) 68%)' : 'transparent'
           }}>
             <Joystick
-              size={isMobile ? 94 : 80}
+              size={isMobile ? 96 : 80}
               sticky={isMobile}
               baseColor={isMobile ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.2)"}
               stickColor={isMobile ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.5)"}

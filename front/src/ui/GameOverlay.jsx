@@ -232,12 +232,20 @@ const GameOverlay = ({
   const roadTextureFolder = mapSettings.roadTextureFolder ?? '';
   const setRoadTextureFolder = mapSettings.setRoadTextureFolder ?? (() => {});
   const setWorldZoomLevel = mapSettings.setZoomLevel ?? (() => {});
-  const layerButtonOffset = Math.round(96 * uiScale + 8);
-  const worldButtonOffset = Math.round(96 * uiScale + 44);
-  const settingsButtonOffset = Math.round(96 * uiScale + 80);
-  const zoomButtonsOffset = Math.round(96 * uiScale + 116);
-  const collapseButtonOffset = Math.round(96 * uiScale + 152);
+  const topToolSize = isMobile ? 28 : 30;
+  const topToolStep = isMobile ? 34 : 36;
+  const layerButtonOffset = topToolStep;
+  const worldButtonOffset = topToolStep * 2;
+  const settingsButtonOffset = topToolStep * 3;
+  const zoomButtonsOffset = topToolStep * 4;
+  const collapseButtonOffset = topToolStep * 5;
   const showTopToolButtons = !isMobile || !topButtonsCollapsed;
+  const minimapWidth = isMobile ? 92 : 96;
+  const topPanelWidth = isMobile ? '92px' : '104px';
+  const topPanelPadding = isMobile ? '7px' : '8px';
+  const mobileCombatRight = '18px';
+  const mobileCombatBottom = '26px';
+  const mobileQuickMenuWidth = isMobile ? `${minimapWidth}px` : 'auto';
 
   const primarySkill = { key: 'R', icon: Flame, label: 'Burst', accent: '#ff7a59' };
   const utilitySkills = [
@@ -250,6 +258,18 @@ const GameOverlay = ({
     { key: '1', name: 'Potion', count: 5, icon: '🧪' },
     { key: '2', name: 'Mana', count: 3, icon: '💧' },
   ];
+
+  const openSidebarMenu = () => {
+    setSidebarMode('menu');
+    setSidebarTab(null);
+    setSidebarOpen(true);
+  };
+
+  const openSidebarTabPanel = (tab) => {
+    setSidebarMode('menu');
+    setSidebarTab((prev) => prev === tab && sidebarOpen ? null : tab);
+    setSidebarOpen(true);
+  };
 
   return (
     <div
@@ -269,19 +289,19 @@ const GameOverlay = ({
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
           left: 'max(10px, env(safe-area-inset-left))',
-          width: '104px',
-          padding: '8px',
-          borderRadius: '12px',
+          width: topPanelWidth,
+          padding: topPanelPadding,
+          borderRadius: isMobile ? '10px' : '12px',
           background: PANEL_BG,
           backdropFilter: 'blur(16px)',
           border: `1px solid ${BORDER_COLOR}`,
           boxShadow: GLOW,
           transformOrigin: 'top left',
-          transform: `scale(${uiScale})`,
+          transform: isMobile ? 'none' : `scale(${uiScale})`,
           pointerEvents: 'auto',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '8px', marginBottom: isMobile ? '6px' : '8px' }}>
           <div
             style={{
               background: `linear-gradient(135deg, ${ACCENT}, ${GOLD})`,
@@ -298,7 +318,7 @@ const GameOverlay = ({
           >
             {playerStats.level}
           </div>
-          <span style={{ color: GOLD, fontWeight: '700', fontSize: isMobile ? '10px' : '15px' }}>
+          <span style={{ color: GOLD, fontWeight: '700', fontSize: isMobile ? '9px' : '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {playerStats.nickname}
           </span>
         </div>
@@ -332,44 +352,46 @@ const GameOverlay = ({
             <div style={{ width: `${expPct}%`, height: '100%', background: 'linear-gradient(90deg, #6d28d9, #8b5cf6)', transition: 'width 0.4s ease' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button
-                onClick={onInventoryOpen}
-                style={{
-                  background: 'rgba(30,50,40,0.8)',
-                  border: '1px solid rgba(100,160,120,0.4)',
-                  borderRadius: '5px',
-                  color: '#67e8d6',
-                  fontSize: isMobile ? '8px' : '10px',
-                  padding: '2px 6px',
-                  cursor: 'pointer',
-                  pointerEvents: 'auto',
-                  fontFamily: 'inherit',
-                }}
-              >
-                인벤 [I]
-              </button>
-              <button
-                onClick={onAutoModeToggle}
-                style={{
-                  background: isAutoMode ? 'rgba(255,120,30,0.25)' : 'rgba(30,30,50,0.8)',
-                  border: `1px solid ${isAutoMode ? 'rgba(255,140,50,0.7)' : 'rgba(80,80,120,0.4)'}`,
-                  borderRadius: '5px',
-                  color: isAutoMode ? '#ffaa44' : '#778',
-                  fontSize: isMobile ? '8px' : '10px',
-                  padding: '2px 6px',
-                  cursor: 'pointer',
-                  pointerEvents: 'auto',
-                  fontFamily: 'inherit',
-                  fontWeight: isAutoMode ? 700 : 400,
-                  boxShadow: isAutoMode ? '0 0 6px rgba(255,140,50,0.4)' : 'none',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {isAutoMode ? '⚔ 자동ON' : '자동 [Z]'}
-              </button>
-            </div>
-            <span style={{ fontSize: isMobile ? '7px' : '9px', color: GOLD }}>
+            {!isMobile && (
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  onClick={onInventoryOpen}
+                  style={{
+                    background: 'rgba(30,50,40,0.8)',
+                    border: '1px solid rgba(100,160,120,0.4)',
+                    borderRadius: '5px',
+                    color: '#67e8d6',
+                    fontSize: '10px',
+                    padding: '2px 6px',
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  인벤 [I]
+                </button>
+                <button
+                  onClick={onAutoModeToggle}
+                  style={{
+                    background: isAutoMode ? 'rgba(255,120,30,0.25)' : 'rgba(30,30,50,0.8)',
+                    border: `1px solid ${isAutoMode ? 'rgba(255,140,50,0.7)' : 'rgba(80,80,120,0.4)'}`,
+                    borderRadius: '5px',
+                    color: isAutoMode ? '#ffaa44' : '#778',
+                    fontSize: '10px',
+                    padding: '2px 6px',
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    fontFamily: 'inherit',
+                    fontWeight: isAutoMode ? 700 : 400,
+                    boxShadow: isAutoMode ? '0 0 6px rgba(255,140,50,0.4)' : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {isAutoMode ? '⚔ 자동ON' : '자동 [Z]'}
+                </button>
+              </div>
+            )}
+            <span style={{ fontSize: isMobile ? '8px' : '9px', color: GOLD, marginLeft: isMobile ? 'auto' : 0 }}>
               {playerStats.gold}G
             </span>
           </div>
@@ -428,8 +450,8 @@ const GameOverlay = ({
             position: 'absolute',
             top: 'max(10px, env(safe-area-inset-top))',
             right: `calc(max(10px, env(safe-area-inset-right)) + ${collapseButtonOffset}px)`,
-            width: '30px',
-            height: '30px',
+            width: `${topToolSize}px`,
+            height: `${topToolSize}px`,
             borderRadius: '8px',
             background: topButtonsCollapsed ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
             border: `1px solid ${topButtonsCollapsed ? ACCENT : BORDER_COLOR}`,
@@ -439,7 +461,7 @@ const GameOverlay = ({
             cursor: 'pointer',
             pointerEvents: 'auto',
             boxShadow: GLOW,
-            fontSize: '15px',
+            fontSize: isMobile ? '14px' : '15px',
             zIndex: 61,
           }}
         >
@@ -460,8 +482,8 @@ const GameOverlay = ({
             position: 'absolute',
             top: 'max(10px, env(safe-area-inset-top))',
             right: `calc(max(10px, env(safe-area-inset-right)) + ${zoomButtonsOffset}px)`,
-            width: '40px',
-            height: '40px',
+            width: `${isMobile ? 36 : 40}px`,
+            height: `${isMobile ? 36 : 40}px`,
             borderRadius: '11px',
             background: showZoomPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.9)',
             border: `1px solid ${showZoomPopup ? ACCENT : BORDER_COLOR}`,
@@ -475,7 +497,7 @@ const GameOverlay = ({
             zIndex: 60,
           }}
         >
-          <Search size={20} color={showZoomPopup ? ACCENT : GOLD} />
+          <Search size={isMobile ? 18 : 20} color={showZoomPopup ? ACCENT : GOLD} />
         </div>
       )}
 
@@ -550,8 +572,8 @@ const GameOverlay = ({
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
           right: `calc(max(10px, env(safe-area-inset-right)) + ${settingsButtonOffset}px)`,
-          width: '30px',
-          height: '30px',
+          width: `${topToolSize}px`,
+          height: `${topToolSize}px`,
           borderRadius: '8px',
           background: showSettingsPopup ? 'rgba(40,30,60,0.95)' : 'rgba(8,14,22,0.88)',
           border: `1px solid ${showSettingsPopup ? '#a78bfa' : BORDER_COLOR}`,
@@ -565,7 +587,7 @@ const GameOverlay = ({
           zIndex: 60,
         }}
       >
-        <Settings size={15} color={showSettingsPopup ? '#c4b5fd' : GOLD} />
+        <Settings size={isMobile ? 14 : 15} color={showSettingsPopup ? '#c4b5fd' : GOLD} />
       </div>}
 
       {/* 환경설정 팝업 */}
@@ -594,8 +616,8 @@ const GameOverlay = ({
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
           right: `calc(max(10px, env(safe-area-inset-right)) + ${layerButtonOffset}px)`,
-          width: '30px',
-          height: '30px',
+          width: `${topToolSize}px`,
+          height: `${topToolSize}px`,
           borderRadius: '8px',
           background: showLayerPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
           border: `1px solid ${showLayerPopup ? ACCENT : BORDER_COLOR}`,
@@ -609,7 +631,7 @@ const GameOverlay = ({
           zIndex: 60,
         }}
       >
-        <Menu size={15} color={showLayerPopup ? ACCENT : GOLD} />
+        <Menu size={isMobile ? 14 : 15} color={showLayerPopup ? ACCENT : GOLD} />
       </div>}
 
       {/* 레이어 팝업 — 독립 플로팅 패널 (레이어 + 카메라) */}
@@ -770,8 +792,8 @@ const GameOverlay = ({
         <div
           style={{
             position: 'relative',
-            width: '96px',
-            height: '76px',
+            width: `${minimapWidth}px`,
+            height: isMobile ? '74px' : '76px',
             background: PANEL_BG,
             borderRadius: isMobile ? '14px' : '24px',
             border: `2px solid ${BORDER_COLOR}`,
@@ -873,7 +895,7 @@ const GameOverlay = ({
               color: showPartitionPanel ? ACCENT : '#c8e8e2',
               borderRadius: '8px',
               padding: '5px 9px',
-              width: '96px',
+              width: mobileQuickMenuWidth,
               textAlign: 'left',
               cursor: 'pointer',
               boxShadow: GLOW,
@@ -910,6 +932,50 @@ const GameOverlay = ({
               {showPartitionPanel ? '▲' : '▼'}
             </span>
           </button>
+        )}
+
+        {!isMapExpanded && isMobile && (
+          <div
+            style={{
+              width: mobileQuickMenuWidth,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '5px',
+              pointerEvents: 'auto',
+            }}
+          >
+            {[
+              { id: 'stats', icon: BarChart2, label: '스탯', color: '#60a5fa', onClick: () => openSidebarTabPanel('stats') },
+              { id: 'items', icon: Package, label: '인벤', color: '#a78bfa', onClick: onInventoryOpen },
+              { id: 'codex', icon: BookOpen, label: '도감', color: '#fbbf24', onClick: () => setShowCodex(true) },
+              { id: 'menu', icon: Menu, label: '메뉴', color: GOLD, onClick: openSidebarMenu },
+            ].map(({ id, icon: Icon, label, color, onClick }) => (
+              <button
+                key={id}
+                onClick={onClick}
+                style={{
+                  minHeight: '28px',
+                  padding: '4px 0',
+                  borderRadius: '8px',
+                  border: `1px solid ${BORDER_COLOR}`,
+                  background: 'rgba(8, 14, 20, 0.9)',
+                  color: '#dceeed',
+                  boxShadow: GLOW,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '1px',
+                  fontSize: '8px',
+                  fontFamily: GAME_FONT,
+                  cursor: 'pointer',
+                }}
+              >
+                <Icon size={11} color={color} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
         )}
 
         {/* PARTITION 상세 패널 */}
@@ -1099,7 +1165,7 @@ const GameOverlay = ({
       </div>
 
       {/* ===== 이동속도 컨트롤 (우측 하단) ===== */}
-      <div
+      {!isMobile && <div
         style={{
           position: 'absolute',
           bottom: '110px',
@@ -1126,31 +1192,31 @@ const GameOverlay = ({
           onClick={() => setMoveSpeed(prev => Math.min(50, prev + 5))}
           style={{ width: '26px', height: '18px', background: 'rgba(8,14,22,0.86)', border: `1px solid ${BORDER_COLOR}`, borderRadius: '5px', color: ACCENT, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >+</button>
-      </div>
+      </div>}
 
       {isMobile && (
         <>
           <div
             style={{
               position: 'absolute',
-              bottom: '22px',
-              right: '14px',
+              bottom: mobileCombatBottom,
+              right: mobileCombatRight,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'flex-end',
-              gap: '8px',
-              transformOrigin: 'bottom right',
-              transform: `scale(${uiScale})`,
+              gap: '10px',
+              width: '144px',
               pointerEvents: 'auto',
+              zIndex: 101,
             }}
           >
-            <div style={{ display: 'flex', gap: '8px', marginRight: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', width: '100%' }}>
               {utilitySkills.map((skill) => (
                 <div
                   key={skill.key}
                   style={{
-                    width: '42px',
-                    height: '42px',
+                    width: '44px',
+                    height: '44px',
                     borderRadius: '14px',
                     background: 'linear-gradient(180deg, rgba(16,24,34,0.96), rgba(8,12,18,0.94))',
                     border: `1px solid ${skill.accent}55`,
@@ -1169,34 +1235,106 @@ const GameOverlay = ({
               ))}
             </div>
 
-          {/* 주 스킬 버튼 */}
-          <div
-            onPointerDown={() => onSimulateKey('r', true)}
-            onPointerUp={() => onSimulateKey('r', false)}
-            onPointerCancel={() => onSimulateKey('r', false)}
-            onPointerLeave={() => onSimulateKey('r', false)}
-            style={{
-              width: '76px',
-              height: '76px',
-              borderRadius: '24px',
-              background: 'radial-gradient(circle at 30% 30%, rgba(255,150,110,0.98), rgba(214,45,32,0.86))',
-              border: '1px solid rgba(255,221,185,0.34)',
-              boxShadow: '0 14px 32px rgba(214,45,32,0.42)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              touchAction: 'none',
-            }}
-          >
-            <Flame size={28} color="#fff4db" />
-            <span style={{ marginTop: '4px', fontSize: '10px', color: '#fff8ef', fontWeight: '800', letterSpacing: '0.08em' }}>
-              BURST
-            </span>
-            <span style={{ position: 'absolute', top: '8px', right: '10px', fontSize: '10px', color: '#ffe0b5', fontWeight: '700' }}>
-              R
-            </span>
-          </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px', width: '100%' }}>
+              <button
+                onClick={onAutoModeToggle}
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '18px',
+                  border: `1px solid ${isAutoMode ? 'rgba(255,170,68,0.8)' : BORDER_COLOR}`,
+                  background: isAutoMode ? 'linear-gradient(180deg, rgba(255,140,55,0.25), rgba(120,40,10,0.88))' : 'linear-gradient(180deg, rgba(12,18,26,0.96), rgba(6,10,16,0.94))',
+                  boxShadow: isAutoMode ? '0 12px 26px rgba(255,140,55,0.28)' : '0 10px 18px rgba(0,0,0,0.24)',
+                  color: isAutoMode ? '#ffd39d' : '#9db7b2',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '2px',
+                  cursor: 'pointer',
+                  fontFamily: GAME_FONT,
+                }}
+              >
+                <Sword size={16} color={isAutoMode ? '#ffd39d' : '#9db7b2'} />
+                <span style={{ fontSize: '8px', fontWeight: '700' }}>{isAutoMode ? 'AUTO' : 'MAN'}</span>
+                <span style={{ fontSize: '7px', color: GOLD }}>Z</span>
+              </button>
+
+              <div
+                onPointerDown={() => onSimulateKey('r', true)}
+                onPointerUp={() => onSimulateKey('r', false)}
+                onPointerCancel={() => onSimulateKey('r', false)}
+                onPointerLeave={() => onSimulateKey('r', false)}
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '24px',
+                  background: 'radial-gradient(circle at 30% 30%, rgba(255,150,110,0.98), rgba(214,45,32,0.86))',
+                  border: '1px solid rgba(255,221,185,0.34)',
+                  boxShadow: '0 14px 32px rgba(214,45,32,0.42)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  touchAction: 'none',
+                  position: 'relative',
+                }}
+              >
+                <Flame size={30} color="#fff4db" />
+                <span style={{ marginTop: '4px', fontSize: '10px', color: '#fff8ef', fontWeight: '800', letterSpacing: '0.08em' }}>
+                  BURST
+                </span>
+                <span style={{ position: 'absolute', top: '8px', right: '10px', fontSize: '10px', color: '#ffe0b5', fontWeight: '700' }}>
+                  R
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <button
+                onClick={onInventoryOpen}
+                style={{
+                  width: '54px',
+                  height: '34px',
+                  borderRadius: '12px',
+                  border: `1px solid ${BORDER_COLOR}`,
+                  background: 'rgba(8,14,22,0.88)',
+                  color: '#dceeed',
+                  cursor: 'pointer',
+                  boxShadow: GLOW,
+                  fontSize: '10px',
+                  fontFamily: GAME_FONT,
+                }}
+              >
+                인벤
+              </button>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 4px',
+                  borderRadius: '12px',
+                  background: 'rgba(8,14,22,0.88)',
+                  border: `1px solid ${BORDER_COLOR}`,
+                  boxShadow: GLOW,
+                }}
+              >
+                <button
+                  onClick={() => setMoveSpeed(prev => Math.max(1, prev - 5))}
+                  style={{ width: '22px', height: '22px', borderRadius: '7px', border: `1px solid ${BORDER_COLOR}`, background: 'rgba(255,255,255,0.04)', color: ACCENT, cursor: 'pointer' }}
+                >-</button>
+                <div style={{ minWidth: '26px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '6px', color: GOLD }}>SPD</div>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: moveSpeed >= 40 ? '#ff7a7a' : ACCENT }}>{Math.round(moveSpeed)}</div>
+                </div>
+                <button
+                  onClick={() => setMoveSpeed(prev => Math.min(50, prev + 5))}
+                  style={{ width: '22px', height: '22px', borderRadius: '7px', border: `1px solid ${BORDER_COLOR}`, background: 'rgba(255,255,255,0.04)', color: ACCENT, cursor: 'pointer' }}
+                >+</button>
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -1255,7 +1393,7 @@ const GameOverlay = ({
       )}
 
       {/* ===== 사이드바 토글 버튼 ===== */}
-      <div
+      {!isMobile && <div
         onClick={() => {
           if (sidebarOpen && sidebarMode === 'menu') {
             setSidebarOpen(false);
@@ -1287,16 +1425,16 @@ const GameOverlay = ({
         }}
       >
         {(sidebarOpen && sidebarMode === 'menu') ? <X size={16} color={ACCENT} /> : <Menu size={16} color={GOLD} />}
-      </div>
+      </div>}
 
       {/* ===== 사이드바 패널 ===== */}
       {sidebarOpen && (
         <div
           style={{
             position: 'absolute',
-            top: '154px',
-            right: '10px',
-            width: '200px',
+            top: isMobile ? '154px' : '154px',
+            right: isMobile ? '10px' : '10px',
+            width: isMobile ? '184px' : '200px',
             background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
             border: `1px solid ${BORDER_COLOR}`,
             borderRadius: '12px',
@@ -1305,8 +1443,8 @@ const GameOverlay = ({
             pointerEvents: 'auto',
             boxShadow: GLOW,
             transformOrigin: 'top right',
-            transform: `scale(${uiScale})`,
-            maxHeight: `${Math.floor(window.innerHeight / uiScale - 60)}px`,
+            transform: isMobile ? 'none' : `scale(${uiScale})`,
+            maxHeight: isMobile ? 'calc(100vh - 170px)' : `${Math.floor(window.innerHeight / uiScale - 60)}px`,
             overflowY: 'auto',
           }}
         >
@@ -1488,8 +1626,8 @@ const GameOverlay = ({
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
           right: `calc(max(10px, env(safe-area-inset-right)) + ${worldButtonOffset}px)`,
-          width: '30px',
-          height: '30px',
+          width: `${topToolSize}px`,
+          height: `${topToolSize}px`,
           background: showWorldToolsPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
           border: `1px solid ${showWorldToolsPopup ? ACCENT : BORDER_COLOR}`,
           borderRadius: '8px',
