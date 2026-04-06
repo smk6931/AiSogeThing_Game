@@ -238,18 +238,16 @@ const GameOverlay = ({
   const zoomButtonsOffset = Math.round(96 * uiScale + 116);
   const showTopToolButtons = !isMobile || !topButtonsCollapsed;
 
-  const skills = [
-    { key: 'Q', icon: Sword, label: 'Slash', cooldown: 0 },
-    { key: 'W', icon: Shield, label: 'Guard', cooldown: 2 },
-    { key: 'E', icon: Zap, label: 'Spark', cooldown: 0 },
-    { key: 'R', icon: Flame, label: 'Burst', cooldown: 10 },
+  const primarySkill = { key: 'R', icon: Flame, label: 'Burst', accent: '#ff7a59' };
+  const utilitySkills = [
+    { key: 'Q', icon: Sword, label: 'Slash', accent: '#f6c453' },
+    { key: 'W', icon: Shield, label: 'Guard', accent: '#7dd3fc' },
+    { key: 'E', icon: Zap, label: 'Spark', accent: '#67e8d6' },
   ];
 
-  const items = [
+  const quickItems = [
     { key: '1', name: 'Potion', count: 5, icon: '🧪' },
     { key: '2', name: 'Mana', count: 3, icon: '💧' },
-    { key: '3', name: '', count: 0, icon: '' },
-    { key: '4', name: '', count: 0, icon: '' },
   ];
 
   return (
@@ -1036,31 +1034,31 @@ const GameOverlay = ({
           pointerEvents: 'auto',
         }}
       >
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {skills.map((skill) => (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {[...utilitySkills, primarySkill].map((skill) => (
             <div
               key={skill.key}
               style={{
-                width: '60px',
-                height: '60px',
+                width: skill.key === 'R' ? '72px' : '56px',
+                height: skill.key === 'R' ? '72px' : '56px',
                 background: PANEL_BG,
-                border: `1px solid ${BORDER_COLOR}`,
-                borderRadius: '8px',
+                border: `1px solid ${skill.accent}66`,
+                borderRadius: skill.key === 'R' ? '18px' : '14px',
                 position: 'relative',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
+                boxShadow: skill.key === 'R' ? '0 12px 30px rgba(255, 90, 60, 0.24)' : 'none',
               }}
             >
-              <span style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '10px', color: GOLD }}>
+              <span style={{ position: 'absolute', top: '6px', left: '8px', fontSize: '10px', color: GOLD }}>
                 {skill.key}
               </span>
-              <skill.icon size={24} color="#fff" />
-              {skill.cooldown > 0 && (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
-                  {skill.cooldown}
-                </div>
-              )}
+              <skill.icon size={skill.key === 'R' ? 26 : 20} color={skill.accent} />
+              <span style={{ marginTop: '4px', fontSize: skill.key === 'R' ? '11px' : '9px', color: '#eaf7f4', fontWeight: '700', letterSpacing: '0.04em' }}>
+                {skill.label}
+              </span>
             </div>
           ))}
         </div>
@@ -1068,7 +1066,7 @@ const GameOverlay = ({
         <div style={{ width: '1px', height: '60px', background: BORDER_COLOR, opacity: 0.5 }} />
 
         <div style={{ display: 'flex', gap: '6px' }}>
-          {items.map((item) => (
+          {quickItems.map((item) => (
             <div
               key={item.key}
               style={{
@@ -1130,30 +1128,73 @@ const GameOverlay = ({
 
       {isMobile && (
         <>
-
-          {/* 공격 버튼 */}
           <div
-            onClick={() => onSimulateKey('r', true)}
             style={{
               position: 'absolute',
-              bottom: '28px',
-              right: '18px',
-              width: '58px',
-              height: '58px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle at 30% 30%, rgba(255,120,120,0.95), rgba(220,38,38,0.82))',
-              border: '1px solid rgba(255,210,180,0.32)',
-              boxShadow: '0 10px 24px rgba(220,38,38,0.35)',
+              bottom: '22px',
+              right: '14px',
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: '8px',
               transformOrigin: 'bottom right',
               transform: `scale(${uiScale})`,
-              justifyContent: 'center',
-              fontSize: '22px',
               pointerEvents: 'auto',
             }}
           >
-            ⚔
+            <div style={{ display: 'flex', gap: '8px', marginRight: '6px' }}>
+              {utilitySkills.map((skill) => (
+                <div
+                  key={skill.key}
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(180deg, rgba(16,24,34,0.96), rgba(8,12,18,0.94))',
+                    border: `1px solid ${skill.accent}55`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 10px 18px rgba(0,0,0,0.25)',
+                  }}
+                >
+                  <skill.icon size={16} color={skill.accent} />
+                  <span style={{ marginTop: '2px', fontSize: '8px', color: '#dceeed', fontWeight: '700' }}>
+                    {skill.key}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+          {/* 주 스킬 버튼 */}
+          <div
+            onPointerDown={() => onSimulateKey('r', true)}
+            onPointerUp={() => onSimulateKey('r', false)}
+            onPointerCancel={() => onSimulateKey('r', false)}
+            onPointerLeave={() => onSimulateKey('r', false)}
+            style={{
+              width: '76px',
+              height: '76px',
+              borderRadius: '24px',
+              background: 'radial-gradient(circle at 30% 30%, rgba(255,150,110,0.98), rgba(214,45,32,0.86))',
+              border: '1px solid rgba(255,221,185,0.34)',
+              boxShadow: '0 14px 32px rgba(214,45,32,0.42)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              touchAction: 'none',
+            }}
+          >
+            <Flame size={28} color="#fff4db" />
+            <span style={{ marginTop: '4px', fontSize: '10px', color: '#fff8ef', fontWeight: '800', letterSpacing: '0.08em' }}>
+              BURST
+            </span>
+            <span style={{ position: 'absolute', top: '8px', right: '10px', fontSize: '10px', color: '#ffe0b5', fontWeight: '700' }}>
+              R
+            </span>
+          </div>
           </div>
         </>
       )}

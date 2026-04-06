@@ -365,16 +365,23 @@ const GameEntry = () => {
         <>
           <div style={{
             position: 'absolute',
-            bottom: 30,
-            left: isMobile ? 16 : 20,
+            bottom: isMobile ? 22 : 30,
+            left: isMobile ? 12 : 20,
             zIndex: 90,
-            opacity: 0.8
+            opacity: 0.95,
+            width: isMobile ? 124 : 'auto',
+            height: isMobile ? 124 : 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: isMobile ? '50%' : 0,
+            background: isMobile ? 'radial-gradient(circle, rgba(255,255,255,0.08), rgba(255,255,255,0.01) 68%)' : 'transparent'
           }}>
             <Joystick
-              size={isMobile ? 72 : 80}
-              sticky={false}
-              baseColor="rgba(255, 255, 255, 0.2)"
-              stickColor="rgba(255, 255, 255, 0.5)"
+              size={isMobile ? 94 : 80}
+              sticky={isMobile}
+              baseColor={isMobile ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.2)"}
+              stickColor={isMobile ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.5)"}
               move={handleJoystickMove}
               stop={handleJoystickMove}
             />
@@ -383,10 +390,11 @@ const GameEntry = () => {
           {/* ================= Right Joystick (Skill) ================= */}
           <div style={{
             position: 'absolute',
-            bottom: 30,
-            right: isMobile ? 16 : 20,
+            bottom: isMobile ? 24 : 30,
+            right: isMobile ? 14 : 20,
             zIndex: 90,
-            opacity: 0.8
+            opacity: isMobile ? 0 : 0.8,
+            pointerEvents: isMobile ? 'none' : 'auto'
           }}>
             <Joystick
               size={isMobile ? 72 : 80}
