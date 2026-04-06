@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
 import { Joystick } from 'react-joystick-component';
 import { useAuth } from '@contexts/AuthContext';
 import { useGameInput } from '@engine/useGameInput';
@@ -15,6 +15,36 @@ const WorldMapModal = lazy(() => import('@ui/WorldMapModal'));
 const MonsterInfoPanel = lazy(() => import('@entity/monster/MonsterInfoPanel'));
 const InventoryModal = lazy(() => import('@ui/InventoryModal'));
 const GameCanvas = lazy(() => import('@engine/GameCanvas'));
+
+const CAMERA_STORAGE_KEYS = {
+  zoomLevel: 'game_camera_zoom_level',
+  cameraMode: 'game_camera_mode',
+};
+
+const DEFAULT_ZOOM_LEVEL = 16.5;
+const DEFAULT_CAMERA_MODE = 'isometric';
+
+const loadStoredZoomLevel = () => {
+  try {
+    const raw = Number(localStorage.getItem(CAMERA_STORAGE_KEYS.zoomLevel));
+    if (Number.isFinite(raw)) {
+      return Math.max(6, Math.min(23.5, raw));
+    }
+  } catch (_) {}
+  return DEFAULT_ZOOM_LEVEL;
+};
+
+const loadStoredCameraMode = () => {
+  try {
+    const raw = localStorage.getItem(CAMERA_STORAGE_KEYS.cameraMode);
+    if (raw === 'isometric' || raw === '360') {
+      return raw;
+    }
+  } catch (_) {}
+  return DEFAULT_CAMERA_MODE;
+};
+
+const clampZoomLevel = (value) => Math.max(6, Math.min(23.5, value));
 
 const GameEntry = () => {
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -75,7 +105,7 @@ const GameEntry = () => {
     return () => clearTimeout(timer);
   }, [droppedItems, setDroppedItems]);
 
-  const [zoomLevel, setZoomLevel] = useState(16.5);
+  const [zoomLevel, setZoomLevel] = useState(loadStoredZoomLevel);
   const [showOsmMap, setShowOsmMap] = useState(true);
   const [showSeoulRoads, setShowSeoulRoads] = useState(true);
   const [roadTypeFilters, setRoadTypeFilters] = useState({
@@ -103,12 +133,13 @@ const GameEntry = () => {
   const [highlightCurrentGroup, setHighlightCurrentGroup] = useState(true);
   const [showCurrentGroupTexture, setShowCurrentGroupTexture] = useState(true);
   const [showCullRadius, setShowCullRadius] = useState(false);
-  const [cameraMode, setCameraMode] = useState('isometric'); // 'isometric' or '360'
+  const [cameraMode, setCameraMode] = useState(loadStoredCameraMode); // 'isometric' or '360'
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [availableGroundTextureFolders, setAvailableGroundTextureFolders] = useState([]);
   const [groundTextureFolder, setGroundTextureFolder] = useState(() => localStorage.getItem('ground_texture_folder') || '');
   const [availableRoadTextureFolders, setAvailableRoadTextureFolders] = useState([]);
   const [roadTextureFolder, setRoadTextureFolder] = useState(() => localStorage.getItem('road_texture_folder') || '');
+  const pinchDistanceRef = useRef(null);
 
 
   // [복구] 위치 동기화 핸들러
@@ -212,6 +243,56 @@ const GameEntry = () => {
     }
   }, [roadTextureFolder]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(CAMERA_STORAGE_KEYS.zoomLevel, String(zoomLevel));
+    } catch (_) {}
+  }, [zoomLevel]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CAMERA_STORAGE_KEYS.cameraMode, cameraMode);
+    } catch (_) {}
+  }, [cameraMode]);
+
+  const getTouchDistance = useCallback((touches) => {
+    if (!touches || touches.length < 2) return null;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }, []);
+
+  const handleTouchStart = useCallback((event) => {
+    if (event.touches.length >= 2) {
+      pinchDistanceRef.current = getTouchDistance(event.touches);
+    }
+  }, [getTouchDistance]);
+
+  const handleTouchMove = useCallback((event) => {
+    if (event.touches.length < 2) {
+      pinchDistanceRef.current = null;
+      return;
+    }
+
+    const nextDistance = getTouchDistance(event.touches);
+    const prevDistance = pinchDistanceRef.current;
+    if (!nextDistance || !prevDistance) {
+      pinchDistanceRef.current = nextDistance;
+      return;
+    }
+
+    const delta = nextDistance - prevDistance;
+    if (Math.abs(delta) < 4) return;
+
+    event.preventDefault();
+    setZoomLevel((prev) => clampZoomLevel(prev - delta * 0.015));
+    pinchDistanceRef.current = nextDistance;
+  }, [getTouchDistance]);
+
+  const handleTouchEnd = useCallback((event) => {
+    pinchDistanceRef.current = event.touches.length >= 2 ? getTouchDistance(event.touches) : null;
+  }, [getTouchDistance]);
+
   return (
     <div style={{
       position: 'fixed',
@@ -222,7 +303,12 @@ const GameEntry = () => {
       background: '#0a0a0a',
       color: 'white',
       touchAction: 'none'
-    }}>
+    }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
 
       {/* ================= 3D Game World ================= */}
       <div style={{ position: 'absolute', inset: 0 }}>

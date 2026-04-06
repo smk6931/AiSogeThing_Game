@@ -236,6 +236,7 @@ const GameOverlay = ({
   const worldButtonOffset = Math.round(96 * uiScale + 44);
   const settingsButtonOffset = Math.round(96 * uiScale + 80);
   const zoomButtonsOffset = Math.round(96 * uiScale + 116);
+  const collapseButtonOffset = Math.round(96 * uiScale + 152);
   const showTopToolButtons = !isMobile || !topButtonsCollapsed;
 
   const primarySkill = { key: 'R', icon: Flame, label: 'Burst', accent: '#ff7a59' };
@@ -426,7 +427,7 @@ const GameOverlay = ({
           style={{
             position: 'absolute',
             top: 'max(10px, env(safe-area-inset-top))',
-            right: `calc(max(10px, env(safe-area-inset-right)) + ${layerButtonOffset}px)`,
+            right: `calc(max(10px, env(safe-area-inset-right)) + ${collapseButtonOffset}px)`,
             width: '30px',
             height: '30px',
             borderRadius: '8px',
@@ -446,7 +447,7 @@ const GameOverlay = ({
         </div>
       )}
 
-      {isMobile && (
+      {isMobile && showTopToolButtons && (
         <div
           onClick={() => {
             setShowZoomPopup((prev) => !prev);
@@ -459,9 +460,9 @@ const GameOverlay = ({
             position: 'absolute',
             top: 'max(10px, env(safe-area-inset-top))',
             right: `calc(max(10px, env(safe-area-inset-right)) + ${zoomButtonsOffset}px)`,
-            width: '32px',
-            height: '32px',
-            borderRadius: '9px',
+            width: '40px',
+            height: '40px',
+            borderRadius: '11px',
             background: showZoomPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.9)',
             border: `1px solid ${showZoomPopup ? ACCENT : BORDER_COLOR}`,
             boxShadow: GLOW,
@@ -474,19 +475,19 @@ const GameOverlay = ({
             zIndex: 60,
           }}
         >
-          <Search size={16} color={showZoomPopup ? ACCENT : GOLD} />
+          <Search size={20} color={showZoomPopup ? ACCENT : GOLD} />
         </div>
       )}
 
-      {isMobile && showZoomPopup && (
+      {isMobile && showTopToolButtons && showZoomPopup && (
         <div
           style={{
             position: 'absolute',
-            top: `calc(max(10px, env(safe-area-inset-top)) + 38px)`,
+            top: `calc(max(10px, env(safe-area-inset-top)) + 46px)`,
             right: `calc(max(10px, env(safe-area-inset-right)) + ${zoomButtonsOffset}px)`,
-            width: '148px',
-            padding: '10px',
-            borderRadius: '12px',
+            width: '184px',
+            padding: '12px',
+            borderRadius: '14px',
             background: 'linear-gradient(180deg, rgba(10,16,24,0.97), rgba(6,10,18,0.96))',
             border: `1px solid ${BORDER_COLOR}`,
             boxShadow: `${GLOW}, 0 4px 24px rgba(0,0,0,0.6)`,
@@ -494,7 +495,7 @@ const GameOverlay = ({
             zIndex: 62,
           }}
         >
-          <div style={{ color: GOLD, fontSize: '9px', fontWeight: '700', letterSpacing: '1.5px', marginBottom: '8px', textTransform: 'uppercase' }}>
+          <div style={{ color: GOLD, fontSize: '10px', fontWeight: '700', letterSpacing: '1.5px', marginBottom: '10px', textTransform: 'uppercase' }}>
             Camera Zoom
           </div>
           <input
@@ -506,26 +507,27 @@ const GameOverlay = ({
             onChange={(event) => setWorldZoomLevel(Number(event.target.value))}
             style={{
               width: '100%',
+              height: '22px',
               accentColor: ACCENT,
               cursor: 'pointer',
             }}
           />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '10px', color: '#9bb6b0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: '#9bb6b0' }}>
             <span>Far</span>
-            <span style={{ color: ACCENT, fontWeight: '700' }}>{(mapSettings.zoomLevel ?? 16.5).toFixed(1)}</span>
+            <span style={{ color: ACCENT, fontWeight: '700', fontSize: '12px' }}>{(mapSettings.zoomLevel ?? 16.5).toFixed(1)}</span>
             <span>Near</span>
           </div>
           <button
             onClick={() => setWorldZoomLevel(18.5)}
             style={{
-              marginTop: '8px',
+              marginTop: '10px',
               width: '100%',
-              padding: '7px 8px',
+              padding: '10px 12px',
               borderRadius: '8px',
               border: `1px solid ${BORDER_COLOR}`,
               background: 'rgba(255,255,255,0.05)',
               color: '#d7ece8',
-              fontSize: '11px',
+              fontSize: '12px',
               cursor: 'pointer',
               fontFamily: GAME_FONT,
             }}
