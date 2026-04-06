@@ -69,6 +69,36 @@ async def get_item_template(item_id: int) -> dict | None:
 # 장비 착용 관련
 # ──────────────────────────────────────────────
 
+async def get_item_templates(user_id: int | None = None) -> list[dict]:
+    """아이템 도감용 전체 템플릿 조회. user_id가 있으면 보유 수량 포함."""
+    if user_id is None:
+        return await fetch_all(
+            """
+            SELECT it.id AS item_id, it.name_ko, it.name_en, it.item_type, it.rarity,
+                   it.stat_bonus, it.description, it.icon_key,
+                   0 AS quantity
+            FROM item_template it
+            WHERE it.is_active = TRUE
+            ORDER BY it.id
+            """
+        )
+
+    return await fetch_all(
+        """
+        SELECT it.id AS item_id, it.name_ko, it.name_en, it.item_type, it.rarity,
+               it.stat_bonus, it.description, it.icon_key,
+               COALESCE(SUM(ci.quantity), 0) AS quantity
+        FROM item_template it
+        LEFT JOIN character_inventory ci
+          ON ci.item_id = it.id AND ci.user_id = :user_id
+        WHERE it.is_active = TRUE
+        GROUP BY it.id, it.name_ko, it.name_en, it.item_type, it.rarity, it.stat_bonus, it.description, it.icon_key
+        ORDER BY it.id
+        """,
+        {"user_id": user_id}
+    )
+
+
 EQUIPPABLE_TYPES = {"weapon", "armor", "helmet", "gloves", "boots"}
 
 def get_slot_for_type(item_type: str) -> str | None:

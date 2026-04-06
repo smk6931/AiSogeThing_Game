@@ -13,6 +13,12 @@ async def get_inventory(user_id: int):
     return {"items": items}
 
 
+@router.get("/templates")
+async def get_item_templates(user_id: int | None = None):
+    items = await repository.get_item_templates(user_id)
+    return {"items": items}
+
+
 @router.get("/equipment/{user_id}")
 async def get_equipment(user_id: int):
     equipment = await repository.get_equipment(user_id)

@@ -107,6 +107,7 @@ const GameOverlay = ({
   const [showZoomPopup, setShowZoomPopup] = useState(false);
   const [showRoadPanel, setShowRoadPanel] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
+  const [showMobileStatsPopup, setShowMobileStatsPopup] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
   const [gpsCoords, setGpsCoords] = useState({ lat: GIS_ORIGIN.lat, lng: GIS_ORIGIN.lng });
   const [currentDistrict, setCurrentDistrict] = useState(null);
@@ -155,6 +156,9 @@ const GameOverlay = ({
       setUiScale(Math.max(1, Math.min(2.2, window.innerWidth / 600)));
       if (!mobile) {
         setTopButtonsCollapsed(false);
+      } else {
+        setSidebarOpen(false);
+        setSidebarTab(null);
       }
     };
     window.addEventListener('resize', handleResize);
@@ -269,6 +273,12 @@ const GameOverlay = ({
     setSidebarMode('menu');
     setSidebarTab((prev) => prev === tab && sidebarOpen ? null : tab);
     setSidebarOpen(true);
+  };
+
+  const toggleMobileStatsPopup = () => {
+    setShowMobileStatsPopup((prev) => !prev);
+    setShowSettingsPopup(false);
+    setShowCodex(false);
   };
 
   return (
@@ -939,16 +949,16 @@ const GameOverlay = ({
             style={{
               width: mobileQuickMenuWidth,
               display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
+              gridTemplateColumns: 'repeat(2, 1fr)',
               gap: '5px',
               pointerEvents: 'auto',
             }}
           >
             {[
-              { id: 'stats', icon: BarChart2, label: '스탯', color: '#60a5fa', onClick: () => openSidebarTabPanel('stats') },
+              { id: 'stats', icon: BarChart2, label: '스탯', color: '#60a5fa', onClick: toggleMobileStatsPopup },
               { id: 'items', icon: Package, label: '인벤', color: '#a78bfa', onClick: onInventoryOpen },
-              { id: 'codex', icon: BookOpen, label: '도감', color: '#fbbf24', onClick: () => setShowCodex(true) },
-              { id: 'menu', icon: Menu, label: '메뉴', color: GOLD, onClick: openSidebarMenu },
+              { id: 'codex', icon: BookOpen, label: '도감', color: '#fbbf24', onClick: () => { setShowMobileStatsPopup(false); setShowCodex(true); } },
+              { id: 'settings', icon: Settings, label: '설정', color: ACCENT, onClick: () => { setShowMobileStatsPopup(false); setShowSettingsPopup(true); } },
             ].map(({ id, icon: Icon, label, color, onClick }) => (
               <button
                 key={id}
@@ -974,6 +984,36 @@ const GameOverlay = ({
                 <Icon size={11} color={color} />
                 <span>{label}</span>
               </button>
+            ))}
+          </div>
+        )}
+
+        {!isMapExpanded && isMobile && showMobileStatsPopup && (
+          <div
+            style={{
+              width: '154px',
+              padding: '10px',
+              borderRadius: '12px',
+              background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
+              border: `1px solid ${BORDER_COLOR}`,
+              boxShadow: GLOW,
+              color: '#eefaf7',
+              pointerEvents: 'auto',
+            }}
+          >
+            <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', marginBottom: '8px' }}>PLAYER STATS</div>
+            {[
+              { label: 'Level', value: playerStats.level, color: GOLD, icon: '⭐' },
+              { label: 'HP', value: `${playerStats.hp} / ${playerStats.maxHp}`, color: '#ff6b6b', icon: '❤️' },
+              { label: 'MP', value: `${playerStats.mp} / ${playerStats.maxMp}`, color: '#60a5fa', icon: '💧' },
+              { label: 'Gold', value: `${playerStats.gold}G`, color: GOLD, icon: '💰' },
+            ].map(({ label, value, color, icon }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px', padding: '5px 2px', borderBottom: '1px solid rgba(124,171,166,0.1)' }}>
+                <span style={{ color: '#8ca6a0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ fontSize: '11px' }}>{icon}</span>{label}
+                </span>
+                <span style={{ color, fontWeight: '700' }}>{value}</span>
+              </div>
             ))}
           </div>
         )}
@@ -1239,8 +1279,8 @@ const GameOverlay = ({
               <button
                 onClick={onAutoModeToggle}
                 style={{
-                  width: '54px',
-                  height: '54px',
+                  width: '58px',
+                  height: '58px',
                   borderRadius: '18px',
                   border: `1px solid ${isAutoMode ? 'rgba(255,170,68,0.8)' : BORDER_COLOR}`,
                   background: isAutoMode ? 'linear-gradient(180deg, rgba(255,140,55,0.25), rgba(120,40,10,0.88))' : 'linear-gradient(180deg, rgba(12,18,26,0.96), rgba(6,10,16,0.94))',
@@ -1255,8 +1295,8 @@ const GameOverlay = ({
                   fontFamily: GAME_FONT,
                 }}
               >
-                <Sword size={16} color={isAutoMode ? '#ffd39d' : '#9db7b2'} />
-                <span style={{ fontSize: '8px', fontWeight: '700' }}>{isAutoMode ? 'AUTO' : 'MAN'}</span>
+                <Sword size={17} color={isAutoMode ? '#ffd39d' : '#9db7b2'} />
+                <span style={{ fontSize: '8px', fontWeight: '700' }}>{isAutoMode ? '자동ON' : '자동'}</span>
                 <span style={{ fontSize: '7px', color: GOLD }}>Z</span>
               </button>
 
@@ -1290,25 +1330,7 @@ const GameOverlay = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <button
-                onClick={onInventoryOpen}
-                style={{
-                  width: '54px',
-                  height: '34px',
-                  borderRadius: '12px',
-                  border: `1px solid ${BORDER_COLOR}`,
-                  background: 'rgba(8,14,22,0.88)',
-                  color: '#dceeed',
-                  cursor: 'pointer',
-                  boxShadow: GLOW,
-                  fontSize: '10px',
-                  fontFamily: GAME_FONT,
-                }}
-              >
-                인벤
-              </button>
-
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', width: '100%' }}>
               <div
                 style={{
                   display: 'flex',
@@ -1428,13 +1450,13 @@ const GameOverlay = ({
       </div>}
 
       {/* ===== 사이드바 패널 ===== */}
-      {sidebarOpen && (
+      {!isMobile && sidebarOpen && (
         <div
           style={{
             position: 'absolute',
-            top: isMobile ? '154px' : '154px',
-            right: isMobile ? '10px' : '10px',
-            width: isMobile ? '184px' : '200px',
+            top: '154px',
+            right: '10px',
+            width: '200px',
             background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
             border: `1px solid ${BORDER_COLOR}`,
             borderRadius: '12px',
@@ -1443,8 +1465,8 @@ const GameOverlay = ({
             pointerEvents: 'auto',
             boxShadow: GLOW,
             transformOrigin: 'top right',
-            transform: isMobile ? 'none' : `scale(${uiScale})`,
-            maxHeight: isMobile ? 'calc(100vh - 170px)' : `${Math.floor(window.innerHeight / uiScale - 60)}px`,
+            transform: `scale(${uiScale})`,
+            maxHeight: `${Math.floor(window.innerHeight / uiScale - 60)}px`,
             overflowY: 'auto',
           }}
         >

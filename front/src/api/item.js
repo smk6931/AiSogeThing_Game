@@ -3,6 +3,7 @@ import client from '@api/client';
 
 const itemApi = {
   getInventory: (userId) => client.get(`/api/item/inventory/${userId}`),
+  getTemplates: (userId) => client.get('/api/item/templates', { params: userId ? { user_id: userId } : {} }),
   getEquipment: (userId) => client.get(`/api/item/equipment/${userId}`),
   equip: (userId, itemId) => client.put('/api/item/equip', { user_id: userId, item_id: itemId }),
   unequip: (userId, slot) => client.delete(`/api/item/equip/${userId}/${slot}`),
