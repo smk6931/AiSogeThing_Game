@@ -24,7 +24,7 @@ export default function Signup() {
     setError('');
 
     if (form.password !== form.confirmPassword) {
-      setError('비밀번호 확인이 일치하지 않습니다.');
+      setError('Passwords do not match.');
       return;
     }
 
@@ -44,44 +44,48 @@ export default function Signup() {
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-page-signup">
       <div className="auth-shell">
         <section className="auth-hero">
           <div className="auth-hero-inner">
             <div className="auth-kicker">New Character Entry</div>
-            <h1 className="auth-title">첫 계정 생성</h1>
-            <p className="auth-copy">
-              회원가입이 끝나면 기본 캐릭터가 바로 생성됩니다.
-              별도 캐릭터 생성 단계를 두지 않고 바로 월드 진입까지 이어집니다.
-            </p>
-            <div className="auth-highlights">
-              <div className="auth-highlight">
-                <div className="auth-highlight-label">Character</div>
-                <div className="auth-highlight-value">가입 즉시 기본 캐릭터 생성</div>
+            <h1 className="auth-title">Create the Route</h1>
+            <p className="auth-copy">One screen. One account. Instant entry.</p>
+
+            <div className="auth-badge-row">
+              <span className="auth-chip">Camp</span>
+              <span className="auth-chip">Ruin</span>
+              <span className="auth-chip">Village</span>
+            </div>
+
+            <div className="auth-scene">
+              <div className="auth-map-panel auth-map-panel-signup">
+                <div className="auth-map-panel-copy">
+                  <span className="auth-map-panel-label">Spawn Ring</span>
+                  <strong>First Step Setup</strong>
+                  <p>Create an account and move straight into the world.</p>
+                </div>
               </div>
-              <div className="auth-highlight">
-                <div className="auth-highlight-label">Initial Stats</div>
-                <div className="auth-highlight-value">Lv1 / HP100 / MP50</div>
-              </div>
-              <div className="auth-highlight">
-                <div className="auth-highlight-label">Entry Flow</div>
-                <div className="auth-highlight-value">가입 후 자동 로그인</div>
+
+              <div className="auth-preview-stack" aria-hidden="true">
+                <div className="auth-preview-card auth-preview-card-ruin" />
+                <div className="auth-preview-card auth-preview-card-main" />
+                <div className="auth-preview-card auth-preview-card-camp" />
               </div>
             </div>
           </div>
+
           <div className="auth-hero-footer">
-            <span>계정과 캐릭터를 같이 초기화</span>
-            <span>초반 UX 끊김 제거</span>
+            <span>Quick account flow</span>
+            <span>Mobile scroll supported</span>
           </div>
         </section>
 
         <section className="auth-panel">
           <div className="auth-card">
             <div className="auth-card-top">
-              <h2 className="auth-card-title">회원가입</h2>
-              <p className="auth-card-subtitle">
-                닉네임, 이메일, 비밀번호를 입력하면 바로 게임 계정을 생성합니다.
-              </p>
+              <h2 className="auth-card-title">Sign Up</h2>
+              <p className="auth-card-subtitle">Create account and auto-login.</p>
             </div>
 
             <form className="auth-form" onSubmit={handleSubmit}>
@@ -90,7 +94,7 @@ export default function Signup() {
                 <input
                   className="auth-input"
                   type="text"
-                  placeholder="플레이어 이름"
+                  placeholder="Player name"
                   value={form.nickname}
                   onChange={updateField('nickname')}
                   minLength={2}
@@ -115,7 +119,7 @@ export default function Signup() {
                 <input
                   className="auth-input"
                   type="password"
-                  placeholder="최소 4자 이상"
+                  placeholder="At least 4 chars"
                   value={form.password}
                   onChange={updateField('password')}
                   minLength={4}
@@ -128,7 +132,7 @@ export default function Signup() {
                 <input
                   className="auth-input"
                   type="password"
-                  placeholder="비밀번호 확인"
+                  placeholder="Repeat password"
                   value={form.confirmPassword}
                   onChange={updateField('confirmPassword')}
                   minLength={4}
@@ -145,10 +149,21 @@ export default function Signup() {
               </div>
             </form>
 
+            <div className="auth-stat-grid">
+              <div className="auth-stat-card">
+                <span>Start</span>
+                <strong>Account + Character</strong>
+              </div>
+              <div className="auth-stat-card">
+                <span>Flow</span>
+                <strong>Single Screen</strong>
+              </div>
+            </div>
+
             <div className="auth-switch">
-              이미 계정이 있으면{' '}
+              Already have an account?{' '}
               <button className="auth-text-btn" type="button" onClick={() => navigate('/login')}>
-                로그인으로 돌아가기
+                Back to login
               </button>
             </div>
           </div>

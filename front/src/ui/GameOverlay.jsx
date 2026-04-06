@@ -1,5 +1,5 @@
 ﻿import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarChart2, Package, Wrench, BookOpen } from 'lucide-react';
+import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarChart2, Package, Wrench, BookOpen, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@contexts/AuthContext';
@@ -94,8 +94,8 @@ const GameOverlay = ({
   const { moveSpeed, setMoveSpeed } = useGameConfig();
   const navigate = useNavigate();
 
-  const checkMobile = () => true; // 전기기 통일 클린 모바일 HUD
-  const [isMobile, setIsMobile] = useState(true);
+  const checkMobile = () => window.innerWidth <= 768;
+  const [isMobile, setIsMobile] = useState(checkMobile);
   const [uiScale, setUiScale] = useState(() => Math.max(1, Math.min(2.2, window.innerWidth / 600)));
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -104,6 +104,7 @@ const GameOverlay = ({
   const [showLayerPopup, setShowLayerPopup] = useState(false);
   const [showSettingsPopup, setShowSettingsPopup] = useState(false);
   const [showWorldToolsPopup, setShowWorldToolsPopup] = useState(false);
+  const [showZoomPopup, setShowZoomPopup] = useState(false);
   const [showRoadPanel, setShowRoadPanel] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
@@ -113,6 +114,7 @@ const GameOverlay = ({
   const [showZoneTitle, setShowZoneTitle] = useState(false);
   const [showPartitionTitle, setShowPartitionTitle] = useState(false);
   const [showPartitionPanel, setShowPartitionPanel] = useState(false);
+  const [topButtonsCollapsed, setTopButtonsCollapsed] = useState(checkMobile);
 
   const lastDistrictRef = useRef('');
   const lastDongRef = useRef('');
@@ -148,8 +150,12 @@ const GameOverlay = ({
     }
 
     const handleResize = () => {
-      setIsMobile(checkMobile());
+      const mobile = checkMobile();
+      setIsMobile(mobile);
       setUiScale(Math.max(1, Math.min(2.2, window.innerWidth / 600)));
+      if (!mobile) {
+        setTopButtonsCollapsed(false);
+      }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -225,6 +231,12 @@ const GameOverlay = ({
   const setGroundTextureFolder = mapSettings.setGroundTextureFolder ?? (() => {});
   const roadTextureFolder = mapSettings.roadTextureFolder ?? '';
   const setRoadTextureFolder = mapSettings.setRoadTextureFolder ?? (() => {});
+  const setWorldZoomLevel = mapSettings.setZoomLevel ?? (() => {});
+  const layerButtonOffset = Math.round(96 * uiScale + 8);
+  const worldButtonOffset = Math.round(96 * uiScale + 44);
+  const settingsButtonOffset = Math.round(96 * uiScale + 80);
+  const zoomButtonsOffset = Math.round(96 * uiScale + 116);
+  const showTopToolButtons = !isMobile || !topButtonsCollapsed;
 
   const skills = [
     { key: 'Q', icon: Sword, label: 'Slash', cooldown: 0 },
@@ -403,18 +415,141 @@ const GameOverlay = ({
         ))}
       </div>}
 
+      {isMobile && (
+        <div
+          onClick={() => {
+            setTopButtonsCollapsed((prev) => !prev);
+            setShowSettingsPopup(false);
+            setShowLayerPopup(false);
+            setShowWorldToolsPopup(false);
+            setShowZoomPopup(false);
+          }}
+          title={topButtonsCollapsed ? '툴 버튼 열기' : '툴 버튼 접기'}
+          style={{
+            position: 'absolute',
+            top: 'max(10px, env(safe-area-inset-top))',
+            right: `calc(max(10px, env(safe-area-inset-right)) + ${layerButtonOffset}px)`,
+            width: '30px',
+            height: '30px',
+            borderRadius: '8px',
+            background: topButtonsCollapsed ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
+            border: `1px solid ${topButtonsCollapsed ? ACCENT : BORDER_COLOR}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+            boxShadow: GLOW,
+            fontSize: '15px',
+            zIndex: 61,
+          }}
+        >
+          {topButtonsCollapsed ? <Menu size={15} color={ACCENT} /> : <X size={15} color={GOLD} />}
+        </div>
+      )}
+
+      {isMobile && (
+        <div
+          onClick={() => {
+            setShowZoomPopup((prev) => !prev);
+            setShowSettingsPopup(false);
+            setShowLayerPopup(false);
+            setShowWorldToolsPopup(false);
+          }}
+          title="카메라 줌"
+          style={{
+            position: 'absolute',
+            top: 'max(10px, env(safe-area-inset-top))',
+            right: `calc(max(10px, env(safe-area-inset-right)) + ${zoomButtonsOffset}px)`,
+            width: '32px',
+            height: '32px',
+            borderRadius: '9px',
+            background: showZoomPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.9)',
+            border: `1px solid ${showZoomPopup ? ACCENT : BORDER_COLOR}`,
+            boxShadow: GLOW,
+            color: showZoomPopup ? ACCENT : GOLD,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+            zIndex: 60,
+          }}
+        >
+          <Search size={16} color={showZoomPopup ? ACCENT : GOLD} />
+        </div>
+      )}
+
+      {isMobile && showZoomPopup && (
+        <div
+          style={{
+            position: 'absolute',
+            top: `calc(max(10px, env(safe-area-inset-top)) + 38px)`,
+            right: `calc(max(10px, env(safe-area-inset-right)) + ${zoomButtonsOffset}px)`,
+            width: '148px',
+            padding: '10px',
+            borderRadius: '12px',
+            background: 'linear-gradient(180deg, rgba(10,16,24,0.97), rgba(6,10,18,0.96))',
+            border: `1px solid ${BORDER_COLOR}`,
+            boxShadow: `${GLOW}, 0 4px 24px rgba(0,0,0,0.6)`,
+            pointerEvents: 'auto',
+            zIndex: 62,
+          }}
+        >
+          <div style={{ color: GOLD, fontSize: '9px', fontWeight: '700', letterSpacing: '1.5px', marginBottom: '8px', textTransform: 'uppercase' }}>
+            Camera Zoom
+          </div>
+          <input
+            type="range"
+            min="6"
+            max="23.5"
+            step="0.1"
+            value={mapSettings.zoomLevel ?? 16.5}
+            onChange={(event) => setWorldZoomLevel(Number(event.target.value))}
+            style={{
+              width: '100%',
+              accentColor: ACCENT,
+              cursor: 'pointer',
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '10px', color: '#9bb6b0' }}>
+            <span>Far</span>
+            <span style={{ color: ACCENT, fontWeight: '700' }}>{(mapSettings.zoomLevel ?? 16.5).toFixed(1)}</span>
+            <span>Near</span>
+          </div>
+          <button
+            onClick={() => setWorldZoomLevel(18.5)}
+            style={{
+              marginTop: '8px',
+              width: '100%',
+              padding: '7px 8px',
+              borderRadius: '8px',
+              border: `1px solid ${BORDER_COLOR}`,
+              background: 'rgba(255,255,255,0.05)',
+              color: '#d7ece8',
+              fontSize: '11px',
+              cursor: 'pointer',
+              fontFamily: GAME_FONT,
+            }}
+          >
+            Reset View
+          </button>
+        </div>
+      )}
+
       {/* 환경설정 버튼 — 레이어 버튼 왼쪽 */}
-      <div
+      {showTopToolButtons && <div
         onClick={() => {
           setShowSettingsPopup(v => !v);
           setShowLayerPopup(false);
           setShowWorldToolsPopup(false);
+          setShowZoomPopup(false);
         }}
         title="환경설정"
         style={{
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
-          right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 80)}px)`,
+          right: `calc(max(10px, env(safe-area-inset-right)) + ${settingsButtonOffset}px)`,
           width: '30px',
           height: '30px',
           borderRadius: '8px',
@@ -431,7 +566,7 @@ const GameOverlay = ({
         }}
       >
         <Settings size={15} color={showSettingsPopup ? '#c4b5fd' : GOLD} />
-      </div>
+      </div>}
 
       {/* 환경설정 팝업 */}
       {showSettingsPopup && (
@@ -447,17 +582,18 @@ const GameOverlay = ({
       )}
 
       {/* 레이어 토글 버튼 — 미니맵 왼쪽 */}
-      <div
+      {showTopToolButtons && <div
         onClick={() => {
           setShowLayerPopup(v => !v);
           setShowSettingsPopup(false);
           setShowWorldToolsPopup(false);
+          setShowZoomPopup(false);
         }}
         title="레이어 설정"
         style={{
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
-          right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 8)}px)`,
+          right: `calc(max(10px, env(safe-area-inset-right)) + ${layerButtonOffset}px)`,
           width: '30px',
           height: '30px',
           borderRadius: '8px',
@@ -474,7 +610,7 @@ const GameOverlay = ({
         }}
       >
         <Menu size={15} color={showLayerPopup ? ACCENT : GOLD} />
-      </div>
+      </div>}
 
       {/* 레이어 팝업 — 독립 플로팅 패널 (레이어 + 카메라) */}
       {showLayerPopup && (
@@ -482,7 +618,7 @@ const GameOverlay = ({
           style={{
             position: 'absolute',
             top: `calc(max(10px, env(safe-area-inset-top)) + 36px)`,
-            right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 8)}px)`,
+            right: `calc(max(10px, env(safe-area-inset-right)) + ${layerButtonOffset}px)`,
             width: '164px',
             padding: '10px',
             borderRadius: '12px',
@@ -1297,17 +1433,18 @@ const GameOverlay = ({
         </div>
       )}
       {/* ===== 게임 도감 오버레이 ===== */}
-      <div
+      {showTopToolButtons && <div
         onClick={() => {
           setShowWorldToolsPopup(v => !v);
           setShowSettingsPopup(false);
           setShowLayerPopup(false);
+          setShowZoomPopup(false);
         }}
         title="월드 툴"
         style={{
           position: 'absolute',
           top: 'max(10px, env(safe-area-inset-top))',
-          right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 44)}px)`,
+          right: `calc(max(10px, env(safe-area-inset-right)) + ${worldButtonOffset}px)`,
           width: '30px',
           height: '30px',
           background: showWorldToolsPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.88)',
@@ -1326,13 +1463,13 @@ const GameOverlay = ({
         }}
       >
         W
-      </div>
+      </div>}
       {showWorldToolsPopup && (
         <div
           style={{
             position: 'absolute',
             top: `calc(max(10px, env(safe-area-inset-top)) + 36px)`,
-            right: `calc(max(10px, env(safe-area-inset-right)) + ${Math.round(96 * uiScale + 44)}px)`,
+            right: `calc(max(10px, env(safe-area-inset-right)) + ${worldButtonOffset}px)`,
             width: '190px',
             background: 'linear-gradient(180deg, rgba(5,11,18,0.97), rgba(8,14,22,0.96))',
             border: `1px solid ${BORDER_COLOR}`,

@@ -145,11 +145,11 @@ const GameEntry = () => {
   }, []);
 
   const checkMobile = () => true; // 전기기 통일 클린 모바일 HUD
-  const [isMobile, setIsMobile] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
   // 화면 크기 감지
   useEffect(() => {
-    const handleResize = () => setIsMobile(checkMobile());
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -309,6 +309,7 @@ const GameEntry = () => {
         onSettingsSave={saveToDb}
         onSettingsReset={resetSettings}
         mapSettings={{
+          zoomLevel, setZoomLevel,
           showOsmMap, setShowOsmMap,
           showSeoulRoads, setShowSeoulRoads,
           roadTypeFilters, setRoadTypeFilters,

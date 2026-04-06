@@ -34,44 +34,48 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-page-login">
       <div className="auth-shell">
         <section className="auth-hero">
           <div className="auth-hero-inner">
             <div className="auth-kicker">Seoul Urban Fantasy RPG</div>
-            <h1 className="auth-title">AiSogeThing<br />Game</h1>
-            <p className="auth-copy">
-              노량진 골목에서 시작해 서울 전역으로 확장되는 오픈월드 RPG.
-              생활권, 탐험, 사냥, 지역 정보가 한 화면에서 이어지는 입구로 재구성했습니다.
-            </p>
-            <div className="auth-highlights">
-              <div className="auth-highlight">
-                <div className="auth-highlight-label">Start Zone</div>
-                <div className="auth-highlight-value">노량진 생활권</div>
+            <h1 className="auth-title">Enter the Frontier</h1>
+            <p className="auth-copy">Map first. Fast login. Direct world entry.</p>
+
+            <div className="auth-badge-row">
+              <span className="auth-chip">Town Map</span>
+              <span className="auth-chip">Fast Start</span>
+              <span className="auth-chip">Mobile Ready</span>
+            </div>
+
+            <div className="auth-scene">
+              <div className="auth-map-panel">
+                <div className="auth-map-panel-copy">
+                  <span className="auth-map-panel-label">Starting Area</span>
+                  <strong>Noryangjin Route</strong>
+                  <p>Roads, camps, ruins, and a village map layered into the entry flow.</p>
+                </div>
               </div>
-              <div className="auth-highlight">
-                <div className="auth-highlight-label">World Rule</div>
-                <div className="auth-highlight-value">자유 이동 기반 오픈월드</div>
-              </div>
-              <div className="auth-highlight">
-                <div className="auth-highlight-label">Focus</div>
-                <div className="auth-highlight-value">탐험, 파밍, 지역 도감</div>
+
+              <div className="auth-preview-stack" aria-hidden="true">
+                <div className="auth-preview-card auth-preview-card-main" />
+                <div className="auth-preview-card auth-preview-card-camp" />
+                <div className="auth-preview-card auth-preview-card-ruin" />
               </div>
             </div>
           </div>
+
           <div className="auth-hero-footer">
-            <span>지역 데이터 기반 UI</span>
-            <span>모바일 우선 플레이 흐름</span>
+            <span>Game login screen</span>
+            <span>Scrolls on small screens</span>
           </div>
         </section>
 
         <section className="auth-panel">
           <div className="auth-card">
             <div className="auth-card-top">
-              <h2 className="auth-card-title">게임 진입</h2>
-              <p className="auth-card-subtitle">
-                기존 계정으로 로그인하거나, 게스트로 빠르게 들어갈 수 있습니다.
-              </p>
+              <h2 className="auth-card-title">Login</h2>
+              <p className="auth-card-subtitle">Sign in or jump in as guest.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form">
@@ -92,7 +96,7 @@ export default function Login() {
                 <input
                   type="password"
                   className="auth-input"
-                  placeholder="비밀번호를 입력하세요"
+                  placeholder="Enter password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
@@ -106,15 +110,26 @@ export default function Login() {
                   Enter World
                 </button>
                 <button type="button" className="auth-secondary-btn" onClick={handleGuestLogin}>
-                  게스트로 빠르게 시작
+                  Guest Start
                 </button>
               </div>
             </form>
 
+            <div className="auth-stat-grid">
+              <div className="auth-stat-card">
+                <span>Mode</span>
+                <strong>Cross Device</strong>
+              </div>
+              <div className="auth-stat-card">
+                <span>Flow</span>
+                <strong>Login to Spawn</strong>
+              </div>
+            </div>
+
             <div className="auth-switch">
-              계정이 아직 없으면{' '}
+              Need an account?{' '}
               <button className="auth-text-btn" type="button" onClick={() => navigate('/signup')}>
-                회원가입으로 이동
+                Create one
               </button>
             </div>
           </div>
