@@ -1636,7 +1636,7 @@ const GameOverlay = ({
         </div>
       )}
       {/* ===== 게임 도감 오버레이 ===== */}
-      {showTopToolButtons && <div
+      {!isMobile && showTopToolButtons && <div
         onClick={() => {
           setShowWorldToolsPopup(v => !v);
           setShowSettingsPopup(false);
@@ -1667,7 +1667,7 @@ const GameOverlay = ({
       >
         W
       </div>}
-      {showWorldToolsPopup && (
+      {!isMobile && showWorldToolsPopup && (
         <div
           style={{
             position: 'absolute',
