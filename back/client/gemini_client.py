@@ -42,7 +42,7 @@ async def generate_response_gemini(prompt: str, system_role: str = "Assistant"):
         res = await llm.ainvoke(messages)
         return res.content
     except Exception as e:
-        print(f"⚠️ Gemini Chat Error: {e}")
+        print(f"[WARN]Gemini Chat Error: {e}")
         return "Error generating response."
 
 
@@ -71,11 +71,11 @@ async def generate_image_gemini(
     Raises:
         Exception: 이미지 생성 실패 시
     """
-    print(f"🎨 이미지 생성 시작: {prompt[:50]}...")
+    print(f"[INFO] 이미지 생성 시작: {prompt[:50]}...")
     
     # google-genai SDK 사용
     if not genai_client:
-        print("⚠️ google-genai 패키지가 설치되지 않았습니다. 'pip install google-genai'를 실행해주세요.")
+        print("[WARN]google-genai 패키지가 설치되지 않았습니다. 'pip install google-genai'를 실행해주세요.")
         return None
         
     from google.genai.types import GenerateContentConfig
@@ -93,14 +93,14 @@ async def generate_image_gemini(
             )
         )
     except Exception as e:
-        print(f"⚠️ Imagen 3 생성 API 오류: {e}")
+        print(f"[WARN]Imagen 3 생성 API 오류: {e}")
         return None
     
     # 이미지 추출
     if (not response.candidates or 
         not response.candidates[0].content or 
         not response.candidates[0].content.parts):
-        print(f"⚠️ 이미지 생성 실패 (안전 필터 또는 오류): {response}")
+        print(f"[WARN]이미지 생성 실패 (안전 필터 또는 오류): {response}")
         return None
     
     image_part = response.candidates[0].content.parts[0]
@@ -120,9 +120,9 @@ async def generate_image_gemini(
         image_data = image_part.inline_data.data
         img = Image.open(io.BytesIO(image_data))
         img.save(output_path, format="PNG")
-        print(f"✅ 이미지 저장 완료: {filename} (Size: {img.size})")
+        print(f"[OK] 이미지 저장 완료: {filename} (Size: {img.size})")
     except Exception as e:
-        print(f"⚠️ 이미지 저장 중 오류 발생: {e}")
+        print(f"[WARN]이미지 저장 중 오류 발생: {e}")
         # Raw write fallback
         try:
             with open(output_path, 'wb') as f:

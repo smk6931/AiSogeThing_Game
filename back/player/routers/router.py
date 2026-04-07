@@ -1,3 +1,4 @@
+import time
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 from typing import Any
@@ -129,7 +130,20 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
 
                 player = player_manager.get_player(user_id)
                 if player:
-                    await _send_visible_monsters(websocket, player)
+                    pos = player.get("position") or {}
+                    px, pz = pos.get("x", 0) or 0, pos.get("z", 0) or 0
+                    last_sync = player.get("_last_monster_sync_pos")
+                    now_ts = time.time()
+                    last_sync_time = player.get("_last_monster_sync_time", 0)
+                    moved_far = (
+                        last_sync is None or
+                        (px - last_sync[0]) ** 2 + (pz - last_sync[1]) ** 2 >= 225  # 15 units
+                    )
+                    time_elapsed = (now_ts - last_sync_time) >= 2.0
+                    if moved_far or time_elapsed:
+                        player["_last_monster_sync_pos"] = (px, pz)
+                        player["_last_monster_sync_time"] = now_ts
+                        await _send_visible_monsters(websocket, player)
             
             # --- [CHAT] 채팅 메시지 ---
             elif msg_type == "chat":

@@ -38,7 +38,7 @@ async def get_embedding_openai(text: str) -> List[float]:
         )
         return response.data[0].embedding
     except Exception as e:
-        print(f"⚠️ OpenAI Embedding Error: {e}")
+        print(f"[WARN] OpenAI Embedding Error: {e}")
         return [0.0] * 1536
 
 async def get_embeddings_batch_openai(texts: List[str]) -> List[List[float]]:
@@ -54,7 +54,7 @@ async def get_embeddings_batch_openai(texts: List[str]) -> List[List[float]]:
         )
         return [d.embedding for d in response.data]
     except Exception as e:
-        print(f"⚠️ OpenAI Batch Error: {e}")
+        print(f"[WARN] OpenAI Batch Error: {e}")
         return [[0.0] * 1536 for _ in texts]
 
 # --------------------------------------------------------
@@ -79,5 +79,5 @@ async def generate_response_openai(prompt: str, system_role: str = "Assistant"):
         res = await llm.ainvoke(messages)
         return res.content
     except Exception as e:
-        print(f"⚠️ OpenAI Chat Error: {e}")
+        print(f"[WARN] OpenAI Chat Error: {e}")
         return "Error generating response."

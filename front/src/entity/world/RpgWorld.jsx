@@ -16,6 +16,8 @@ import { useAutoFarm } from '@hooks/useAutoFarm';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
+import CameraRig from '@entity/world/CameraRig';
+import CullRadiusIndicator from '@entity/world/CullRadiusIndicator';
 
 const MapTiles = lazy(() => import('@entity/world/MapTiles'));
 const ZoneOverlay = lazy(() => import('@entity/world/ZoneOverlay'));
@@ -32,92 +34,6 @@ const MONSTER_CULL_RADIUS = 100;
 const MONSTER_CULL_SQ = MONSTER_CULL_RADIUS * MONSTER_CULL_RADIUS;
 const WORLD_STAGE_DELAYS = [0, 120, 260, 420];
 
-const CullRadiusIndicator = ({ playerRef }) => {
-  const meshRef = useRef();
-
-  useFrame(() => {
-    if (!meshRef.current || !playerRef.current) return;
-    meshRef.current.position.x = playerRef.current.position.x;
-    meshRef.current.position.z = playerRef.current.position.z;
-  });
-
-  return (
-    <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1, 0]}>
-      <ringGeometry args={[MONSTER_CULL_RADIUS - 8, MONSTER_CULL_RADIUS, 128]} />
-      <meshBasicMaterial color="#ff4444" transparent opacity={0.55} side={THREE.DoubleSide} depthWrite={false} />
-    </mesh>
-  );
-};
-
-const CameraRig = ({ target, zoomLevel, orbitRef, cameraMode, debugConfig }) => {
-  const lastTargetPos = useRef(null);
-  const modeRef = useRef(cameraMode);
-
-  useFrame((state) => {
-    if (!target?.current?.position || !orbitRef?.current) return;
-
-    const targetPos = new THREE.Vector3().copy(target.current.position);
-
-    if (modeRef.current !== cameraMode) {
-      modeRef.current = cameraMode;
-      lastTargetPos.current = null;
-    }
-
-    if (!lastTargetPos.current) {
-      lastTargetPos.current = targetPos.clone();
-
-      if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
-        state.camera.fov = debugConfig.cameraFov;
-        state.camera.updateProjectionMatrix();
-      }
-
-      let cx;
-      let cz;
-      let baseHeight;
-
-      if (cameraMode === 'isometric') {
-        const isoDistMult = debugConfig.camIsoDistMult || 50;
-        const dist = state.camera.isOrthographicCamera ? 10000 : isoDistMult * Math.pow(2, 16.5 - zoomLevel);
-        const pitch = ((debugConfig.camIsoPitch || 25) * Math.PI) / 180;
-        cx = targetPos.x;
-        cz = targetPos.z + dist * Math.sin(pitch);
-        baseHeight = dist * Math.cos(pitch);
-      } else {
-        const playDistMult = debugConfig.playCamDistMult || 20;
-        const playPitch = ((debugConfig.playCamPitch || 60) * Math.PI) / 180;
-        const dist = state.camera.isOrthographicCamera ? 10000 : playDistMult * Math.pow(2, 16.5 - zoomLevel);
-        const radius = dist * Math.cos(playPitch);
-        cx = targetPos.x;
-        cz = targetPos.z + radius;
-        baseHeight = dist * Math.sin(playPitch);
-      }
-
-      state.camera.position.set(cx, targetPos.y + baseHeight, cz);
-      orbitRef.current.target.copy(targetPos);
-      orbitRef.current.update();
-      return;
-    }
-
-    const currentOffset = new THREE.Vector3().subVectors(state.camera.position, lastTargetPos.current);
-    state.camera.position.copy(targetPos).add(currentOffset);
-    orbitRef.current.target.copy(targetPos);
-
-    if (state.camera.isPerspectiveCamera && state.camera.fov !== debugConfig.cameraFov) {
-      state.camera.fov = debugConfig.cameraFov;
-      state.camera.updateProjectionMatrix();
-    }
-
-    if (cameraMode === 'isometric') {
-      orbitRef.current.setAzimuthalAngle((debugConfig.camIsoAzimuth || 0) * (Math.PI / 180));
-      orbitRef.current.setPolarAngle(((debugConfig.camIsoPitch || 15) * Math.PI) / 180);
-    }
-
-    orbitRef.current.update();
-    lastTargetPos.current.copy(targetPos);
-  });
-
-  return null;
-};
 
 const RpgWorld = ({
   input,
@@ -133,30 +49,10 @@ const RpgWorld = ({
   monsters = {},
   spawnPosition,
   sendHit,
-  zoomLevel,
-  showOsmMap,
-  showSeoulRoads,
-  roadTypeFilters = {},
-  showSeoulNature,
-  showLanduseTextureLayer,
-  showRoadSplitLayer,
-  showLanduseZones,
-  landuseFilters = {},
-  showHeightMap,
-  showGroundMesh,
-  showDistrictBoundaries = false,
-  showMicroBoundaries = false,
-  showGroupBoundaries = true,
-  highlightCurrentGroup = true,
-  showCurrentGroupTexture = false,
-  showCullRadius = false,
-  groundTextureFolder = '',
-  roadTextureFolder = '',
+  mapSettings = {},
   orbitRef,
-  cameraMode,
   onMonsterClick,
   currentRegionInfo = null,
-  worldEditorOpen = false,
   isAutoMode = false,
   onAutoModeChange,
   playerDamageEvents = [],
@@ -164,6 +60,29 @@ const RpgWorld = ({
   autoFarmRange = 60,
   autoAttackRange = 30,
 }) => {
+  const {
+    zoomLevel,
+    cameraMode,
+    showOsmMap,
+    showSeoulRoads,
+    roadTypeFilters = {},
+    showSeoulNature,
+    showLanduseTextureLayer,
+    showRoadSplitLayer,
+    showLanduseZones,
+    landuseFilters = {},
+    showHeightMap,
+    showGroundMesh,
+    showDistrictBoundaries = false,
+    showMicroBoundaries = false,
+    showGroupBoundaries = true,
+    highlightCurrentGroup = true,
+    showCurrentGroupTexture = false,
+    showCullRadius = false,
+    groundTextureFolder = '',
+    roadTextureFolder = '',
+    worldEditorOpen = false,
+  } = mapSettings;
   const [debugConfig, setDebugConfig] = useState(() => {
     const saved = localStorage.getItem('world_debug_config');
     if (saved) {
@@ -223,6 +142,7 @@ const RpgWorld = ({
   const playerRef = useRef();
   const projectilePositions = useRef({});
   const projectileHits = useRef({});
+  const collisionFrameRef = useRef(0);
   const initialConfig = useRef({ ...debugConfig });
   // monsters를 interval/ref에서 최신값으로 읽기 위한 ref
   const monstersRef = useRef(monsters);
@@ -377,6 +297,40 @@ const RpgWorld = ({
     return () => timers.forEach(window.clearTimeout);
   }, [currentDistrictId, currentDongId]);
 
+  const visibleMonsterElements = useMemo(() => {
+    const monsterKeys = Object.keys(monsters);
+    if (monsterKeys.length === 0) return null;
+
+    const playerPos = playerRef.current?.position;
+
+    return monsterKeys.map((key) => {
+      const monster = monsters[key];
+      if (!monster?.position) return null;
+
+      if (playerPos) {
+        const distSq = (monster.position.x - playerPos.x) ** 2 + (monster.position.z - playerPos.z) ** 2;
+        if (distSq > MONSTER_CULL_SQ) return null;
+      }
+
+      return (
+        <group key={monster.id} onClick={(event) => { event.stopPropagation(); handleMonsterClick(monster); }}>
+          <Monster
+            id={monster.id}
+            position={monster.position}
+            hp={monster.hp}
+            maxHp={monster.maxHp}
+            state={monster.state}
+            modelPath={monster.modelPath || null}
+            tier={monster.tier || 'normal'}
+            scale={debugConfig.playerScale}
+            isTargeted={String(selectedTargetId) === String(monster.id)}
+            onInfoClick={() => handleMonsterInfoClick(monster)}
+          />
+        </group>
+      );
+    });
+  }, [monsters, selectedTargetId, handleMonsterClick, handleMonsterInfoClick, debugConfig.playerScale]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleProjectileUpdate = (id, pos) => {
     projectilePositions.current[id] = pos;
   };
@@ -388,6 +342,8 @@ const RpgWorld = ({
   };
 
   useFrame(() => {
+    collisionFrameRef.current = (collisionFrameRef.current + 1) % 2;
+    if (collisionFrameRef.current !== 0) return;
     if (projectiles.length === 0 || Object.keys(monsters).length === 0) return;
 
     projectiles.forEach((projectile) => {
@@ -668,46 +624,7 @@ const RpgWorld = ({
           />
         ))}
 
-      {(() => {
-        const monsterKeys = Object.keys(monsters);
-        if (monsterKeys.length === 0) return null;
-
-        const playerPos = playerRef.current?.position;
-        const hasNearby = !playerPos || monsterKeys.some((key) => {
-          const monster = monsters[key];
-          if (!monster?.position) return false;
-          return (monster.position.x - playerPos.x) ** 2 + (monster.position.z - playerPos.z) ** 2 <= MONSTER_CULL_SQ;
-        });
-
-        if (!hasNearby) return null;
-
-        return monsterKeys.map((key) => {
-          const monster = monsters[key];
-          if (!monster?.position) return null;
-
-          if (playerPos) {
-            const distSq = (monster.position.x - playerPos.x) ** 2 + (monster.position.z - playerPos.z) ** 2;
-            if (distSq > MONSTER_CULL_SQ) return null;
-          }
-
-          return (
-            <group key={monster.id} onClick={(event) => { event.stopPropagation(); handleMonsterClick(monster); }}>
-              <Monster
-                id={monster.id}
-                position={monster.position}
-                hp={monster.hp}
-                maxHp={monster.maxHp}
-                state={monster.state}
-                modelPath={monster.modelPath || null}
-                tier={monster.tier || 'normal'}
-                scale={debugConfig.playerScale}
-                isTargeted={String(selectedTargetId) === String(monster.id)}
-                onInfoClick={() => handleMonsterInfoClick(monster)}
-              />
-            </group>
-          );
-        });
-      })()}
+      {visibleMonsterElements}
 
       {showCullRadius && <CullRadiusIndicator playerRef={playerRef} />}
 

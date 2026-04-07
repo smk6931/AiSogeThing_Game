@@ -29,7 +29,7 @@ class GisService:
         """
         특정 지점 주변의 도로나 수계 데이터를 OSM에서 가져옴
         """
-        print(f"🌍 GIS 데이터 추출 중: ({lat}, {lng}), 반경 {dist}m")
+        print(f"[INFO] GIS 데이터 추출 중: ({lat}, {lng}), 반경 {dist}m")
         try:
             # bbox 생성
             # dist가 100m이면 전체 200m x 200m 영역
@@ -37,13 +37,13 @@ class GisService:
             nodes, edges = ox.graph_to_gdfs(graph)
             return edges
         except Exception as e:
-            print(f"❌ GIS 추출 실패: {e}")
+            print(f"[ERROR] GIS 추출 실패: {e}")
             return None
 
     def export_skeleton(self, edges, output_path, dpi=100):
         """도로망을 흰색 선으로 그려 AI 밑그림(Template) 생성"""
         if edges is None or edges.empty:
-            print("⚠️ 그릴 데이터가 없습니다.")
+            print("[WARN] 그릴 데이터가 없습니다.")
             return False
         
         import matplotlib.pyplot as plt
@@ -60,7 +60,7 @@ class GisService:
         
         plt.savefig(output_path, bbox_inches='tight', pad_inches=0, facecolor='black')
         plt.close()
-        print(f"🎨 GIS 템플릿 저장 완료: {output_path}")
+        print(f"[OK] GIS 템플릿 저장 완료: {output_path}")
         return True
 
 # 싱글톤 인스턴스

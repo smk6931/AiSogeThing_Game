@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useRef } from 'react';
+import React, { Suspense, lazy, useRef, memo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei/core/OrbitControls.js';
 import ZoomController from '@engine/ZoomController';
@@ -17,29 +17,9 @@ const GameCanvas = ({
   sendSkill, projectiles, addProjectile, updateProjectile, removeProjectile, monsters,
   sendHit,
   currentMapId, spawnPosition, onPortalEncounter,
-  zoomLevel,
-  showOsmMap,
-  showSeoulRoads,
-  roadTypeFilters,
-  showSeoulNature,
-  showLanduseTextureLayer,
-  showRoadSplitLayer,
-  showLanduseZones,
-  landuseFilters,
-  showHeightMap,
-  showGroundMesh,
-  showDistrictBoundaries,
-  showMicroBoundaries,
-  showGroupBoundaries,
-  highlightCurrentGroup,
-  showCurrentGroupTexture,
-  showCullRadius,
-  groundTextureFolder,
-  roadTextureFolder,
-  cameraMode,
+  mapSettings = {},
   onMonsterClick,
   currentRegionInfo,
-  worldEditorOpen = false,
   isAutoMode = false,
   onAutoModeChange,
   playerDamageEvents = [],
@@ -47,6 +27,7 @@ const GameCanvas = ({
   autoFarmRange = 60,
   autoAttackRange = 30,
 }) => {
+  const { zoomLevel, cameraMode } = mapSettings;
   const orbitRef = useRef();
 
   return (
@@ -89,29 +70,9 @@ const GameCanvas = ({
           currentMapId={currentMapId}
           spawnPosition={spawnPosition}
           onPortalEncounter={onPortalEncounter}
-          zoomLevel={zoomLevel}
-          showOsmMap={showOsmMap}
-          showSeoulRoads={showSeoulRoads}
-          roadTypeFilters={roadTypeFilters}
-          showSeoulNature={showSeoulNature}
-          showLanduseTextureLayer={showLanduseTextureLayer}
-          showRoadSplitLayer={showRoadSplitLayer}
-          showLanduseZones={showLanduseZones}
-          landuseFilters={landuseFilters}
-          showHeightMap={showHeightMap}
-          showGroundMesh={showGroundMesh}
-          showDistrictBoundaries={showDistrictBoundaries}
-          showMicroBoundaries={showMicroBoundaries}
-          showGroupBoundaries={showGroupBoundaries}
-          highlightCurrentGroup={highlightCurrentGroup}
-          showCurrentGroupTexture={showCurrentGroupTexture}
-          showCullRadius={showCullRadius}
-          groundTextureFolder={groundTextureFolder}
-          roadTextureFolder={roadTextureFolder}
-          cameraMode={cameraMode}
+          mapSettings={mapSettings}
           onMonsterClick={onMonsterClick}
           currentRegionInfo={currentRegionInfo}
-          worldEditorOpen={worldEditorOpen}
           orbitRef={orbitRef}
           isAutoMode={isAutoMode}
           onAutoModeChange={onAutoModeChange}
@@ -134,4 +95,4 @@ const GameCanvas = ({
   );
 };
 
-export default GameCanvas;
+export default memo(GameCanvas);

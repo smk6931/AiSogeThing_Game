@@ -71,7 +71,7 @@ def safe_execute(error_msg="An error occurred"):
     try:
         yield
     except Exception as e:
-        print(f"⚠️ {error_msg}: {e}")
+        print(f"[WARN] {error_msg}: {e}")
 
 
 # ========================================================
@@ -103,8 +103,8 @@ def handle_exceptions(default_message: str = "작업 실패"):
                 raise  # FastAPI HTTPException은 그대로 전달
             except Exception as e:
                 error_msg = f"{default_message}: {str(e)}"
-                print(f"❌ {error_msg}")
-                print(f"📍 Traceback:\n{traceback.format_exc()}")
+                print(f"[ERROR] {error_msg}")
+                print(f"[TRACE] Traceback:\n{traceback.format_exc()}")
                 raise HTTPException(status_code=500, detail=error_msg)
         return wrapper  # 래핑된 함수 반환
     return decorator  # 데코레이터 반환
@@ -126,8 +126,8 @@ def handle_sync_exceptions(default_message: str = "작업 실패"):
                 return func(*args, **kwargs)
             except Exception as e:
                 error_msg = f"{default_message}: {str(e)}"
-                print(f"❌ {error_msg}")
-                print(f"📍 Traceback:\n{traceback.format_exc()}")
+                print(f"[ERROR] {error_msg}")
+                print(f"[TRACE] Traceback:\n{traceback.format_exc()}")
                 return None
         return wrapper
     return decorator

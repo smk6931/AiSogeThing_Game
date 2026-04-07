@@ -1,53 +1,22 @@
 import React, { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
 import { Joystick } from 'react-joystick-component';
-import { useAuth } from '@contexts/AuthContext';
 import { useGameInput } from '@engine/useGameInput';
 import { useProjectiles } from '@hooks/useProjectiles';
 import { useGameSocket } from '@engine/useGameSocket';
 import { useCurrentRegionInfo } from '@hooks/useCurrentRegionInfo';
 import { useGameSettings } from '@hooks/useGameSettings';
+import { useIsMobile } from '@hooks/useIsMobile';
+import { useMapSettings, clampZoomLevel } from '@hooks/useMapSettings';
 import GameOverlay from '@ui/GameOverlay';
 import ChatBox from '@ui/ChatBox';
 import { getMap } from '@entity/world/mapConfig';
-import { useGameConfig } from '@contexts/GameConfigContext';
-import worldApi from '@api/world';
 const WorldMapModal = lazy(() => import('@ui/WorldMapModal'));
 const MonsterInfoPanel = lazy(() => import('@entity/monster/MonsterInfoPanel'));
 const InventoryModal = lazy(() => import('@ui/InventoryModal'));
 const GameCanvas = lazy(() => import('@engine/GameCanvas'));
 
-const CAMERA_STORAGE_KEYS = {
-  zoomLevel: 'game_camera_zoom_level',
-  cameraMode: 'game_camera_mode',
-};
-
-const DEFAULT_ZOOM_LEVEL = 16.5;
-const DEFAULT_CAMERA_MODE = 'isometric';
-
-const loadStoredZoomLevel = () => {
-  try {
-    const raw = Number(localStorage.getItem(CAMERA_STORAGE_KEYS.zoomLevel));
-    if (Number.isFinite(raw)) {
-      return Math.max(6, Math.min(23.5, raw));
-    }
-  } catch (_) {}
-  return DEFAULT_ZOOM_LEVEL;
-};
-
-const loadStoredCameraMode = () => {
-  try {
-    const raw = localStorage.getItem(CAMERA_STORAGE_KEYS.cameraMode);
-    if (raw === 'isometric' || raw === '360') {
-      return raw;
-    }
-  } catch (_) {}
-  return DEFAULT_CAMERA_MODE;
-};
-
-const clampZoomLevel = (value) => Math.max(6, Math.min(23.5, value));
 
 const GameEntry = () => {
-  const { moveSpeed, setMoveSpeed } = useGameConfig();
   const { settings, updateSetting, saveToDb, resetSettings } = useGameSettings();
 
   const [selectedMonster, setSelectedMonster] = useState(null);
@@ -105,40 +74,7 @@ const GameEntry = () => {
     return () => clearTimeout(timer);
   }, [droppedItems, setDroppedItems]);
 
-  const [zoomLevel, setZoomLevel] = useState(loadStoredZoomLevel);
-  const [showOsmMap, setShowOsmMap] = useState(true);
-  const [showSeoulRoads, setShowSeoulRoads] = useState(true);
-  const [roadTypeFilters, setRoadTypeFilters] = useState({
-    major: true,
-    mid: true,
-    alley: true,
-    pedestrian: true,
-    service: true,
-  });
-  const [showSeoulNature, setShowSeoulNature] = useState(false);
-  const [showLanduseTextureLayer, setShowLanduseTextureLayer] = useState(false);
-  const [showRoadSplitLayer, setShowRoadSplitLayer] = useState(false);
-  const [showLanduseZones, setShowLanduseZones] = useState(false);
-  const [landuseFilters, setLanduseFilters] = useState({
-    residential: true, commercial: true, industrial: true,
-    institutional: true, educational: true, medical: true, parking: true,
-    natural_site: true, military: true, religious: true, sports: true,
-    cemetery: true, transport: true, port: true, unexplored: true
-  });
-  const [showHeightMap, setShowHeightMap] = useState(false); // [OFF] 등고선 비활성화 (나중에 true로 복원 가능)
-  const [showGroundMesh, setShowGroundMesh] = useState(false);
-  const [showDistrictBoundaries, setShowDistrictBoundaries] = useState(false);
-  const [showMicroBoundaries, setShowMicroBoundaries] = useState(false);
-  const [showGroupBoundaries, setShowGroupBoundaries] = useState(true);
-  const [highlightCurrentGroup, setHighlightCurrentGroup] = useState(true);
-  const [showCurrentGroupTexture, setShowCurrentGroupTexture] = useState(true);
-  const [showCullRadius, setShowCullRadius] = useState(false);
-  const [cameraMode, setCameraMode] = useState(loadStoredCameraMode); // 'isometric' or '360'
-  const [worldEditorOpen, setWorldEditorOpen] = useState(false);
-  const [availableGroundTextureFolders, setAvailableGroundTextureFolders] = useState([]);
-  const [groundTextureFolder, setGroundTextureFolder] = useState(() => localStorage.getItem('ground_texture_folder') || '');
-  const [availableRoadTextureFolders, setAvailableRoadTextureFolders] = useState([]);
-  const [roadTextureFolder, setRoadTextureFolder] = useState(() => localStorage.getItem('road_texture_folder') || '');
+  const { mapSettings, zoomLevel, setZoomLevel, cameraMode } = useMapSettings();
   const pinchDistanceRef = useRef(null);
 
 
@@ -175,85 +111,7 @@ const GameEntry = () => {
     return () => window.removeEventListener('wheel', handleWheel);
   }, []);
 
-  const checkMobile = () => true; // 전기기 통일 클린 모바일 HUD
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
-
-  // 화면 크기 감지
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchTextureFolders = async () => {
-      try {
-        const res = await worldApi.getBlockTextureFolders();
-        const folders = Array.isArray(res.data) ? res.data : [];
-        if (cancelled) return;
-        setAvailableGroundTextureFolders(folders);
-        if (groundTextureFolder && !folders.includes(groundTextureFolder)) {
-          setGroundTextureFolder('');
-        }
-      } catch (_) {
-        if (!cancelled) setAvailableGroundTextureFolders([]);
-      }
-    };
-
-    fetchTextureFolders();
-    return () => { cancelled = true; };
-  }, [groundTextureFolder]);
-
-  useEffect(() => {
-    if (groundTextureFolder) {
-      localStorage.setItem('ground_texture_folder', groundTextureFolder);
-    } else {
-      localStorage.removeItem('ground_texture_folder');
-    }
-  }, [groundTextureFolder]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchTextureFolders = async () => {
-      try {
-        const res = await worldApi.getRoadTextureFolders();
-        const folders = Array.isArray(res.data) ? res.data : [];
-        if (cancelled) return;
-        setAvailableRoadTextureFolders(folders);
-        if (roadTextureFolder && !folders.includes(roadTextureFolder)) {
-          setRoadTextureFolder('');
-        }
-      } catch (_) {
-        if (!cancelled) setAvailableRoadTextureFolders([]);
-      }
-    };
-
-    fetchTextureFolders();
-    return () => { cancelled = true; };
-  }, [roadTextureFolder]);
-
-  useEffect(() => {
-    if (roadTextureFolder) {
-      localStorage.setItem('road_texture_folder', roadTextureFolder);
-    } else {
-      localStorage.removeItem('road_texture_folder');
-    }
-  }, [roadTextureFolder]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(CAMERA_STORAGE_KEYS.zoomLevel, String(zoomLevel));
-    } catch (_) {}
-  }, [zoomLevel]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(CAMERA_STORAGE_KEYS.cameraMode, cameraMode);
-    } catch (_) {}
-  }, [cameraMode]);
+  const isMobile = useIsMobile();
 
   const getTouchDistance = useCallback((touches) => {
     if (!touches || touches.length < 2) return null;
@@ -330,29 +188,9 @@ const GameEntry = () => {
           currentMapId={currentMapId}
           spawnPosition={spawnPosition}
           onPortalEncounter={handlePortalEncounter}
-          zoomLevel={zoomLevel} // [NEW] 줌 레벨 전달
-          showOsmMap={showOsmMap}
-          showSeoulRoads={showSeoulRoads}
-          roadTypeFilters={roadTypeFilters}
-          showSeoulNature={showSeoulNature}
-          showLanduseTextureLayer={showLanduseTextureLayer}
-          showRoadSplitLayer={showRoadSplitLayer}
-          showLanduseZones={showLanduseZones}
-          landuseFilters={landuseFilters}
-          showHeightMap={showHeightMap}
-          showGroundMesh={showGroundMesh}
-          showDistrictBoundaries={showDistrictBoundaries}
-          showMicroBoundaries={showMicroBoundaries}
-          showGroupBoundaries={showGroupBoundaries}
-          highlightCurrentGroup={highlightCurrentGroup}
-          showCurrentGroupTexture={showCurrentGroupTexture}
-          showCullRadius={showCullRadius}
-          groundTextureFolder={groundTextureFolder}
-          roadTextureFolder={roadTextureFolder}
-          cameraMode={cameraMode}
+          mapSettings={mapSettings}
           onMonsterClick={setSelectedMonster}
           currentRegionInfo={currentRegionInfo}
-          worldEditorOpen={worldEditorOpen}
           isAutoMode={isAutoMode}
           onAutoModeChange={setIsAutoMode}
           playerDamageEvents={playerDamageEvents}
@@ -384,8 +222,6 @@ const GameEntry = () => {
         myStats={myStats}
         monsters={monsters}
         currentRegionInfo={currentRegionInfo}
-        availableGroundTextureFolders={availableGroundTextureFolders}
-        availableRoadTextureFolders={availableRoadTextureFolders}
         droppedItems={droppedItems}
         onInventoryOpen={() => setInventoryOpen(true)}
         isAutoMode={isAutoMode}
@@ -394,29 +230,7 @@ const GameEntry = () => {
         onSettingUpdate={updateSetting}
         onSettingsSave={saveToDb}
         onSettingsReset={resetSettings}
-        mapSettings={{
-          zoomLevel, setZoomLevel,
-          showOsmMap, setShowOsmMap,
-          showSeoulRoads, setShowSeoulRoads,
-          roadTypeFilters, setRoadTypeFilters,
-          showSeoulNature, setShowSeoulNature,
-          showLanduseTextureLayer, setShowLanduseTextureLayer,
-          showRoadSplitLayer, setShowRoadSplitLayer,
-          showLanduseZones, setShowLanduseZones,
-          landuseFilters, setLanduseFilters,
-          showGroundMesh, setShowGroundMesh,
-          showDistrictBoundaries, setShowDistrictBoundaries,
-          showMicroBoundaries, setShowMicroBoundaries,
-          showGroupBoundaries, setShowGroupBoundaries,
-          highlightCurrentGroup, setHighlightCurrentGroup,
-          showCurrentGroupTexture, setShowCurrentGroupTexture,
-          showCullRadius, setShowCullRadius,
-          groundTextureFolder, setGroundTextureFolder,
-          roadTextureFolder, setRoadTextureFolder,
-          cameraMode, setCameraMode,
-          worldEditorOpen, setWorldEditorOpen,
-          onPlayView: () => { setZoomLevel(18.5); setCameraMode('isometric'); },
-        }}
+        mapSettings={mapSettings}
       />
 
       {/* ================= Monster Info Panel ================= */}
