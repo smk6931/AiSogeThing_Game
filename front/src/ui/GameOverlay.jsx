@@ -27,6 +27,16 @@ const MAP_PLACEHOLDER_STYLE = {
   letterSpacing: '1.2px',
 };
 
+const REGION_ENTRY_BG = '/images/ui/region-entry-fantasy-v1.png';
+const REGION_ENTRY_VIGNETTE = {
+  position: 'absolute',
+  inset: 0,
+  background: 'radial-gradient(circle at center, rgba(8,12,18,0.12), rgba(4,7,12,0.56) 72%)',
+  backdropFilter: 'blur(4px)',
+  WebkitBackdropFilter: 'blur(4px)',
+  pointerEvents: 'none',
+};
+
 const injectFont = () => {
   if (document.getElementById('game-font-link')) return;
   const link = document.createElement('link');
@@ -210,6 +220,7 @@ const GameOverlay = ({
   const currentPartition = regionState?.currentPartition || null;
   const currentPartitionTitle = currentPartition?.group_display_name || currentPartition?.display_name || '';
   const currentPartitionTheme = currentPartition?.group_theme_code || currentPartition?.theme_code || '-';
+  const showRegionEntryOverlay = gameSettings.showRegionTitle !== false && (showZoneTitle || (showPartitionTitle && currentPartition));
   const worldEditorOpen = mapSettings.worldEditorOpen ?? false;
   const setWorldEditorOpen = mapSettings.setWorldEditorOpen ?? (() => {});
   const groundTextureFolder = mapSettings.groundTextureFolder ?? '';
@@ -1243,11 +1254,34 @@ const GameOverlay = ({
         </>
       )}
 
+      {showRegionEntryOverlay && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `linear-gradient(180deg, rgba(2,6,10,0.18), rgba(2,6,10,0.44)), url(${REGION_ENTRY_BG})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              pointerEvents: 'none',
+              zIndex: 107,
+            }}
+          />
+          <div
+            style={{
+              ...REGION_ENTRY_VIGNETTE,
+              animation: 'fadeInOut 3s forwards',
+              zIndex: 108,
+            }}
+          />
+        </>
+      )}
+
       {showZoneTitle && gameSettings.showRegionTitle !== false && (
         <div
           style={{
             position: 'absolute',
-            top: '25%',
+            top: '28%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
             display: 'flex',
@@ -1255,18 +1289,23 @@ const GameOverlay = ({
             alignItems: 'center',
             animation: 'fadeInOut 3s forwards',
             pointerEvents: 'none',
+            zIndex: 109,
+            width: isMobile ? '86vw' : 'min(70vw, 720px)',
+            textAlign: 'center',
           }}
         >
-          <div style={{ color: GOLD, fontSize: '14px', fontWeight: 'bold', letterSpacing: '4px', marginBottom: '4px' }}>
+          <div style={{ color: GOLD, fontSize: isMobile ? '12px' : '14px', fontWeight: 'bold', letterSpacing: '4px', marginBottom: '10px' }}>
             NOW ENTERING
           </div>
-          <div style={{ color: '#fff', fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', letterSpacing: '2px' }}>
+          <div style={{ color: '#fff', fontSize: isMobile ? '34px' : '56px', fontWeight: 'bold', letterSpacing: '2px', textShadow: '0 10px 30px rgba(0,0,0,0.45)' }}>
             {currentDistrict?.name || ''}
           </div>
           {currentDistrict?.name_en && (
-            <div style={{ color: '#aaa', fontSize: '18px', marginTop: '4px' }}>{currentDistrict.name_en}</div>
+            <div style={{ color: 'rgba(245,240,226,0.85)', fontSize: isMobile ? '16px' : '20px', marginTop: '8px', letterSpacing: '1px', textShadow: '0 4px 16px rgba(0,0,0,0.35)' }}>
+              {currentDistrict.name_en}
+            </div>
           )}
-          <div style={{ width: '200px', height: '1px', background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)`, marginTop: '10px' }} />
+          <div style={{ width: isMobile ? '160px' : '220px', height: '1px', background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)`, marginTop: '18px' }} />
         </div>
       )}
 
@@ -1274,7 +1313,7 @@ const GameOverlay = ({
         <div
           style={{
             position: 'absolute',
-            top: '35%',
+            top: '39%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
             display: 'flex',
@@ -1282,15 +1321,18 @@ const GameOverlay = ({
             alignItems: 'center',
             animation: 'fadeInOut 2.2s forwards',
             pointerEvents: 'none',
+            zIndex: 109,
+            width: isMobile ? '80vw' : 'min(58vw, 620px)',
+            textAlign: 'center',
           }}
         >
-          <div style={{ color: ACCENT, fontSize: '12px', fontWeight: '700', letterSpacing: '3px', marginBottom: '4px' }}>
+          <div style={{ color: ACCENT, fontSize: '12px', fontWeight: '700', letterSpacing: '3px', marginBottom: '8px', textShadow: '0 4px 16px rgba(0,0,0,0.35)' }}>
             REGION ENTERED
           </div>
-          <div style={{ color: GOLD, fontSize: '12px', marginBottom: '4px' }}>
+          <div style={{ color: GOLD, fontSize: isMobile ? '12px' : '13px', marginBottom: '6px', textShadow: '0 4px 16px rgba(0,0,0,0.35)' }}>
             {currentPartitionTitle}
           </div>
-          <div style={{ color: '#fff', fontSize: isMobile ? '20px' : '30px', fontWeight: '700', textAlign: 'center' }}>
+          <div style={{ color: '#fff', fontSize: isMobile ? '24px' : '34px', fontWeight: '700', textShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
             {currentPartition.display_name}
           </div>
         </div>

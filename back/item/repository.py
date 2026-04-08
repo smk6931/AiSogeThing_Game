@@ -87,12 +87,15 @@ async def get_item_templates(user_id: int | None = None) -> list[dict]:
         """
         SELECT it.id AS item_id, it.name_ko, it.name_en, it.item_type, it.rarity,
                it.stat_bonus, it.description, it.icon_key,
-               COALESCE(SUM(ci.quantity), 0) AS quantity
+               COALESCE(inv.quantity, 0) AS quantity
         FROM item_template it
-        LEFT JOIN character_inventory ci
-          ON ci.item_id = it.id AND ci.user_id = :user_id
+        LEFT JOIN (
+            SELECT item_id, SUM(quantity) AS quantity
+            FROM character_inventory
+            WHERE user_id = :user_id
+            GROUP BY item_id
+        ) inv ON inv.item_id = it.id
         WHERE it.is_active = TRUE
-        GROUP BY it.id, it.name_ko, it.name_en, it.item_type, it.rarity, it.stat_bonus, it.description, it.icon_key
         ORDER BY it.id
         """,
         {"user_id": user_id}
