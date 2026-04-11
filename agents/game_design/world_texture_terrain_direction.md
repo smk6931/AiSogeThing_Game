@@ -152,10 +152,18 @@ Priority: high
 - grass/dirt/rock/moss 멀티 레이어 블렌딩
 - partition은 재질 weight source로 전환
 
-### 4차
-- heightmap 또는 procedural displacement 도입
-- 도로가 지형을 따라가도록 terrain conform 적용
-- 물/숲/경사에 따른 재질 보정
+### 4차 — 파티션 계단식 고도 (채택 결정, 2026-04-11)
+- 국토지리정보원 DEM 5m → 파티션별 평균 `elevation_m` 계산 후 DB 저장
+- `CityBlockOverlay`에서 y-offset으로 적용 (`0.55 + elevation_m * ELEV_SCALE`)
+- 플레이어/몬스터/카메라 코드는 변경 없이 시각적 고도감 부여
+- 상세 설계: `docs/world/3D지형_고도_설계.md`
+
+### 5차 (미래 v2)
+- Vertex Shader 하이트맵 — smooth terrain으로 전환
+- Fragment Shader `fract()` 등고선 표현
+- 텍스처 스플래팅 (고도·경사별 grass/rock/snow 자동 블렌딩)
+- LOD 청크 관리 (카메라 거리별 mesh 해상도)
+- 도로 terrain conform 적용
 
 ## 실무 결론
 
