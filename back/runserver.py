@@ -2,8 +2,36 @@ import os
 import sys
 from pathlib import Path
 
-import uvicorn
-from dotenv import dotenv_values
+
+def _ensure_venv() -> None:
+    """현재 Python이 프로젝트 venv가 아니면 venv Python으로 재실행한다."""
+    import subprocess
+
+    backend_dir = Path(__file__).resolve().parent
+    project_root = backend_dir.parent
+
+    # Windows: venv/Scripts/python.exe  /  Unix: venv/bin/python
+    _exe = "python.exe" if sys.platform == "win32" else "python"
+    _sub = "Scripts" if sys.platform == "win32" else "bin"
+    venv_python = project_root / "venv" / _sub / _exe
+
+    if not venv_python.exists():
+        print(f"[runserver] venv 없음: {venv_python} — 시스템 Python으로 진행")
+        return
+
+    current = Path(sys.executable).resolve()
+    if current == venv_python.resolve():
+        return  # 이미 venv Python
+
+    print(f"[runserver] 시스템 Python 감지됨. venv로 재실행: {venv_python}")
+    result = subprocess.run([str(venv_python)] + sys.argv)
+    sys.exit(result.returncode)
+
+
+_ensure_venv()
+
+import uvicorn  # noqa: E402
+from dotenv import dotenv_values  # noqa: E402
 
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")

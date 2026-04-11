@@ -39,6 +39,24 @@ Priority: high
 - DB/외부 연동 실패를 숨기지 말되, 앱 전체 크래시보다 안전한 fallback을 우선한다.
 - migration 전/후 차이처럼 환경 상태에 따라 실패할 수 있는 코드는 보호 코드를 둔다.
 
+## SQL 파라미터 바인딩
+
+`execute()` 로 Raw SQL 실행 시 위치 기반(`%s`, `?`) 대신 네임드 파라미터를 사용한다.
+
+```python
+# Good
+await execute(
+    "INSERT INTO user_logs (user_id, action) VALUES (:user_id, :action)",
+    {"user_id": user_id, "action": "view"}
+)
+
+# Bad — 순서 의존, 가독성 낮음
+await execute(
+    "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
+    (user_id, "view")
+)
+```
+
 ## 금지 패턴
 
 - 모든 도메인 라우터를 `back/router` 하나에 몰기

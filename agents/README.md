@@ -51,4 +51,6 @@ Priority: high | medium | low
 - `process/`
   Claude와 Codex가 공통으로 따를 작업 절차, 역할 분리, 검증 흐름 문서
   공통 조언 방식, 공통 소통 규칙도 포함
+- `db/`
+  DB 전략, 테이블 구조, 파티션 설계, ERD 등 월드 DB 관련 규칙
 

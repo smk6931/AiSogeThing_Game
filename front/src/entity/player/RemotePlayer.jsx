@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import { Html, Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 
 // 모든 RemotePlayer 인스턴스가 공유하는 geometry (한 번만 생성)
@@ -54,20 +54,21 @@ const RemotePlayer = ({ position, rotation, animation, nickname, chat, scale = 1
         <meshStandardMaterial color="white" />
       </mesh>
 
-      {/* 닉네임 표시 */}
-      {/* 닉네임 표시 */}
-      <Html position={[0, 2.5, 0]} center>
-        <div style={{
-          background: 'rgba(0, 0, 0, 0.6)',
-          color: 'white',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontSize: '10px',
-          whiteSpace: 'nowrap'
-        }}>
-          {nickname}
-        </div>
-      </Html>
+      {/* 닉네임 표시 — Billboard+Text로 3D 공간 렌더링 (Html 사용 시 화면 밖 투영 → 왼쪽 위 검정 사각형 버그) */}
+      {nickname && (
+        <Billboard position={[0, 2.5, 0]}>
+          <Text
+            fontSize={0.45}
+            color="white"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.06}
+            outlineColor="#000000"
+          >
+            {nickname}
+          </Text>
+        </Billboard>
+      )}
 
       {/* 말풍선 */}
       {showChat && (

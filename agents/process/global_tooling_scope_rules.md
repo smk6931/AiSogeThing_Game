@@ -12,20 +12,12 @@ Priority: high
 
 ## 전역에 넣어도 되는 것
 
-- 작업 절차
-  - 분석 -> 계획 -> 구현 -> 검증 -> 리뷰
-- 툴 역할 분담
-  - Claude는 계획, 비교, 문서화
-  - Codex는 구현, 탐색, 로컬 검증
-- 공통 편집 안전 규칙
-  - `apply_patch` 우선
-  - PowerShell 전체 재저장 금지
-- 공통 예외처리 원칙
-  - 앱 전체 크래시보다 안전한 fallback 우선
-- 공통 모듈 분리 원칙
-  - 여러 도메인에서 재사용되는 client/helper만 공통으로 뺀다
-- 민감정보/배포 안전 원칙
-  - `.env`, key, dump는 Git 금지
+- 작업 절차 (`agents/process/workflow_rules.md` 참고)
+- 툴 역할 분담 (`agents/process/tool_split_rules.md` 참고)
+- 편집 안전 규칙 (`agents/development/editing_safety_rules.md` 참고)
+- 공통 예외처리 원칙: 앱 전체 크래시보다 안전한 fallback 우선
+- 공통 모듈 분리 원칙: 여러 도메인에서 재사용되는 client/helper만 공통으로 뺀다
+- 민감정보/배포 안전 원칙: `.env`, key, dump는 Git 금지
 
 ## 전역에 넣으면 안 되는 것
 
@@ -59,9 +51,6 @@ Priority: high
 - 공통 예외처리와 공통 모듈 분리 원칙
 - 인코딩/편집 안전 수칙
 
-## 이 저장소 기준 정리
+## 이 저장소 기준
 
-- 백엔드 구조 규칙은 `agents/development/backend_structure_rules.md`
-- 편집/인코딩 안전 규칙은 `agents/development/editing_safety_rules.md`
-- 툴 역할 분담은 `agents/process/tool_split_rules.md`
-- 전역 skill에는 위 문서 내용을 복사하지 말고, 필요한 경우 "프로젝트에서는 AGENTS/agents를 따르라"는 진입 규칙만 둔다.
+전역 skill에는 위 문서 내용을 복사하지 말고, "프로젝트에서는 `agents/`를 따르라"는 진입 규칙만 둔다.

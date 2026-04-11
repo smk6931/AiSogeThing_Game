@@ -1,26 +1,47 @@
 # Claude Workflow
 
-## Project Rule Entry
+## Source Of Truth
 
-- Shared project rules live in [`AGENTS.md`](C:/GitHub/AiSogeThing_Game/AGENTS.md) and [`agents/`](C:/GitHub/AiSogeThing_Game/agents/README.md).
-- This file is only for Claude-specific workflow guidance.
-- Do not duplicate shared architecture or domain rules here.
+- 프로젝트 공통 규칙은 [`agents/`](C:/GitHub/AiSogeThing_Game/agents/README.md)에 있다.
+- 이 파일은 Claude 전용 워크플로우 안내만 담는다.
+- 공통 아키텍처나 도메인 규칙을 여기에 중복하지 않는다.
+
+## Reading Rule
+
+- 코딩 전 요청 내용, 대상 파일, 명령 목적을 `agents/` 파일들과 대조한다.
+- `Title`, `Description`, `When-To-Read`, `Keywords`가 명확히 일치하는 파일만 읽는다.
+- `agents/` 전체를 기본으로 로드하지 않는다.
+- 관련 파일을 선택한 뒤 해당 규칙을 따르고 기존 패턴을 재사용한다.
+
+## Priority Order
+
+1. 보안, 파괴적 명령 안전, 민감 데이터
+2. 데이터 무결성과 소스 오브 트루스
+3. 아키텍처와 계층 경계
+4. 워크플로우와 검증 절차
+5. 스타일과 표현 선호
+
+## Core Index
+
+- [`agents/README.md`](C:/GitHub/AiSogeThing_Game/agents/README.md)
+- [`agents/development/core_rules.md`](C:/GitHub/AiSogeThing_Game/agents/development/core_rules.md)
+- [`agents/development/backend_structure_rules.md`](C:/GitHub/AiSogeThing_Game/agents/development/backend_structure_rules.md)
+- [`agents/development/editing_safety_rules.md`](C:/GitHub/AiSogeThing_Game/agents/development/editing_safety_rules.md)
+- [`agents/frontend/ui_rules.md`](C:/GitHub/AiSogeThing_Game/agents/frontend/ui_rules.md)
+- [`agents/game_design/world_partition_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_partition_rules.md)
+- [`agents/game_design/road_design_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
+- [`agents/process/workflow_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/workflow_rules.md)
+- [`agents/process/tool_split_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/tool_split_rules.md)
+- [`agents/process/global_tooling_scope_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/global_tooling_scope_rules.md)
+- [`agents/process/advisory_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/advisory_rules.md)
+- [`agents/process/communication_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/communication_rules.md)
 
 ## Claude Scope
 
-- Claude-specific:
-  - planning
-  - design comparison
-  - review checklist
-  - documentation draft
-- Project-specific:
-  - backend structure
-  - UI layout
-  - DB source of truth
-  - editing/encoding safety
-  - world and partition rules
+- Claude 전용: 계획, 설계 비교, 리뷰 체크리스트, 문서 초안
+- 프로젝트 전용: 백엔드 구조, UI 배치, DB 소스 오브 트루스, 편집 안전, 월드 규칙
 
-Project-specific items must stay in `agents/`.
+프로젝트 전용 항목은 `agents/`에 둔다.
 
 ## Best Use Cases
 
@@ -56,3 +77,4 @@ Project-specific items must stay in `agents/`.
 - 새 공통 규칙이 필요하면 `agents/`에 추가한다.
 - Claude 전용 사용법만 여기서 관리한다.
 - 툴 편의 기능보다 프로젝트 공통 규칙을 우선한다.
+- 프로젝트 규칙을 전역 설정이나 skill에 중복 작성하지 않는다.

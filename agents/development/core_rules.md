@@ -13,9 +13,7 @@ Priority: high
 
 ## DB 원칙
 
-- `world_admin_area`는 도시/구/동 계층의 기준 테이블이다.
-- `world_level_partition`는 최하위 파티션 테이블이다.
-- 상위 플레이 그룹은 별도 row를 섞지 말고 `group_*` 메타로 관리한다.
+→ `agents/db/` 참고 (db_strategy, level_db_classification, partition_grouping_concept)
 
 ## 배포 원칙
 
