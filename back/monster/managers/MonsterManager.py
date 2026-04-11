@@ -62,20 +62,68 @@ class Monster:
 
 
 MONSTER_TEMPLATES = [
-    {"template_id": 1, "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",       "tier": "boss",   "hp": 5000, "speed": 0.5, "exp": 400, "gold": 180, "attack_power": 55, "attack_range": 5.0, "attack_cooldown": 3.0,
+    # ── 기존 7종 ─────────────────────────────────────────────────────────────────
+    {"template_id":  1, "tier": "boss",   "hp": 5000, "speed": 0.5, "exp": 400, "gold": 180, "attack_power": 55, "attack_range": 5.0, "attack_cooldown": 3.0,
+     "model_path": "monsters/Gangnam_Boss_Fire_001_Dragon.glb",
      "drops": [{"item_id": 9, "rate": 0.8, "quantity": 1}]},
-    {"template_id": 2, "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",        "tier": "normal", "hp": 80,   "speed": 2.0, "exp": 15,  "gold": 7,   "attack_power": 8,  "attack_range": 2.5, "attack_cooldown": 2.0,
+    {"template_id":  2, "tier": "normal", "hp":   80, "speed": 2.0, "exp":  15, "gold":   7, "attack_power":  8, "attack_range": 2.5, "attack_cooldown": 2.0,
+     "model_path": "monsters/Seoul_Normal_Water_001_Slime.glb",
      "drops": [{"item_id": 6, "rate": 0.6, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},
-    {"template_id": 3, "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb", "tier": "normal", "hp": 60,   "speed": 2.5, "exp": 18,  "gold": 9,   "attack_power": 10, "attack_range": 2.5, "attack_cooldown": 1.8,
+    {"template_id":  3, "tier": "normal", "hp":   60, "speed": 2.5, "exp":  18, "gold":   9, "attack_power": 10, "attack_range": 2.5, "attack_cooldown": 1.8,
+     "model_path": "monsters/Noryangjin_Normal_Forest_003_Goblin.glb",
      "drops": [{"item_id": 4, "rate": 0.7, "quantity": 1}, {"item_id": 1, "rate": 0.15, "quantity": 1}]},
-    {"template_id": 4, "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",      "tier": "elite",  "hp": 350,  "speed": 1.5, "exp": 65,  "gold": 28,  "attack_power": 22, "attack_range": 3.0, "attack_cooldown": 1.8,
+    {"template_id":  4, "tier": "elite",  "hp":  350, "speed": 1.5, "exp":  65, "gold":  28, "attack_power": 22, "attack_range": 3.0, "attack_cooldown": 1.8,
+     "model_path": "monsters/Noryangjin_Elite_Stone_004_Orc.glb",
      "drops": [{"item_id": 5, "rate": 0.65, "quantity": 1}, {"item_id": 2, "rate": 0.3, "quantity": 1}, {"item_id": 11, "rate": 0.1, "quantity": 1}]},
-    {"template_id": 5, "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",   "tier": "normal", "hp": 90,   "speed": 1.2, "exp": 20,  "gold": 10,  "attack_power": 12, "attack_range": 2.5, "attack_cooldown": 2.2,
+    {"template_id":  5, "tier": "normal", "hp":   90, "speed": 1.2, "exp":  20, "gold":  10, "attack_power": 12, "attack_range": 2.5, "attack_cooldown": 2.2,
+     "model_path": "monsters/Noryangjin_Normal_Dark_005_Zombie.glb",
      "drops": [{"item_id": 8, "rate": 0.6, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},
-    {"template_id": 6, "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",    "tier": "elite",  "hp": 280,  "speed": 2.0, "exp": 72,  "gold": 32,  "attack_power": 20, "attack_range": 4.0, "attack_cooldown": 2.0,
+    {"template_id":  6, "tier": "elite",  "hp":  280, "speed": 2.0, "exp":  72, "gold":  32, "attack_power": 20, "attack_range": 4.0, "attack_cooldown": 2.0,
+     "model_path": "monsters/Noryangjin_Elite_Magic_006_Witch.glb",
      "drops": [{"item_id": 7, "rate": 0.5, "quantity": 1}, {"item_id": 13, "rate": 0.15, "quantity": 1}]},
-    {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",      "tier": "boss",   "hp": 3000, "speed": 0.8, "exp": 260, "gold": 140, "attack_power": 45, "attack_range": 4.5, "attack_cooldown": 2.5,
+    {"template_id":  7, "tier": "boss",   "hp": 3000, "speed": 0.8, "exp": 260, "gold": 140, "attack_power": 45, "attack_range": 4.5, "attack_cooldown": 2.5,
+     "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",
      "drops": [{"item_id": 10, "rate": 0.9, "quantity": 1}, {"item_id": 12, "rate": 0.4, "quantity": 1}, {"item_id": 3, "rate": 0.5, "quantity": 1}]},
+    # ── 신규 13종 ────────────────────────────────────────────────────────────────
+    {"template_id":  8, "tier": "normal", "hp":   45, "speed": 2.5, "exp":  12, "gold":   5, "attack_power":  6, "attack_range": 2.0, "attack_cooldown": 1.8,
+     "model_path": "monsters/Mapo_Normal_Water_008_Fairy.glb",
+     "drops": [{"item_id": 14, "rate": 0.7, "quantity": 1}, {"item_id": 1, "rate": 0.25, "quantity": 1}]},
+    {"template_id":  9, "tier": "elite",  "hp":  420, "speed": 1.8, "exp":  90, "gold":  40, "attack_power": 28, "attack_range": 4.0, "attack_cooldown": 2.2,
+     "model_path": "monsters/Yongsan_Elite_Fire_009_Phoenix.glb",
+     "drops": [{"item_id": 15, "rate": 0.35, "quantity": 1}, {"item_id": 22, "rate": 0.55, "quantity": 1}, {"item_id": 2, "rate": 0.3, "quantity": 1}]},
+    {"template_id": 10, "tier": "normal", "hp":   70, "speed": 1.8, "exp":  16, "gold":   8, "attack_power":  9, "attack_range": 2.5, "attack_cooldown": 2.0,
+     "model_path": "monsters/Seongdong_Normal_Stone_010_Skeleton.glb",
+     "drops": [{"item_id": 16, "rate": 0.75, "quantity": 2}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},
+    {"template_id": 11, "tier": "boss",   "hp": 4500, "speed": 0.6, "exp": 360, "gold": 200, "attack_power": 60, "attack_range": 5.5, "attack_cooldown": 2.8,
+     "model_path": "monsters/Jongno_Boss_Magic_011_Lich.glb",
+     "drops": [{"item_id": 17, "rate": 0.7, "quantity": 1}, {"item_id": 29, "rate": 0.25, "quantity": 1}, {"item_id": 3, "rate": 0.5, "quantity": 2}]},
+    {"template_id": 12, "tier": "normal", "hp":   65, "speed": 2.8, "exp":  14, "gold":   6, "attack_power": 10, "attack_range": 2.5, "attack_cooldown": 1.7,
+     "model_path": "monsters/Dobong_Normal_Forest_012_Bandit.glb",
+     "drops": [{"item_id": 18, "rate": 0.4, "quantity": 1}, {"item_id": 1, "rate": 0.3, "quantity": 1}, {"item_id": 11, "rate": 0.08, "quantity": 1}]},
+    {"template_id": 13, "tier": "elite",  "hp":  310, "speed": 2.2, "exp":  85, "gold":  38, "attack_power": 25, "attack_range": 3.5, "attack_cooldown": 2.0,
+     "model_path": "monsters/Nowon_Elite_Dark_013_Vampire.glb",
+     "drops": [{"item_id": 19, "rate": 0.5, "quantity": 1}, {"item_id": 7, "rate": 0.3, "quantity": 1}, {"item_id": 2, "rate": 0.25, "quantity": 1}]},
+    {"template_id": 14, "tier": "normal", "hp":  130, "speed": 1.0, "exp":  22, "gold":  11, "attack_power": 18, "attack_range": 2.8, "attack_cooldown": 2.5,
+     "model_path": "monsters/Gangbuk_Normal_Earth_014_Golem.glb",
+     "drops": [{"item_id": 20, "rate": 0.8, "quantity": 3}, {"item_id": 5, "rate": 0.2, "quantity": 1}]},
+    {"template_id": 15, "tier": "elite",  "hp":  380, "speed": 1.6, "exp":  95, "gold":  42, "attack_power": 26, "attack_range": 3.2, "attack_cooldown": 2.0,
+     "model_path": "monsters/Seocho_Elite_Water_015_Serpent.glb",
+     "drops": [{"item_id": 21, "rate": 0.55, "quantity": 1}, {"item_id": 6, "rate": 0.45, "quantity": 2}, {"item_id": 28, "rate": 0.12, "quantity": 1}]},
+    {"template_id": 16, "tier": "normal", "hp":   55, "speed": 2.2, "exp":  13, "gold":   6, "attack_power":  8, "attack_range": 2.3, "attack_cooldown": 1.9,
+     "model_path": "monsters/Songpa_Normal_Fire_016_Salamander.glb",
+     "drops": [{"item_id": 22, "rate": 0.65, "quantity": 1}, {"item_id": 1, "rate": 0.2, "quantity": 1}]},
+    {"template_id": 17, "tier": "elite",  "hp":  450, "speed": 1.3, "exp": 100, "gold":  45, "attack_power": 30, "attack_range": 3.0, "attack_cooldown": 2.3,
+     "model_path": "monsters/Guro_Elite_Earth_017_Troll.glb",
+     "drops": [{"item_id": 23, "rate": 0.5, "quantity": 1}, {"item_id": 5, "rate": 0.4, "quantity": 2}, {"item_id": 27, "rate": 0.1, "quantity": 1}]},
+    {"template_id": 18, "tier": "normal", "hp":   40, "speed": 3.0, "exp":  11, "gold":   5, "attack_power":  7, "attack_range": 2.0, "attack_cooldown": 1.6,
+     "model_path": "monsters/Gwangjin_Normal_Magic_018_Wisp.glb",
+     "drops": [{"item_id": 24, "rate": 0.7, "quantity": 1}, {"item_id": 1, "rate": 0.15, "quantity": 1}]},
+    {"template_id": 19, "tier": "boss",   "hp": 6000, "speed": 0.4, "exp": 500, "gold": 250, "attack_power": 70, "attack_range": 6.0, "attack_cooldown": 3.5,
+     "model_path": "monsters/Seodaemun_Boss_Stone_019_Stone_Giant.glb",
+     "drops": [{"item_id": 25, "rate": 0.6, "quantity": 1}, {"item_id": 20, "rate": 0.9, "quantity": 5}, {"item_id": 30, "rate": 0.15, "quantity": 1}]},
+    {"template_id": 20, "tier": "elite",  "hp":  400, "speed": 2.0, "exp":  88, "gold":  40, "attack_power": 27, "attack_range": 3.0, "attack_cooldown": 1.9,
+     "model_path": "monsters/Dongjak_Elite_Forest_020_Werewolf.glb",
+     "drops": [{"item_id": 26, "rate": 0.45, "quantity": 1}, {"item_id": 5, "rate": 0.35, "quantity": 2}, {"item_id": 27, "rate": 0.12, "quantity": 1}]},
 ]
 
 class MonsterManager:
@@ -84,14 +132,29 @@ class MonsterManager:
         self.next_id = 1
         self.is_running = False
         self.sync_radius = 180.0
+        # 활성 스폰 template_id 목록 (None = 전체 허용)
+        self.enabled_template_ids: Optional[set[int]] = None
         self._spawn_all_at_start()
 
+    def get_active_templates(self) -> list[dict]:
+        """현재 enabled_template_ids 기준으로 활성 템플릿 목록 반환"""
+        if self.enabled_template_ids is None:
+            return MONSTER_TEMPLATES
+        return [t for t in MONSTER_TEMPLATES if t["template_id"] in self.enabled_template_ids]
+
+    def set_enabled_templates(self, template_ids: list[int]) -> None:
+        """스폰 허용 템플릿 ID 목록 변경. 빈 리스트 = 전체 허용."""
+        self.enabled_template_ids = set(template_ids) if template_ids else None
+
     def _spawn_all_at_start(self):
-        """서버 시작 시 7종 몬스터를 플레이어 스폰 지점 주변에 배치"""
+        """서버 시작 시 활성 몬스터를 플레이어 스폰 지점 주변에 배치"""
+        active = self.get_active_templates()
         positions = [
-            (8, 8), (-10, 5), (12, -8), (-6, -12), (15, 3), (-14, 10), (5, -15)
+            (8, 8), (-10, 5), (12, -8), (-6, -12), (15, 3), (-14, 10), (5, -15),
+            (-8, 15), (18, -5), (-15, -8), (6, 18), (-18, 3), (10, 12), (-4, -18),
+            (16, -15), (-12, 12), (3, -10), (20, 8), (-6, 20), (-20, -10),
         ]
-        for i, tmpl in enumerate(MONSTER_TEMPLATES):
+        for i, tmpl in enumerate(active):
             x, z = positions[i % len(positions)]
             x += random.uniform(-3, 3)
             z += random.uniform(-3, 3)
@@ -121,7 +184,7 @@ class MonsterManager:
             return []
         to_spawn = min(count, 5 - normal_count)
         start_id = max(self.monsters.keys()) + 1 if self.monsters else self.next_id
-        normal_templates = [t for t in MONSTER_TEMPLATES if t["tier"] == "normal"]
+        normal_templates = [t for t in self.get_active_templates() if t["tier"] == "normal"]
         spawned_ids = []
         for i in range(to_spawn):
             tmpl = random.choice(normal_templates)

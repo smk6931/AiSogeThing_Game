@@ -52,11 +52,11 @@ from core.database import async_session_factory
 # ──────────────────────────────────────────────────────────────────────────────
 COMFYUI_HOST    = "http://localhost:8188"
 CHECKPOINT_NAME = "sd_xl_base_1.0.safetensors"
-STEPS           = 30
-CFG             = 5.0
+STEPS           = 20
+CFG             = 4.0
 SAMPLER         = "euler"
 SCHEDULER       = "karras"
-MASK_FEATHER    = 12   # polygon 경계 페더링 반경(px)
+MASK_FEATHER    = 0    # 경계 선명하게 (blur 없음)
 
 # 지리 좌표 → 미터 (서울 기준, mapConfig.js 동일)
 LAT_TO_M = 110940
@@ -64,55 +64,88 @@ LNG_TO_M = 88200
 
 # 스케일
 METERS_PER_PIXEL = 0.5   # 1px = 0.5m
-MIN_IMAGE_SIZE   = 512
+MAX_ASPECT       = 3.0   # 이 비율 초과하면 타일로 분할 (SDXL 안전 범위)
+TARGET_PIXELS    = 512 * 512
 MAX_IMAGE_SIZE   = 1536
 
 STYLE_PREFIX = (
-    "top-down bird's eye view RPG ground texture, "
-    "directly overhead 90 degrees, flat ground surface, "
-    "korean neighborhood, fantasy RPG atmosphere, "
-    "buildings and structures in center, natural terrain and paths at edges, "
-    "no characters, no people, pure environment, game asset"
+    "top-down bird's eye view RPG ground texture tile, "
+    "directly overhead 90 degrees, flat seamless ground surface, "
+    "dark fantasy korean neighborhood, rich detailed floor texture, "
+    "fill entire area completely with ground detail, "
+    "polygon edges filled with natural terrain: dirt paths, grass, stone ground, forest floor "
+    "so cutting at any edge looks seamless and natural, "
+    "no characters, no people, pure environment texture, game asset, "
+    "high detail, painterly fantasy art style"
 )
 STYLE_NEGATIVE = (
     "blurry, low quality, watermark, text, signature, "
     "humans, characters, animals, UI elements, "
     "isometric, 3D perspective, side view, angled view, "
-    "photorealistic, modern tech, aerial photo, "
-    "cut off buildings, cropped structures, partial objects at edges"
+    "photorealistic, modern photo, "
+    "empty black areas, unfilled regions, blank spaces, "
+    "abrupt edge cutoffs, obvious clipping, hard boundary lines"
 )
 
 # persona → 프롬프트 힌트 (image_prompt_append가 없을 때 fallback)
 PERSONA_PROMPTS: dict[str, str] = {
-    "grove_keeper":      "dense trees and undergrowth, hidden garden paths, mossy stone walls, korean traditional courtyard surrounded by forest",
-    "route_keeper":      "crossroads and winding alleyways, cobblestone paths, lanterns along the road, worn stone steps between buildings",
-    "crossroad_runner":  "narrow busy alley, stairway lanes, small shops and market stalls rooftops, branching paths",
-    "academy_watcher":   "courtyard with study pavilions, bookshelves visible from above, stone plaza, ancient academy architecture, ink-brushed tiles",
-    "sanctuary_ward":    "sacred shrine courtyard, stone lanterns, offering tables, sacred trees, ceremonial stone path",
-    "merchant_runner":   "market district rooftops, storage crates, merchant tents, busy plaza, cargo paths",
-    "elder_watcher":     "calm residential alleys, old korean hanok rooftops, garden wells, aged stone walkways",
-    "shadow_warden":     "dark narrow alleys, hidden passages, shadows between buildings, mysterious courtyard",
+    "grove_keeper":      "lush forest floor, dense moss and undergrowth, hidden garden stone paths, gnarled tree roots covering ground, korean garden courtyard center, natural grass and foliage fills edges seamlessly",
+    "route_keeper":      "cobblestone road network from above, worn dirt paths branching outward, stone lantern bases, weathered paving stones, road edges fade naturally to dirt and gravel",
+    "crossroad_runner":  "busy market alley floor, stained cobblestones, wooden stall platforms, scattered goods and crates on ground, alley edges blend into dusty stone terrain",
+    "academy_watcher":   "ancient stone courtyard floor, worn flagstone tiles, ink-stained paving, scholarly stone plaza, edges transition naturally to aged stone and mossy ground",
+    "sanctuary_ward":    "sacred stone shrine floor, ceremonial tile patterns, moss between stones, offerings scattered on ground, edges fade into natural stone and sacred earth",
+    "merchant_runner":   "busy marketplace ground, packed earth and cobblestone, merchant stall footprints, dusty trade routes, edges blend into dirt and stone naturally",
+    "elder_watcher":     "calm hanok courtyard floor, aged stone tiles, garden soil patches, garden well base, edges naturally transition to earth and old stone paths",
+    "shadow_warden":     "dark narrow alley floor, shadowed wet cobblestones, cracked stone ground, edges dissolve into dark earth and broken pavement",
 }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 스케일 계산
 # ──────────────────────────────────────────────────────────────────────────────
-def compute_image_size(span_lng: float, span_lat: float) -> tuple[int, int]:
-    """실제 면적(도) → SDXL 최적 해상도 (64 배수, MIN~MAX 클램프)"""
-    raw_w = span_lng * LNG_TO_M / METERS_PER_PIXEL
-    raw_h = span_lat * LAT_TO_M / METERS_PER_PIXEL
+def compute_image_size(span_lng: float, span_lat: float) -> tuple[int, int, float, float]:
+    """
+    실제 면적(도) → SDXL 최적 해상도 + 타일이 커버하는 실제 크기(m) 반환.
 
+    - 종횡비 MAX_ASPECT(3:1) 초과 시 짧은 쪽 기준 타일로 캡 → 나머지는 JS 타일링
+    - TARGET_PIXELS(512×512) 이하 시 스케일업, MAX_IMAGE_SIZE 초과 시 스케일다운
+    - 두 축 독립 MIN 클램핑 없음 → 비율 보존
+
+    Returns: (img_w, img_h, tile_w_m, tile_h_m)
+      tile_w_m / tile_h_m: 이미지 1장이 커버하는 실제 가로/세로 미터
+    """
+    real_w = span_lng * LNG_TO_M  # 실제 가로 미터
+    real_h = span_lat * LAT_TO_M  # 실제 세로 미터
+
+    # 종횡비 캡: tile은 MAX_ASPECT:1 이내
+    if real_w > real_h * MAX_ASPECT:
+        tile_w_m = real_h * MAX_ASPECT
+        tile_h_m = real_h
+    elif real_h > real_w * MAX_ASPECT:
+        tile_w_m = real_w
+        tile_h_m = real_w * MAX_ASPECT
+    else:
+        tile_w_m = real_w
+        tile_h_m = real_h
+
+    raw_w = tile_w_m / METERS_PER_PIXEL
+    raw_h = tile_h_m / METERS_PER_PIXEL
+
+    # 픽셀 수 조정 (TARGET 이하 → 스케일업, MAX 초과 → 스케일다운)
+    total = raw_w * raw_h
+    if total < TARGET_PIXELS:
+        scale  = (TARGET_PIXELS / total) ** 0.5
+        raw_w *= scale
+        raw_h *= scale
     max_px = MAX_IMAGE_SIZE * MAX_IMAGE_SIZE
-    total  = raw_w * raw_h
-    if total > max_px:
-        scale  = (max_px / total) ** 0.5
+    if raw_w * raw_h > max_px:
+        scale  = (max_px / (raw_w * raw_h)) ** 0.5
         raw_w *= scale
         raw_h *= scale
 
-    w = max(MIN_IMAGE_SIZE, round(raw_w / 64) * 64)
-    h = max(MIN_IMAGE_SIZE, round(raw_h / 64) * 64)
-    return w, h
+    w = max(64, round(raw_w / 64) * 64)
+    h = max(64, round(raw_h / 64) * 64)
+    return w, h, tile_w_m, tile_h_m
 
 
 def compute_bbox(boundaries: list[dict]) -> tuple[float, float, float, float]:
@@ -145,7 +178,10 @@ def create_mask(boundaries: list[dict], bbox: tuple, width: int, height: int,
     span_lng = max_lng - min_lng or 1e-9
     span_lat = max_lat - min_lat or 1e-9
 
-    # Three.js flipY=true: pixel_y = (lat - min_lat) / span_lat * h
+    # Three.js gpsToGame: z = (GIS_ORIGIN.lat - lat) * LAT_TO_M → 북쪽이 작은 z
+    # UV v = (z - minZ) / spanZ = 1 - (lat - minLat) / spanLat
+    # flipY=true: image_y = (1-v)*h = (lat - minLat) / spanLat * h
+    # → lat 클수록(북쪽) 이미지 하단(큰 y)에 그려야 함
     def to_px(lng, lat):
         x = (lng - min_lng) / span_lng * width
         y = (lat - min_lat) / span_lat * height
@@ -258,14 +294,13 @@ def draw_polygon_outline(
     boundaries: list[dict],
     bbox: tuple,
     color: tuple = (0, 230, 180),
-    thickness: int = 3,
+    thickness: int = 4,
 ) -> None:
     """
     생성된 이미지 위에 polygon 경계선을 덧그림.
     마스크와 동일한 좌표계 (Three.js UV flipY=true 기준).
+    선명한 선 (blur 없음).
     """
-    from PIL import ImageDraw as _Draw
-
     img = Image.open(out_path).convert("RGBA")
     w, h = img.size
     min_lng, min_lat, max_lng, max_lat = bbox
@@ -278,7 +313,7 @@ def draw_polygon_outline(
         return (x, y)
 
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    draw = _Draw.Draw(overlay)
+    draw = ImageDraw.Draw(overlay)
 
     for b in boundaries:
         if not b:
@@ -288,10 +323,6 @@ def draw_polygon_outline(
         outer = b.get("coordinates", [[]])[0]
         pts = [to_px(c[0], c[1]) for c in outer]
         if len(pts) >= 2:
-            # 두께만큼 여러 번 그려서 굵기 표현
-            for t in range(thickness):
-                shrunk = [(x, y) for x, y in pts]
-                draw.polygon(shrunk, outline=color + (255,))
             draw.line(pts + [pts[0]], fill=color + (255,), width=thickness)
 
     img = Image.alpha_composite(img, overlay)
@@ -355,18 +386,30 @@ async def generate_one(
     span_lat = bbox[3] - bbox[1]
     width_m  = span_lng * LNG_TO_M
     height_m = span_lat * LAT_TO_M
-    img_w, img_h = compute_image_size(span_lng, span_lat)
+    img_w, img_h, tile_w_m, tile_h_m = compute_image_size(span_lng, span_lat)
 
-    scale_hint = f"area {width_m:.0f}m x {height_m:.0f}m, each building 10-20m wide"
-    pos_full   = positive + f", {scale_hint}"
+    repeat_x = width_m  / tile_w_m
+    repeat_y = height_m / tile_h_m
+    is_tiled = repeat_x > 1.05 or repeat_y > 1.05
 
-    print(f"  [{label}] 면적: {width_m:.0f}m×{height_m:.0f}m → {img_w}×{img_h}px")
+    scale_hint = f"seamless tileable ground texture, tile covers {tile_w_m:.0f}m x {tile_h_m:.0f}m"
+    if is_tiled:
+        scale_hint += f", tiles {repeat_x:.1f}x{repeat_y:.1f} times to fill area"
+    pos_full = positive + f", {scale_hint}"
+
+    tile_info = f" (tile {tile_w_m:.0f}m×{tile_h_m:.0f}m, repeat {repeat_x:.1f}×{repeat_y:.1f})" if is_tiled else ""
+    print(f"  [{label}] 면적: {width_m:.0f}m×{height_m:.0f}m → {img_w}×{img_h}px{tile_info}")
 
     if dry_run:
         print(f"  [DRY-RUN] would save to {out_path}")
         return True
 
-    mask_img  = create_mask(boundaries, bbox, img_w, img_h)
+    # 타일링 모드: 전체 흰 마스크 (polygon 경계 무관, 타일 전체 채움)
+    # 단일 모드: polygon 마스크 (경계 내부만 생성)
+    if is_tiled:
+        mask_img = Image.new("RGB", (img_w, img_h), (255, 255, 255))
+    else:
+        mask_img = create_mask(boundaries, bbox, img_w, img_h)
     mask_name = upload_mask(mask_img, mask_upload_name)
     print(f"  마스크 업로드: {mask_name}")
 
@@ -456,7 +499,7 @@ async def run_partition_mode(partition_keys: list[str], dry_run: bool, outline: 
             row = await session.execute(
                 text("""
                     SELECT p.id, p.partition_key, p.display_name,
-                           p.boundary_geojson,
+                           p.boundary_geojson, p.persona_tag,
                            p.image_prompt_append, p.image_prompt_negative,
                            g.image_prompt_base, g.image_prompt_negative as group_neg,
                            a.image_prompt_base as area_prompt_base,
@@ -508,6 +551,73 @@ async def run_partition_mode(partition_keys: list[str], dry_run: bool, outline: 
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# OUTLINE-ONLY 모드 (이미지 재생성 없이 기존 이미지에 outline만 덧그림)
+# ──────────────────────────────────────────────────────────────────────────────
+async def run_outline_only(group_key: str, blank: bool = False):
+    """
+    group 내 모든 파티션에 polygon outline 덧그림.
+    blank=True: 기존 이미지 삭제 후 어두운 배경 위에 outline만 있는 새 이미지 생성.
+    blank=False: 기존 이미지 위에 outline만 추가.
+    """
+    async with async_session_factory() as session:
+        rows = await session.execute(
+            text("""
+                SELECT p.partition_key, p.boundary_geojson,
+                       g.group_key
+                FROM world_partition p
+                JOIN world_partition_group_member m ON m.partition_id = p.id
+                JOIN world_partition_group g ON g.id = m.group_id
+                WHERE g.group_key = :gk
+                ORDER BY p.partition_seq
+            """), {"gk": group_key}
+        )
+        partitions = rows.mappings().all()
+
+    mode_label = "BLANK+OUTLINE" if blank else "OUTLINE-ONLY"
+    print(f"[{mode_label}] {group_key} — {len(partitions)}개 파티션")
+
+    # blank 모드: 폴더 내 기존 PNG 전부 삭제
+    if blank:
+        g_short  = short_name(group_key)
+        folder   = FRONT_PUBLIC / "world_partition" / g_short
+        if folder.exists():
+            deleted = list(folder.glob("*.png"))
+            for f in deleted:
+                f.unlink()
+            print(f"  기존 PNG {len(deleted)}개 삭제: {folder}")
+
+    ok_count = skip_count = 0
+
+    for p in partitions:
+        pk       = p["partition_key"]
+        p_short  = short_name(pk)
+        g_short  = short_name(p["group_key"])
+        out_path = FRONT_PUBLIC / "world_partition" / g_short / f"{p_short}.png"
+
+        boundaries = [p["boundary_geojson"]]
+        bbox       = compute_bbox(boundaries)
+        span_lng   = bbox[2] - bbox[0]
+        span_lat   = bbox[3] - bbox[1]
+
+        if blank:
+            # 실제 스케일 기반 해상도로 어두운 배경 생성
+            img_w, img_h = compute_image_size(span_lng, span_lat)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            bg = Image.new("RGBA", (img_w, img_h), (30, 30, 40, 255))
+            bg.save(out_path, format="PNG")
+        elif not out_path.exists():
+            print(f"  [SKIP] 파일 없음: {out_path.name}")
+            skip_count += 1
+            continue
+
+        draw_polygon_outline(out_path, boundaries, bbox)
+        print(f"  [OK] {p_short}")
+        ok_count += 1
+
+    print(f"\n완료: {ok_count}개 outline 완료, {skip_count}개 스킵")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 엔트리포인트
 # ──────────────────────────────────────────────────────────────────────────────
 async def get_group_partition_keys(group_key: str) -> list[str]:
@@ -535,6 +645,10 @@ if __name__ == "__main__":
                         help="--group-key와 함께 사용: group 내 파티션 각각 개별 생성")
     parser.add_argument("--outline", action="store_true",
                         help="생성 이미지에 polygon 경계선 덧그림 (정렬 확인용)")
+    parser.add_argument("--outline-only", action="store_true",
+                        help="이미지 재생성 없이 기존 이미지에 outline만 덧그림 (--group-key 필요)")
+    parser.add_argument("--blank", action="store_true",
+                        help="--outline-only와 함께: 기존 이미지 삭제 후 빈 배경에 outline만 그림")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--checkpoint", default=CHECKPOINT_NAME)
     args = parser.parse_args()
@@ -542,12 +656,17 @@ if __name__ == "__main__":
     if args.checkpoint != CHECKPOINT_NAME:
         CHECKPOINT_NAME = args.checkpoint
 
-    if not check_comfyui():
+    if not args.outline_only and not check_comfyui():
         print(f"[ERROR] ComfyUI가 {COMFYUI_HOST}에서 응답하지 않습니다.")
         sys.exit(1)
 
     async def main():
-        if args.group_key and args.per_partition:
+        if args.outline_only:
+            if not args.group_key:
+                print("[ERROR] --outline-only는 --group-key와 함께 사용해야 합니다.")
+                sys.exit(1)
+            await run_outline_only(args.group_key, blank=args.blank)
+        elif args.group_key and args.per_partition:
             keys = await get_group_partition_keys(args.group_key)
             print(f"[INFO] {args.group_key} → {len(keys)}개 파티션 개별 생성")
             await run_partition_mode(keys, args.dry_run, outline=args.outline)

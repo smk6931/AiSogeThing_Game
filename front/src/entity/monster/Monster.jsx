@@ -1,4 +1,5 @@
 import React, { useRef, useMemo, useEffect } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { Billboard, Text, useGLTF, useAnimations } from '@react-three/drei';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
@@ -8,13 +9,28 @@ const BASE_MODEL_URL = '/models/';
  * 모델 파일별 스케일·Y오프셋 설정 (TODO: monster_template DB 컬럼으로 이전 예정)
  */
 const MODEL_CONFIG = {
-  'monsters/Gangnam_Boss_Fire_001_Dragon.glb':      { scale: 0.15, yOffset: 0, hpBarHeight: 6 },
-  'monsters/Seoul_Normal_Water_001_Slime.glb':      { scale: 0.6,  yOffset: 0.014, hpBarHeight: 4 },
-  'monsters/Noryangjin_Normal_Forest_003_Goblin.glb': { scale: 0.6,  yOffset: 0, hpBarHeight: 4 },
-  'monsters/Noryangjin_Elite_Stone_004_Orc.glb':    { scale: 0.9,  yOffset: 0, hpBarHeight: 5 },
-  'monsters/Noryangjin_Normal_Dark_005_Zombie.glb': { scale: 0.6,  yOffset: 0, hpBarHeight: 4 },
-  'monsters/Noryangjin_Elite_Magic_006_Witch.glb':  { scale: 0.75, yOffset: 0, hpBarHeight: 5 },
-  'monsters/Noryangjin_Boss_Earth_007_Ogre.glb':    { scale: 1.2,  yOffset: 0, hpBarHeight: 8 },
+  // ── 기존 7종 (수동 튜닝값 유지) ──────────────────────────────────────
+  'monsters/Gangnam_Boss_Fire_001_Dragon.glb':            { scale: 0.15,   yOffset: 0,   hpBarHeight: 6 },
+  'monsters/Seoul_Normal_Water_001_Slime.glb':            { scale: 0.6,    yOffset: 0.014, hpBarHeight: 4 },
+  'monsters/Noryangjin_Normal_Forest_003_Goblin.glb':     { scale: 0.6,    yOffset: 0,   hpBarHeight: 4 },
+  'monsters/Noryangjin_Elite_Stone_004_Orc.glb':          { scale: 0.9,    yOffset: 0,   hpBarHeight: 5 },
+  'monsters/Noryangjin_Normal_Dark_005_Zombie.glb':       { scale: 0.6,    yOffset: 0,   hpBarHeight: 4 },
+  'monsters/Noryangjin_Elite_Magic_006_Witch.glb':        { scale: 0.75,   yOffset: 0,   hpBarHeight: 5 },
+  'monsters/Noryangjin_Boss_Earth_007_Ogre.glb':          { scale: 1.2,    yOffset: 0,   hpBarHeight: 8 },
+  // ── 신규 13종 (bounding box 자동 계산 — 목표: normal 2m / elite 2.4m / boss 3m) ──
+  'monsters/Mapo_Normal_Water_008_Fairy.glb':             { scale: 0.7656, yOffset: 0.3, hpBarHeight: 4 },  // Birb (anim 9)
+  'monsters/Yongsan_Elite_Fire_009_Phoenix.glb':          { scale: 0.8744, yOffset: 0.3, hpBarHeight: 5 },  // Hywirl (anim 8)
+  'monsters/Seongdong_Normal_Stone_010_Skeleton.glb':     { scale: 0.645,  yOffset: 0,   hpBarHeight: 4 },  // Ghost Skull (anim 8)
+  'monsters/Jongno_Boss_Magic_011_Lich.glb':              { scale: 1.1532, yOffset: 0,   hpBarHeight: 7 },  // Wizard (anim 9)
+  'monsters/Dobong_Normal_Forest_012_Bandit.glb':         { scale: 0.6643, yOffset: 0,   hpBarHeight: 4 },  // Ninja (anim 9)
+  'monsters/Nowon_Elite_Dark_013_Vampire.glb':            { scale: 0.5019, yOffset: 0,   hpBarHeight: 5 },  // Bat (anim 5)
+  'monsters/Gangbuk_Normal_Earth_014_Golem.glb':          { scale: 0.7787, yOffset: 0,   hpBarHeight: 4 },  // Goleling Evolved (anim 8)
+  'monsters/Seocho_Elite_Water_015_Serpent.glb':          { scale: 0.7905, yOffset: 0,   hpBarHeight: 5 },  // Snake (anim 4)
+  'monsters/Songpa_Normal_Fire_016_Salamander.glb':       { scale: 0.742,  yOffset: 0,   hpBarHeight: 4 },  // Frog (anim 14)
+  'monsters/Guro_Elite_Earth_017_Troll.glb':              { scale: 0.985,  yOffset: 0,   hpBarHeight: 5 },  // Yeti (anim 9)
+  'monsters/Gwangjin_Normal_Magic_018_Wisp.glb':          { scale: 0.645,  yOffset: 0.3, hpBarHeight: 4 },  // Ghost (anim 8)
+  'monsters/Seodaemun_Boss_Stone_019_Stone_Giant.glb':    { scale: 0.7654, yOffset: 0,   hpBarHeight: 7 },  // Giant (anim 7)
+  'monsters/Dongjak_Elite_Forest_020_Werewolf.glb':       { scale: 0.8952, yOffset: 0,   hpBarHeight: 5 },  // Wolf (anim 24)
 };
 const DEFAULT_CONFIG_HP_BAR = 4;
 const DEFAULT_CONFIG = { scale: 0.6, yOffset: 0, hpBarHeight: 4 };
@@ -53,6 +69,13 @@ const MonsterGLB = ({ modelPath, scale: playerScale, state }) => {
     }, 600);
     return () => clearTimeout(t);
   }, [state, actions, hitAnim, idleAnim]);
+
+  // T-포즈 모델(애니메이션 없음)에 procedural idle — 미세 상하 흔들기
+  const isStaticPose = !idleAnim;
+  useFrame(({ clock }) => {
+    if (!isStaticPose || !groupRef.current) return;
+    groupRef.current.position.y = Math.sin(clock.elapsedTime * 1.2) * 0.04 * finalScale;
+  });
 
   return (
     <group ref={groupRef} position={[0, cfg.yOffset * finalScale, 0]} scale={finalScale}>

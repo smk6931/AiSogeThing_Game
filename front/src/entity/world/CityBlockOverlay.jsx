@@ -64,10 +64,48 @@ const findAdjacentGroupKeys = (currentGroupKey, partitions, radius = 700) => {
   return adjacent;
 };
 
+// 파티션 종횡비 캡 (Python 동일 값)
+const MAX_PARTITION_ASPECT = 3.0;
+
+/**
+ * per-partition 이미지의 UV repeat 계산
+ * Python compute_image_size 와 동일한 로직: MAX_ASPECT:1 초과 → 타일링
+ * @returns {{ x: number, z: number }}  UV repeat (1보다 크면 타일링)
+ */
+const computePartitionRepeat = (partition) => {
+  const b = partition.boundary_geojson;
+  if (!b?.coordinates?.[0]) return { x: 1, z: 1 };
+
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const [lng, lat] of b.coordinates[0]) {
+    const pt = gpsToGame(lat, lng);
+    if (pt.x < minX) minX = pt.x;
+    if (pt.x > maxX) maxX = pt.x;
+    if (pt.z < minZ) minZ = pt.z;
+    if (pt.z > maxZ) maxZ = pt.z;
+  }
+  const realW = maxX - minX || 1;  // meters
+  const realH = maxZ - minZ || 1;  // meters
+
+  let tileW, tileH;
+  if (realW > realH * MAX_PARTITION_ASPECT) {
+    tileW = realH * MAX_PARTITION_ASPECT;
+    tileH = realH;
+  } else if (realH > realW * MAX_PARTITION_ASPECT) {
+    tileW = realW;
+    tileH = realW * MAX_PARTITION_ASPECT;
+  } else {
+    tileW = realW;
+    tileH = realH;
+  }
+  return { x: realW / tileW, z: realH / tileH };
+};
+
 // fitUV=false: 100m 타일 반복 (풀 텍스처용)
 // fitUV=true + uvBounds: group bounding box 기준 UV (group 이미지 공유용)
 // fitUV=true + uvBounds=null: 개별 polygon bounding box에 맞춤
-const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null) => {
+// uvRepeat: per-partition 타일링 반복 횟수 (기본 {x:1,z:1})
+const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null, uvRepeat = null) => {
   if (!coords || coords.length < 3) return null;
 
   const pts = coords.map(([lat, lng]) => gpsToGame(lat, lng));
@@ -116,8 +154,10 @@ const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null) =
       positions[vi++] = 0.55;
       positions[vi++] = p.z;
       if (fitUV) {
-        uvs[ui++] = (p.x - minX) / spanX;
-        uvs[ui++] = (p.z - minZ) / spanZ;
+        const rx = uvRepeat ? uvRepeat.x : 1;
+        const rz = uvRepeat ? uvRepeat.z : 1;
+        uvs[ui++] = ((p.x - minX) / spanX) * rx;
+        uvs[ui++] = ((p.z - minZ) / spanZ) * rz;
       } else {
         uvs[ui++] = (p.x - minX) / tileSize;
         uvs[ui++] = (p.z - minZ) / tileSize;
@@ -131,12 +171,12 @@ const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null) =
   return geo;
 };
 
-const buildTerrainBlockFromGeoJson = (boundaryGeoJson, fitUV = false, uvBounds = null) => {
+const buildTerrainBlockFromGeoJson = (boundaryGeoJson, fitUV = false, uvBounds = null, uvRepeat = null) => {
   if (!boundaryGeoJson?.coordinates?.length) return null;
   const [outer, ...holes] = boundaryGeoJson.coordinates;
   const outerCoords = outer.map(([lng, lat]) => [lat, lng]);
   const holeCoords = holes.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
-  return buildTerrainBlock(outerCoords, holeCoords, fitUV, uvBounds);
+  return buildTerrainBlock(outerCoords, holeCoords, fitUV, uvBounds, uvRepeat);
 };
 
 // group_key 단위 geometry 빌드 (캐시 우선)
@@ -185,7 +225,11 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
     // group 이미지(공유 URL) → group bbox UV, per-partition 이미지(고유 URL) → 개별 bbox UV
     const isSharedGroupImage = hasOwnImage && (urlCount.get(partition.texture_image_url) || 0) > 1;
     const uvBounds = isSharedGroupImage ? groupUvBounds : null;
-    const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds);
+    // per-partition 이미지: 종횡비 초과 구역은 타일 UV repeat 적용
+    const uvRepeat = (hasOwnImage && !isSharedGroupImage)
+      ? computePartitionRepeat(partition)
+      : null;
+    const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds, uvRepeat);
     if (!geo) continue;
 
     let texIdx;
