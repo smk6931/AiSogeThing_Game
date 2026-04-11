@@ -4,6 +4,9 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 BACK_DIR = ROOT_DIR / "back"

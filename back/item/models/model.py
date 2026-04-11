@@ -6,7 +6,7 @@ from core.database import Base
 
 class ItemTemplate(Base):
     """게임 내 모든 아이템 종류 정의"""
-    __tablename__ = "item_template"
+    __tablename__ = "item"
 
     id = Column(Integer, primary_key=True, index=True)
     name_ko = Column(String(128), nullable=False)
@@ -21,11 +21,11 @@ class ItemTemplate(Base):
 
 class CharacterInventory(Base):
     """플레이어 인벤토리 — user_id 기준 (guest 포함)"""
-    __tablename__ = "character_inventory"
+    __tablename__ = "char_inven"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
-    item_id = Column(Integer, ForeignKey("item_template.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("item.id"), nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
     slot_index = Column(Integer, nullable=True)
     acquired_at = Column(DateTime, server_default=func.now())
@@ -33,10 +33,10 @@ class CharacterInventory(Base):
 
 class CharacterEquipment(Base):
     """플레이어 착용 장비 — 슬롯당 1개"""
-    __tablename__ = "character_equipment"
+    __tablename__ = "char_equip"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
     slot = Column(String(32), nullable=False)    # weapon / armor
-    item_id = Column(Integer, ForeignKey("item_template.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("item.id"), nullable=False)
     equipped_at = Column(DateTime, server_default=func.now())

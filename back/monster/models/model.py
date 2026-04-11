@@ -4,7 +4,7 @@ from core.database import Base
 
 
 class MonsterTemplate(Base):
-    __tablename__ = "monster_template"
+    __tablename__ = "monster"
 
     id = Column(Integer, primary_key=True, index=True)
     name_en = Column(String(128), nullable=False)

@@ -1,6 +1,9 @@
 # 아이템 템플릿 시드 데이터 INSERT
 import asyncio
 import sys
+
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -41,16 +44,16 @@ MONSTER_DROP_UPDATES = [
 ]
 
 async def seed():
-    print("Seeding item_template...")
+    print("Seeding item...")
     for item in ITEMS:
-        existing = await fetch_one("SELECT id FROM item_template WHERE id = :id", {"id": item["id"]})
+        existing = await fetch_one("SELECT id FROM item WHERE id = :id", {"id": item["id"]})
         if existing:
             print(f"  SKIP: {item['name_ko']} (id={item['id']} already exists)")
             continue
         import json
         stat_json = json.dumps(item["stat_bonus"]) if item["stat_bonus"] else None
         await execute(
-            """INSERT INTO item_template (id, name_ko, name_en, item_type, rarity, stat_bonus, description, icon_key, is_active)
+            """INSERT INTO item (id, name_ko, name_en, item_type, rarity, stat_bonus, description, icon_key, is_active)
                VALUES (:id, :name_ko, :name_en, :item_type, :rarity, CAST(:stat_bonus AS jsonb), :description, :icon_key, TRUE)""",
             {
                 "id": item["id"],

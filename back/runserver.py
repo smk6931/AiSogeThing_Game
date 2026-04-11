@@ -67,7 +67,7 @@ def main() -> None:
     os.environ["PYTHONIOENCODING"] = "utf-8"
 
     port = resolve_backend_port(project_root)
-    uvicorn.run("main:app", host="127.0.0.1", port=port, reload=False)
+    uvicorn.run("main:app", host="127.0.0.1", port=port, reload=True)
 
 
 if __name__ == "__main__":

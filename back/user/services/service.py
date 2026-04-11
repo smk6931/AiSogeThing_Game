@@ -49,7 +49,7 @@ async def create_user(user: UserCreate):
             await conn.execute(
                 text(
                     """
-                    INSERT INTO game_character (user_id, level, exp, hp, max_hp, mp, max_mp)
+                    INSERT INTO char (user_id, level, exp, hp, max_hp, mp, max_mp)
                     VALUES (:user_id, 1, 0, 100, 100, 50, 50)
                     """
                 ),

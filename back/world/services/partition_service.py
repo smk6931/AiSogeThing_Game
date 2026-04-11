@@ -23,7 +23,7 @@ async def get_region_info_by_dong_osm_id(dong_osm_id: int | None) -> dict | None
             center_lat,
             center_lng,
             area_meta
-        FROM world_admin_area
+        FROM world_area
         WHERE osm_id = :osm_id AND area_level = 'dong'
         LIMIT 1
         """,
@@ -40,8 +40,6 @@ async def get_region_info_by_dong_osm_id(dong_osm_id: int | None) -> dict | None
             partition_key,
             partition_seq,
             partition_stage,
-            partition_type,
-            map_name,
             display_name,
             summary,
             description,
@@ -55,9 +53,7 @@ async def get_region_info_by_dong_osm_id(dong_osm_id: int | None) -> dict | None
             persona_tag,
             texture_profile,
             is_road,
-            is_walkable,
             area_m2,
-            landuse_mix_score,
             centroid_lat,
             centroid_lng,
             boundary_geojson,
@@ -96,7 +92,7 @@ async def get_partitions_by_dong_osm_id(dong_osm_id: int | None) -> list[dict]:
     area = await fetch_one(
         """
         SELECT id
-        FROM world_admin_area
+        FROM world_area
         WHERE osm_id = :osm_id AND area_level = 'dong'
         LIMIT 1
         """,
@@ -112,8 +108,6 @@ async def get_partitions_by_dong_osm_id(dong_osm_id: int | None) -> list[dict]:
             partition_key,
             partition_seq,
             partition_stage,
-            partition_type,
-            map_name,
             display_name,
             summary,
             description,
@@ -127,13 +121,10 @@ async def get_partitions_by_dong_osm_id(dong_osm_id: int | None) -> list[dict]:
             persona_tag,
             texture_profile,
             is_road,
-            is_walkable,
             area_m2,
-            landuse_mix_score,
             centroid_lat,
             centroid_lng,
             boundary_geojson,
-            source_feature,
             gameplay_meta
         FROM world_level_partition
         WHERE admin_area_id = :admin_area_id
@@ -174,8 +165,6 @@ async def get_current_region_info(lat: float, lng: float) -> dict:
                 partition_key,
                 partition_seq,
                 partition_stage,
-                partition_type,
-                map_name,
                 display_name,
                 summary,
                 description,
@@ -189,9 +178,7 @@ async def get_current_region_info(lat: float, lng: float) -> dict:
                 persona_tag,
                 texture_profile,
                 is_road,
-                is_walkable,
                 area_m2,
-                landuse_mix_score,
                 centroid_lat,
                 centroid_lng,
                 boundary_geojson,

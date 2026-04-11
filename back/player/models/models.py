@@ -5,7 +5,7 @@ from core.database import Base
 
 
 class GameCharacter(Base):
-    __tablename__ = "game_character"
+    __tablename__ = "char"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("user.id"), unique=True, nullable=False)
@@ -24,7 +24,7 @@ class GameCharacter(Base):
 
 
 class PlayerLevelCurve(Base):
-    __tablename__ = "player_level_curve"
+    __tablename__ = "char_level_exp"
 
     level = Column(Integer, primary_key=True, index=True)
     required_exp_total = Column(Integer, nullable=False)

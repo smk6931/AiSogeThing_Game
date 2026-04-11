@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 import sys
 
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+
 from sqlalchemy import text
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -70,7 +73,7 @@ async def upsert_admin_area(session, payload: dict) -> None:
     await session.execute(
         text(
             """
-            INSERT INTO world_admin_area (
+            INSERT INTO world_area (
                 id,
                 osm_id,
                 area_level,
@@ -123,10 +126,7 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
         "dong_name": meta["dong"],
         "partition_stage": partition["partition_stage"],
         "partition_seq": partition["partition_seq"],
-        "partition_type": partition["partition_type"],
         "source_layer": partition["source_layer"],
-        "source_version": partition.get("source_version"),
-        "map_name": partition["map_name"],
         "display_name": partition["display_name"],
         "summary": partition.get("summary"),
         "description": partition.get("description"),
@@ -140,9 +140,7 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
         "persona_tag": partition.get("persona_tag"),
         "texture_profile": partition.get("texture_profile"),
         "is_road": partition.get("is_road", False),
-        "is_walkable": partition.get("is_walkable", True),
         "area_m2": partition.get("area_m2"),
-        "landuse_mix_score": partition.get("landuse_mix_score"),
         "centroid_lat": partition.get("centroid_lat"),
         "centroid_lng": partition.get("centroid_lng"),
         "boundary_geojson": json.dumps(partition.get("boundary_geojson") or {}, ensure_ascii=False),
@@ -162,10 +160,7 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 dong_name,
                 partition_stage,
                 partition_seq,
-                partition_type,
                 source_layer,
-                source_version,
-                map_name,
                 display_name,
                 summary,
                 description,
@@ -179,9 +174,7 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 persona_tag,
                 texture_profile,
                 is_road,
-                is_walkable,
                 area_m2,
-                landuse_mix_score,
                 centroid_lat,
                 centroid_lng,
                 boundary_geojson,
@@ -196,10 +189,7 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 :dong_name,
                 :partition_stage,
                 :partition_seq,
-                :partition_type,
                 :source_layer,
-                :source_version,
-                :map_name,
                 :display_name,
                 :summary,
                 :description,
@@ -213,9 +203,7 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 :persona_tag,
                 :texture_profile,
                 :is_road,
-                :is_walkable,
                 :area_m2,
-                :landuse_mix_score,
                 :centroid_lat,
                 :centroid_lng,
                 CAST(:boundary_geojson AS JSON),
@@ -229,10 +217,7 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 dong_name = EXCLUDED.dong_name,
                 partition_stage = EXCLUDED.partition_stage,
                 partition_seq = EXCLUDED.partition_seq,
-                partition_type = EXCLUDED.partition_type,
                 source_layer = EXCLUDED.source_layer,
-                source_version = EXCLUDED.source_version,
-                map_name = EXCLUDED.map_name,
                 display_name = EXCLUDED.display_name,
                 summary = EXCLUDED.summary,
                 description = EXCLUDED.description,
@@ -246,9 +231,7 @@ async def upsert_partition(session, admin_area_id: int, partition: dict, meta: d
                 persona_tag = EXCLUDED.persona_tag,
                 texture_profile = EXCLUDED.texture_profile,
                 is_road = EXCLUDED.is_road,
-                is_walkable = EXCLUDED.is_walkable,
                 area_m2 = EXCLUDED.area_m2,
-                landuse_mix_score = EXCLUDED.landuse_mix_score,
                 centroid_lat = EXCLUDED.centroid_lat,
                 centroid_lng = EXCLUDED.centroid_lng,
                 boundary_geojson = EXCLUDED.boundary_geojson,
@@ -351,8 +334,6 @@ async def main() -> None:
                     p.partition_key,
                     p.partition_stage,
                     p.partition_seq,
-                    p.partition_type,
-                    p.map_name,
                     p.display_name,
                     p.summary,
                     p.description,
@@ -366,9 +347,7 @@ async def main() -> None:
                     p.persona_tag,
                     p.texture_profile,
                     p.is_road,
-                    p.is_walkable,
                     p.area_m2,
-                    p.landuse_mix_score,
                     p.centroid_lat,
                     p.centroid_lng,
                     p.city_name,
@@ -379,7 +358,7 @@ async def main() -> None:
                     a.parent_id AS district_admin_id,
                     p.gameplay_meta
                 FROM world_level_partition p
-                JOIN world_admin_area a
+                JOIN world_area a
                     ON a.id = p.admin_area_id
                 """
             )

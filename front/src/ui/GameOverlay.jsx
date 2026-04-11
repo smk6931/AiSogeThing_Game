@@ -119,6 +119,7 @@ const GameOverlay = ({
   const lastPartitionRef = useRef('');
   const partitionTimerRef = useRef(null);
   const zoneTimerRef = useRef(null);
+  const districtInitializedRef = useRef(false);
 
   const { districts, getDistrictAt } = useSeoulDistricts();
   const { dongs, getDongAt } = useSeoulDongs();
@@ -176,9 +177,14 @@ const GameOverlay = ({
         if (districtName && districtName !== lastDistrictRef.current) {
           setCurrentDistrict(foundDistrict);
           lastDistrictRef.current = districtName;
-          setShowZoneTitle(true);
-          if (zoneTimerRef.current) clearTimeout(zoneTimerRef.current);
-          zoneTimerRef.current = setTimeout(() => setShowZoneTitle(false), 3000);
+          if (!districtInitializedRef.current) {
+            // 첫 감지: 새로고침 직후 현재 구를 조용히 초기화만 하고 오버레이 띄우지 않음
+            districtInitializedRef.current = true;
+          } else {
+            setShowZoneTitle(true);
+            if (zoneTimerRef.current) clearTimeout(zoneTimerRef.current);
+            zoneTimerRef.current = setTimeout(() => setShowZoneTitle(false), 3000);
+          }
         }
       }
 
@@ -220,7 +226,7 @@ const GameOverlay = ({
   const currentPartition = regionState?.currentPartition || null;
   const currentPartitionTitle = currentPartition?.group_display_name || currentPartition?.display_name || '';
   const currentPartitionTheme = currentPartition?.group_theme_code || currentPartition?.theme_code || '-';
-  const showRegionEntryOverlay = gameSettings.showRegionTitle !== false && (showZoneTitle || (showPartitionTitle && currentPartition));
+  const showRegionEntryOverlay = gameSettings.showRegionTitle !== false && showZoneTitle;
   const worldEditorOpen = mapSettings.worldEditorOpen ?? false;
   const setWorldEditorOpen = mapSettings.setWorldEditorOpen ?? (() => {});
   const groundTextureFolder = mapSettings.groundTextureFolder ?? '';
@@ -288,7 +294,7 @@ const GameOverlay = ({
         fontFamily: GAME_FONT,
       }}
     >
-      {gameSettings.showStatPanel !== false && (
+      {gameSettings.showStatPanel !== false && myStats && (
         <StatusPanel
           playerStats={playerStats}
           isMobile={isMobile}
@@ -385,9 +391,9 @@ const GameOverlay = ({
             position: 'absolute',
             top: 'max(10px, env(safe-area-inset-top))',
             right: `calc(max(10px, env(safe-area-inset-right)) + ${zoomButtonsOffset}px)`,
-            width: `${isMobile ? 36 : 40}px`,
-            height: `${isMobile ? 36 : 40}px`,
-            borderRadius: '11px',
+            width: `${topToolSize}px`,
+            height: `${topToolSize}px`,
+            borderRadius: '8px',
             background: showZoomPopup ? 'rgba(19,50,60,0.95)' : 'rgba(8,14,22,0.9)',
             border: `1px solid ${showZoomPopup ? ACCENT : BORDER_COLOR}`,
             boxShadow: GLOW,
@@ -400,7 +406,7 @@ const GameOverlay = ({
             zIndex: 60,
           }}
         >
-          <Search size={isMobile ? 18 : 20} color={showZoomPopup ? ACCENT : GOLD} />
+          <Search size={isMobile ? 14 : 15} color={showZoomPopup ? ACCENT : GOLD} />
         </div>
       )}
 
@@ -1040,24 +1046,23 @@ const GameOverlay = ({
             <div
               key={skill.key}
               style={{
-                width: skill.key === 'R' ? '72px' : '56px',
-                height: skill.key === 'R' ? '72px' : '56px',
+                width: '60px',
+                height: '60px',
                 background: PANEL_BG,
                 border: `1px solid ${skill.accent}66`,
-                borderRadius: skill.key === 'R' ? '18px' : '14px',
+                borderRadius: '14px',
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: skill.key === 'R' ? '0 12px 30px rgba(255, 90, 60, 0.24)' : 'none',
               }}
             >
               <span style={{ position: 'absolute', top: '6px', left: '8px', fontSize: '10px', color: GOLD }}>
                 {skill.key}
               </span>
-              <skill.icon size={skill.key === 'R' ? 26 : 20} color={skill.accent} />
-              <span style={{ marginTop: '4px', fontSize: skill.key === 'R' ? '11px' : '9px', color: '#eaf7f4', fontWeight: '700', letterSpacing: '0.04em' }}>
+              <skill.icon size={22} color={skill.accent} />
+              <span style={{ marginTop: '4px', fontSize: '9px', color: '#eaf7f4', fontWeight: '700', letterSpacing: '0.04em' }}>
                 {skill.label}
               </span>
             </div>
@@ -1071,11 +1076,11 @@ const GameOverlay = ({
             <div
               key={item.key}
               style={{
-                width: '50px',
-                height: '50px',
+                width: '60px',
+                height: '60px',
                 background: PANEL_BG,
                 border: `1px solid ${BORDER_COLOR}`,
-                borderRadius: '8px',
+                borderRadius: '14px',
                 position: 'relative',
                 display: 'flex',
                 alignItems: 'center',

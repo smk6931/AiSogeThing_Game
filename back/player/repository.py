@@ -3,10 +3,10 @@ from core.database import fetch_one, execute, insert_and_return
 
 
 async def get_character(user_id: int) -> dict | None:
-    """game_character 테이블에서 스탯 로드"""
+    """char 테이블에서 스탯 로드"""
     return await fetch_one(
         """SELECT level, exp, hp, max_hp, mp, max_mp, gold, attack
-           FROM game_character WHERE user_id = :uid""",
+           FROM char WHERE user_id = :uid""",
         {"uid": user_id}
     )
 
@@ -17,7 +17,7 @@ async def upsert_character(user_id: int) -> dict:
     if existing:
         return existing
     row = await insert_and_return(
-        """INSERT INTO game_character (user_id, level, exp, hp, max_hp, mp, max_mp, gold, attack)
+        """INSERT INTO char (user_id, level, exp, hp, max_hp, mp, max_mp, gold, attack)
            VALUES (:uid, 1, 0, 100, 100, 50, 50, 0, 12)
            RETURNING level, exp, hp, max_hp, mp, max_mp, gold, attack""",
         {"uid": user_id}
@@ -28,7 +28,7 @@ async def upsert_character(user_id: int) -> dict:
 async def get_ui_settings(user_id: int) -> dict | None:
     """게임 UI/전투 설정 로드"""
     row = await fetch_one(
-        "SELECT ui_settings FROM game_character WHERE user_id = :uid",
+        "SELECT ui_settings FROM char WHERE user_id = :uid",
         {"uid": user_id}
     )
     return row["ui_settings"] if row and row["ui_settings"] else None
@@ -38,7 +38,7 @@ async def save_ui_settings(user_id: int, settings: dict) -> None:
     """게임 UI/전투 설정 저장"""
     import json
     await execute(
-        "UPDATE game_character SET ui_settings = CAST(:s AS jsonb) WHERE user_id = :uid",
+        "UPDATE char SET ui_settings = CAST(:s AS jsonb) WHERE user_id = :uid",
         {"uid": user_id, "s": json.dumps(settings)}
     )
 
@@ -46,7 +46,7 @@ async def save_ui_settings(user_id: int, settings: dict) -> None:
 async def save_character(user_id: int, stats: dict) -> None:
     """레벨/EXP/골드/스탯 변경 시 DB 업데이트"""
     await execute(
-        """UPDATE game_character
+        """UPDATE char
            SET level = :level, exp = :exp, hp = :hp, max_hp = :max_hp,
                mp = :mp, max_mp = :max_mp, gold = :gold, attack = :attack
            WHERE user_id = :uid""",

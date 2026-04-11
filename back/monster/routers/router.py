@@ -16,7 +16,7 @@ async def get_live_monsters():
 async def get_all_templates():
     """활성화된 모든 몬스터 템플릿 목록 반환"""
     rows = await fetch_all(
-        "SELECT * FROM monster_template WHERE is_active = true ORDER BY id"
+        "SELECT * FROM monster WHERE is_active = true ORDER BY id"
     )
     return rows
 
@@ -25,7 +25,7 @@ async def get_all_templates():
 async def get_template(template_id: int):
     """특정 몬스터 템플릿 상세 정보 반환"""
     row = await fetch_one(
-        "SELECT * FROM monster_template WHERE id = :id",
+        "SELECT * FROM monster WHERE id = :id",
         {"id": template_id}
     )
     if not row:
