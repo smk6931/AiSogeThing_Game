@@ -1,6 +1,6 @@
 # 아이템 드롭 확률 계산 및 인벤토리 지급
 import random
-from item import repository
+from item.repositories import repository
 
 
 async def roll_drops(drop_table: list[dict]) -> list[dict]:
@@ -16,9 +16,9 @@ async def roll_drops(drop_table: list[dict]) -> list[dict]:
         print(f"[ROLL] item_id={entry.get('item_id')} rate={rate:.2f} roll={roll:.2f} hit={roll < rate}")
         if roll < rate:
             try:
-                item = await repository.get_item_template(entry["item_id"])
+                item = await repository.get_item(entry["item_id"])
             except Exception as e:
-                print(f"[WARN] get_item_template({entry['item_id']}) failed: {e}")
+                print(f"[WARN] get_item({entry['item_id']}) failed: {e}")
                 continue
             if item:
                 dropped.append({
@@ -29,7 +29,7 @@ async def roll_drops(drop_table: list[dict]) -> list[dict]:
                     "quantity": entry.get("quantity", 1),
                 })
             else:
-                print(f"[WARN] item_id={entry['item_id']} not found in item_template")
+                print(f"[WARN] item_id={entry['item_id']} not found in item")
     return dropped
 
 

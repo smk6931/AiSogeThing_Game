@@ -3,6 +3,7 @@ import math
 import asyncio
 import time
 from typing import Dict, Optional
+from player.services import service as player_service
 
 
 class Monster:
@@ -76,13 +77,6 @@ MONSTER_TEMPLATES = [
     {"template_id": 7, "model_path": "monsters/Noryangjin_Boss_Earth_007_Ogre.glb",      "tier": "boss",   "hp": 3000, "speed": 0.8, "exp": 260, "gold": 140, "attack_power": 45, "attack_range": 4.5, "attack_cooldown": 2.5,
      "drops": [{"item_id": 10, "rate": 0.9, "quantity": 1}, {"item_id": 12, "rate": 0.4, "quantity": 1}, {"item_id": 3, "rate": 0.5, "quantity": 1}]},
 ]
-
-SKILL_POWER = {
-    "basic": 0,
-    "pyramid_punch": 8,
-    "magic_orb": 10,
-}
-
 
 class MonsterManager:
     def __init__(self):
@@ -180,45 +174,11 @@ class MonsterManager:
                 visible_ids.add(mid)
         return visible_ids
 
-    def _calc_damage(self, player_attack: int, skill_name: str):
-        return max(1, player_attack + SKILL_POWER.get(skill_name, 0))
-
-    def handle_hit(self, monster_id: int, player_attack: int, skill_name: str = "basic"):
+    def handle_hit(self, monster_id: int, player_attack: int, skill_name: str = "basic") -> dict:
+        """몬스터 피격 — 전투 계산은 player_service에 위임"""
         if monster_id not in self.monsters:
             return {"ok": False, "reason": "monster_not_found"}
-
-        m = self.monsters[monster_id]
-        if m.state == "dead" or m.hp <= 0:
-            return {"ok": False, "reason": "monster_already_dead"}
-
-        damage = self._calc_damage(player_attack, skill_name)
-        m.hp -= damage
-        m.state = "hit"
-        print(f"Monster {monster_id} hit! Damage: {damage}, HP: {m.hp}/{m.max_hp}")
-
-        result = {
-            "ok": True,
-            "monsterId": monster_id,
-            "damage": damage,
-            "hp": max(0, m.hp),
-            "maxHp": m.max_hp,
-            "state": m.state,
-            "killed": False,
-            "expReward": 0,
-            "goldReward": 0,
-        }
-
-        if m.hp <= 0:
-            m.hp = 0
-            m.state = "dead"
-            result["hp"] = 0
-            result["state"] = "dead"
-            result["killed"] = True
-            result["expReward"] = m.exp_reward
-            result["goldReward"] = m.gold_reward
-            result["dropTable"] = m.drops
-
-        return result
+        return player_service.apply_hit_to_monster(self.monsters[monster_id], player_attack, skill_name)
 
     def remove_dead_monsters(self):
         dead_ids = [mid for mid, m in self.monsters.items() if m.state == "dead" and m.hp <= 0]

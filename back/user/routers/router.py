@@ -4,7 +4,7 @@ from datetime import timedelta
 from typing import Annotated
 
 import user.schemas.schemas as schemas
-import user.services.service as service
+import user.repositories.repository as service
 import user.services.auth as auth
 import user.models.models as models
 from jose import JWTError, jwt

@@ -1,7 +1,7 @@
 # 인벤토리/장비 조회·장착 API
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from item import repository
+from item.repositories import repository
 from player.managers.PlayerManager import player_manager
 
 router = APIRouter(prefix="/api/item", tags=["Item"])
@@ -15,7 +15,7 @@ async def get_inventory(user_id: int):
 
 @router.get("/templates")
 async def get_item_templates(user_id: int | None = None):
-    items = await repository.get_item_templates(user_id)
+    items = await repository.get_items(user_id)
     return {"items": items}
 
 

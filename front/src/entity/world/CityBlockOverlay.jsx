@@ -64,7 +64,10 @@ const findAdjacentGroupKeys = (currentGroupKey, partitions, radius = 700) => {
   return adjacent;
 };
 
-const buildTerrainBlock = (coords, holes = []) => {
+// fitUV=false: 100m 타일 반복 (풀 텍스처용)
+// fitUV=true + uvBounds: group bounding box 기준 UV (group 이미지 공유용)
+// fitUV=true + uvBounds=null: 개별 polygon bounding box에 맞춤
+const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null) => {
   if (!coords || coords.length < 3) return null;
 
   const pts = coords.map(([lat, lng]) => gpsToGame(lat, lng));
@@ -81,11 +84,25 @@ const buildTerrainBlock = (coords, holes = []) => {
   }
   if (!faces || faces.length === 0) return null;
 
-  let minX = Infinity, minZ = Infinity;
-  triangulationPts.forEach((p) => {
-    minX = Math.min(minX, p.x);
-    minZ = Math.min(minZ, p.z);
-  });
+  let minX, minZ, spanX, spanZ;
+  if (fitUV && uvBounds) {
+    // group bounding box 기준 UV: 모든 파티션이 같은 좌표계 공유
+    minX = uvBounds.minX;
+    minZ = uvBounds.minZ;
+    spanX = uvBounds.spanX;
+    spanZ = uvBounds.spanZ;
+  } else {
+    let maxX = -Infinity, maxZ = -Infinity;
+    minX = Infinity; minZ = Infinity;
+    triangulationPts.forEach((p) => {
+      minX = Math.min(minX, p.x);
+      minZ = Math.min(minZ, p.z);
+      maxX = Math.max(maxX, p.x);
+      maxZ = Math.max(maxZ, p.z);
+    });
+    spanX = maxX - minX || 1;
+    spanZ = maxZ - minZ || 1;
+  }
 
   const positions = new Float32Array(faces.length * 9);
   const uvs = new Float32Array(faces.length * 6);
@@ -98,8 +115,13 @@ const buildTerrainBlock = (coords, holes = []) => {
       positions[vi++] = p.x;
       positions[vi++] = 0.55;
       positions[vi++] = p.z;
-      uvs[ui++] = (p.x - minX) / tileSize;
-      uvs[ui++] = (p.z - minZ) / tileSize;
+      if (fitUV) {
+        uvs[ui++] = (p.x - minX) / spanX;
+        uvs[ui++] = (p.z - minZ) / spanZ;
+      } else {
+        uvs[ui++] = (p.x - minX) / tileSize;
+        uvs[ui++] = (p.z - minZ) / tileSize;
+      }
     }
   }
 
@@ -109,31 +131,76 @@ const buildTerrainBlock = (coords, holes = []) => {
   return geo;
 };
 
-const buildTerrainBlockFromGeoJson = (boundaryGeoJson) => {
+const buildTerrainBlockFromGeoJson = (boundaryGeoJson, fitUV = false, uvBounds = null) => {
   if (!boundaryGeoJson?.coordinates?.length) return null;
   const [outer, ...holes] = boundaryGeoJson.coordinates;
   const outerCoords = outer.map(([lng, lat]) => [lat, lng]);
   const holeCoords = holes.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
-  return buildTerrainBlock(outerCoords, holeCoords);
+  return buildTerrainBlock(outerCoords, holeCoords, fitUV, uvBounds);
 };
 
 // group_key 단위 geometry 빌드 (캐시 우선)
-const getGroupGeometries = (groupKey, allPartitions, texCount) => {
-  const cacheKey = `${groupKey}:${texCount}`;
+// partitionTexIndexMap: Map<partition_key, texIndex> — ComfyUI 생성 이미지가 있는 파티션의 텍스처 인덱스
+// poolCount: 풀 텍스처 개수 (fallback hash 계산에 사용)
+const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndexMap, poolCount) => {
+  const mapSize = partitionTexIndexMap ? partitionTexIndexMap.size : 0;
+  const cacheKey = `${groupKey}:${texCount}:${mapSize}`;
   if (groupGeometryCache.has(cacheKey)) return groupGeometryCache.get(cacheKey);
+
+  const fallbackCount = poolCount || texCount;
+
+  // group 전체 bounding box 계산 (group 이미지 공유 UV용)
+  let gMinX = Infinity, gMinZ = Infinity, gMaxX = -Infinity, gMaxZ = -Infinity;
+  for (const p of allPartitions) {
+    if (p.group_key !== groupKey) continue;
+    const b = p.boundary_geojson;
+    if (!b?.coordinates?.[0]) continue;
+    for (const [lng, lat] of b.coordinates[0]) {
+      const pt = gpsToGame(lat, lng);
+      if (pt.x < gMinX) gMinX = pt.x;
+      if (pt.x > gMaxX) gMaxX = pt.x;
+      if (pt.z < gMinZ) gMinZ = pt.z;
+      if (pt.z > gMaxZ) gMaxZ = pt.z;
+    }
+  }
+  const groupUvBounds = gMinX < Infinity ? {
+    minX: gMinX, minZ: gMinZ,
+    spanX: gMaxX - gMinX || 1,
+    spanZ: gMaxZ - gMinZ || 1,
+  } : null;
+
+  // URL 공유 여부 파악: 같은 URL을 쓰는 파티션이 2개 이상 → group 이미지 → group bbox UV
+  // 파티션마다 고유 URL → per-partition 이미지 → 개별 bbox UV (uvBounds=null)
+  const urlCount = new Map();
+  for (const p of allPartitions) {
+    if (p.group_key !== groupKey || !p.texture_image_url) continue;
+    urlCount.set(p.texture_image_url, (urlCount.get(p.texture_image_url) || 0) + 1);
+  }
 
   const result = [];
   for (const partition of allPartitions) {
     if (partition.group_key !== groupKey) continue;
-    const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson);
+
+    const hasOwnImage = partitionTexIndexMap && partitionTexIndexMap.has(partition.partition_key);
+    // group 이미지(공유 URL) → group bbox UV, per-partition 이미지(고유 URL) → 개별 bbox UV
+    const isSharedGroupImage = hasOwnImage && (urlCount.get(partition.texture_image_url) || 0) > 1;
+    const uvBounds = isSharedGroupImage ? groupUvBounds : null;
+    const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds);
     if (!geo) continue;
-    const seed = hashString([
-      partition.group_key || '',
-      partition.group_theme_code || '',
-      partition.texture_profile || '',
-      partition.partition_seq || 0,
-    ].join('|'));
-    result.push({ geo, texIdx: seed % texCount, order: 5 });
+
+    let texIdx;
+    if (hasOwnImage) {
+      texIdx = partitionTexIndexMap.get(partition.partition_key);
+    } else {
+      const seed = hashString([
+        partition.group_key || '',
+        partition.group_theme_code || '',
+        partition.texture_profile || '',
+        partition.partition_seq || 0,
+      ].join('|'));
+      texIdx = seed % fallbackCount;
+    }
+    result.push({ geo, texIdx, order: 5, transparent: hasOwnImage });
   }
 
   groupGeometryCache.set(cacheKey, result);
@@ -177,6 +244,8 @@ const DongMask = ({ currentDong, currentDistrict, elevation }) => {
 
 const CityBlockContent = ({
   texturePaths,
+  poolCount,
+  partitionTexIndexMap,
   zoneData,
   dbPartitions,
   currentDong,
@@ -263,7 +332,7 @@ const CityBlockContent = ({
 
       // group_key 단위 캐시 활용
       for (const groupKey of targetGroupKeys) {
-        const geos = getGroupGeometries(groupKey, dbPartitions, texCount);
+        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexIndexMap, poolCount);
         result.push(...geos);
       }
     } else if (showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
@@ -279,7 +348,7 @@ const CityBlockContent = ({
     }
 
     return result;
-  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, texCount, activeGroupKeys]);
+  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, texCount, activeGroupKeys, partitionTexIndexMap, poolCount]);
 
   return (
     <group>
@@ -289,7 +358,8 @@ const CityBlockContent = ({
           <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
             <meshBasicMaterial
               map={Array.isArray(textures) ? textures[block.texIdx] : textures}
-              transparent={false}
+              transparent={block.transparent ?? false}
+              alphaTest={block.transparent ? 0.1 : 0}
               opacity={1}
               stencilWrite
               stencilRef={1}
@@ -363,11 +433,43 @@ const CityBlockOverlay = ({
     return () => { cancelled = true; };
   }, [showSectorBlocks, currentDong?.id]);
 
+  // partition별 개별 이미지 경로 추출 및 합산 텍스처 경로 구성 (hooks — early return 이전)
+  const partitionUrls = useMemo(() => {
+    const seen = new Set();
+    const urls = [];
+    for (const p of dbPartitions) {
+      if (p.texture_image_url && !seen.has(p.texture_image_url)) {
+        seen.add(p.texture_image_url);
+        urls.push(p.texture_image_url);
+      }
+    }
+    return urls;
+  }, [dbPartitions]);
+
+  const allTexturePaths = useMemo(
+    () => (partitionUrls.length > 0 ? [...texturePaths, ...partitionUrls] : texturePaths),
+    [texturePaths, partitionUrls],
+  );
+
+  const partitionTexIndexMap = useMemo(() => {
+    if (!partitionUrls.length) return null;
+    const urlToIdx = new Map(partitionUrls.map((url, i) => [url, texturePaths.length + i]));
+    const map = new Map();
+    for (const p of dbPartitions) {
+      if (p.texture_image_url && urlToIdx.has(p.texture_image_url)) {
+        map.set(p.partition_key, urlToIdx.get(p.texture_image_url));
+      }
+    }
+    return map.size > 0 ? map : null;
+  }, [partitionUrls, texturePaths.length, dbPartitions]);
+
   if (!visible || loading || texturePaths.length === 0) return null;
 
   return (
     <CityBlockContent
-      texturePaths={texturePaths}
+      texturePaths={allTexturePaths}
+      poolCount={texturePaths.length}
+      partitionTexIndexMap={partitionTexIndexMap}
       zoneData={zoneData}
       dbPartitions={dbPartitions}
       currentDong={currentDong}

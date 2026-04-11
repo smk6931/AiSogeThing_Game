@@ -1,8 +1,9 @@
 import asyncio
 from typing import Dict, Optional
 from fastapi import WebSocket
-import player.repository as char_repo
-import item.repository as item_repo
+from player.repositories import repository as char_repo
+from item.repositories import repository as item_repo
+from player.services import service as player_service
 
 class PlayerManager:
     """
@@ -15,12 +16,6 @@ class PlayerManager:
         self.player_sync_radius = 120.0
         self.skill_sync_radius = 160.0
 
-    @staticmethod
-    def _required_exp_for_level(level: int) -> int:
-        """간단한 누적 경험치 곡선. 추후 DB 레벨 테이블로 교체 가능."""
-        if level <= 1:
-            return 0
-        return (level - 1) * level * 50
 
     async def connect(self, websocket: WebSocket, user_id: str, nickname: str, db=None):
         """새로운 플레이어 접속 처리 — 등록 유저는 DB에서 스탯 로드"""
@@ -186,56 +181,28 @@ class PlayerManager:
             player.update(safe_update)
 
     def apply_damage(self, user_id: str, damage: int) -> dict:
-        """플레이어 피격 처리 — HP 감소 및 사망 여부 반환"""
+        """플레이어 피격 처리 — service에 위임"""
         player = self.active_connections.get(user_id)
         if not player:
             return {"ok": False}
-        stats = player.get("stats", {})
-        stats["hp"] = max(0, stats.get("hp", 100) - damage)
-        died = stats["hp"] <= 0
-        if died:
-            stats["hp"] = stats.get("maxHp", 100)  # 즉시 풀회복 후 리스폰
-        return {"ok": True, "hp": stats["hp"], "maxHp": stats.get("maxHp", 100), "died": died}
+        return player_service.apply_damage_to_stats(player["stats"], damage)
 
     def apply_heal(self, user_id: str, amount: int) -> dict:
-        """HP 회복 처리"""
+        """HP 회복 처리 — service에 위임"""
         player = self.active_connections.get(user_id)
         if not player:
             return {"ok": False}
-        stats = player.get("stats", {})
-        max_hp = stats.get("maxHp", 100)
-        stats["hp"] = min(max_hp, stats.get("hp", max_hp) + amount)
-        return {"ok": True, "hp": stats["hp"], "maxHp": max_hp}
+        return player_service.apply_heal_to_stats(player["stats"], amount)
 
     def add_rewards(self, user_id: str, exp_gain: int = 0, gold_gain: int = 0) -> Optional[dict]:
-        """플레이어 보상 반영 및 간단 레벨업 처리"""
+        """보상 반영 및 레벨업 처리 — service에 위임"""
         player = self.active_connections.get(user_id)
         if not player:
             return None
-
         stats = player.get("stats")
         if not stats:
             return None
-
-        stats["exp"] = stats.get("exp", 0) + max(0, exp_gain)
-        stats["gold"] = stats.get("gold", 0) + max(0, gold_gain)
-
-        leveled_up = False
-        while stats["exp"] >= self._required_exp_for_level(stats["level"] + 1):
-            stats["level"] += 1
-            stats["maxHp"] += 20
-            stats["maxMp"] += 10
-            stats["attack"] = stats.get("attack", 12) + 2
-            stats["hp"] = stats["maxHp"]
-            stats["mp"] = stats["maxMp"]
-            leveled_up = True
-
-        return {
-            "expGained": exp_gain,
-            "goldGained": gold_gain,
-            "leveledUp": leveled_up,
-            "stats": dict(stats),
-        }
+        return player_service.add_rewards_to_stats(stats, exp_gain, gold_gain)
 
     async def broadcast(self, message: dict, exclude_user_id: str = None):
         """모든 플레이어에게 메시지 전송 (특정 유저 제외 가능)"""

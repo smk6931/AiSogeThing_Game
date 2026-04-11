@@ -53,4 +53,5 @@ Priority: high | medium | low
   공통 조언 방식, 공통 소통 규칙도 포함
 - `db/`
   DB 전략, 테이블 구조, 파티션 설계, ERD 등 월드 DB 관련 규칙
+  - `db_naming_rules.md` — 테이블/컬럼/인덱스 네이밍 규칙 (새 테이블 설계 전 필독)
 
