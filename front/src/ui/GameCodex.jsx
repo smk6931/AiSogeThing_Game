@@ -264,47 +264,55 @@ function WorldMiniMap({ groups, partitions, selectedGroupId, selectedPartitionId
   );
 }
 
-/* ─── 그룹 DivIcon 생성 헬퍼 ─── */
-function makeGroupIcon(g, state) {
-  // state: 'default' | 'active' | 'dim'
+/* ─── 줌 레벨별 마커 설정 ─── */
+//  zoom < 13  → 점(dot)만
+//  zoom 13-14 → 작은 원, 레이블 없음
+//  zoom 14-15 → 중간 원 + 짧은 레이블
+//  zoom >= 15 → 풀 마커 + 파티션 카운트 뱃지
+function zoomCfg(zoom) {
+  if (zoom < 13) return { dot: true, size: 8,  label: false, badge: false };
+  if (zoom < 14) return { dot: false, size: 18, label: false, badge: false };
+  if (zoom < 15) return { dot: false, size: 30, label: true,  badge: false };
+  return              { dot: false, size: 42, label: true,  badge: true  };
+}
+
+function makeGroupIcon(g, state, zoom = 15) {
   const col = themeColor(g.theme_code);
   const name = (g.display_name || '').slice(0, 5);
   const count = g.partition_count || 0;
+  const zc = zoomCfg(zoom);
 
-  const cfg = {
-    default: { size: 38, borderW: 1.5, fillAlpha: '22', textAlpha: 1, glow: false, scale: 1 },
-    active:  { size: 48, borderW: 2.5, fillAlpha: '33', textAlpha: 1, glow: true,  scale: 1 },
-    dim:     { size: 28, borderW: 1,   fillAlpha: '0d', textAlpha: 0.3, glow: false, scale: 1 },
-  }[state] || {};
+  /* state별 크기 배율 */
+  const scale = { default: 1, active: 1.2, dim: 0.72 }[state] ?? 1;
+  const size = Math.round(zc.size * scale);
 
-  const { size, borderW, fillAlpha, textAlpha, glow } = cfg;
-  const glowCss = glow ? `box-shadow:0 0 12px ${col}99,0 0 4px ${col}66;` : '';
-  const dimCss = state === 'dim' ? 'filter:saturate(0.3);' : '';
+  const opacity = state === 'dim' ? 0.35 : 1;
+  const borderW = state === 'active' ? 2.5 : 1.5;
+  const fillAlpha = state === 'active' ? '30' : state === 'dim' ? '0a' : '1a';
+  const glowCss = state === 'active' && zoom >= 14
+    ? `box-shadow:0 0 10px ${col}88,0 0 3px ${col}55;` : '';
+  const dimFilter = state === 'dim' ? 'filter:saturate(0.25);' : '';
 
-  const badgeHtml = count > 0 ? `
-    <div style="
-      position:absolute;top:-5px;right:-5px;
-      background:${col};color:#050b12;
-      font-size:7px;font-weight:800;border-radius:999px;
-      padding:1px 4px;min-width:14px;text-align:center;
-      line-height:14px;height:14px;
-      font-family:sans-serif;
-      opacity:${state === 'dim' ? 0.3 : 1};
-    ">${count}</div>` : '';
+  /* dot 모드: 단순 원 */
+  if (zc.dot) {
+    const dotSize = state === 'active' ? 10 : state === 'dim' ? 5 : 7;
+    const html = `<div style="width:${dotSize}px;height:${dotSize}px;border-radius:50%;background:${col};opacity:${opacity};cursor:pointer;${glowCss}"></div>`;
+    return L.divIcon({ className: '', html, iconSize: [dotSize, dotSize], iconAnchor: [dotSize / 2, dotSize / 2] });
+  }
+
+  const labelHtml = zc.label
+    ? `<span style="font-size:${size < 30 ? 7 : 8}px;color:${col};font-weight:${state === 'active' ? 700 : 500};font-family:sans-serif;line-height:1.2;">${name}</span>`
+    : '';
+
+  const badgeHtml = zc.badge && count > 0
+    ? `<div style="position:absolute;top:-5px;right:-5px;background:${col};color:#050b12;font-size:7px;font-weight:800;border-radius:999px;padding:1px 4px;min-width:14px;text-align:center;line-height:14px;height:14px;font-family:sans-serif;">${count}</div>`
+    : '';
 
   const html = `
-    <div style="position:relative;width:${size}px;height:${size}px;">
-      <div style="
-        width:${size}px;height:${size}px;border-radius:50%;
-        background:${col}${fillAlpha};
-        border:${borderW}px solid ${col};
-        display:flex;align-items:center;justify-content:center;
-        font-size:${state === 'active' ? 9 : 8}px;
-        color:${col};font-weight:${state === 'active' ? 700 : 600};
-        font-family:sans-serif;text-align:center;line-height:1.2;
-        cursor:pointer;opacity:${textAlpha};
-        ${glowCss}${dimCss}
-      ">${name}</div>
+    <div style="position:relative;width:${size}px;height:${size}px;opacity:${opacity};${dimFilter}">
+      <div style="width:${size}px;height:${size}px;border-radius:50%;background:${col}${fillAlpha};border:${borderW}px solid ${col};display:flex;align-items:center;justify-content:center;cursor:pointer;${glowCss}">
+        ${labelHtml}
+      </div>
       ${badgeHtml}
     </div>`;
 
@@ -318,6 +326,30 @@ function MapLayersController({ groups, partitions, selectedGroupId, selectedPart
   const gMarkerRef   = useRef({}); // group centroid DivIcon markers
   const pLayerRef    = useRef({}); // partition GeoJSON layers
   const allGroupBoundsRef = useRef(null);
+
+  /* stale closure 방지: 최신 selection 값을 ref로 추적 */
+  const selectedGroupIdRef = useRef(selectedGroupId);
+  const groupsRef = useRef(groups);
+  useEffect(() => { selectedGroupIdRef.current = selectedGroupId; }, [selectedGroupId]);
+  useEffect(() => { groupsRef.current = groups; }, [groups]);
+
+  /* 줌 변경 → 마커 아이콘만 업데이트 */
+  useEffect(() => {
+    const onZoomEnd = () => {
+      const zoom = map.getZoom();
+      const hasGroup = !!selectedGroupIdRef.current;
+      Object.entries(gMarkerRef.current).forEach(([id, marker]) => {
+        const gid = Number(id);
+        const g = groupsRef.current.find((x) => x.id === gid);
+        if (!g) return;
+        const state = !hasGroup ? 'default' : selectedGroupIdRef.current === gid ? 'active' : 'dim';
+        marker.setIcon(makeGroupIcon(g, state, zoom));
+      });
+    };
+    map.on('zoomend', onZoomEnd);
+    return () => map.off('zoomend', onZoomEnd);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
 
   /* 그룹 레이어 재구성 (groups 변경 시) */
   useEffect(() => {
@@ -344,9 +376,9 @@ function MapLayersController({ groups, partitions, selectedGroupId, selectedPart
         } catch (_) {}
       }
 
-      /* centroid 마커 */
+      /* centroid 마커 (현재 줌 반영) */
       if (g.centroid_lat && g.centroid_lng) {
-        const marker = L.marker([g.centroid_lat, g.centroid_lng], { icon: makeGroupIcon(g, 'default'), zIndexOffset: 100 })
+        const marker = L.marker([g.centroid_lat, g.centroid_lng], { icon: makeGroupIcon(g, 'default', map.getZoom()), zIndexOffset: 100 })
           .on('click', () => onSelectGroup(g));
         marker.addTo(map);
         gMarkerRef.current[g.id] = marker;
@@ -406,13 +438,14 @@ function MapLayersController({ groups, partitions, selectedGroupId, selectedPart
       }
     });
 
-    /* 그룹 마커 아이콘 업데이트 */
+    /* 그룹 마커 아이콘 업데이트 (현재 줌 반영) */
+    const zoom = map.getZoom();
     Object.entries(gMarkerRef.current).forEach(([id, marker]) => {
       const gid = Number(id);
       const g = groups.find((x) => x.id === gid);
       if (!g) return;
       const state = !hasGroup ? 'default' : selectedGroupId === gid ? 'active' : 'dim';
-      marker.setIcon(makeGroupIcon(g, state));
+      marker.setIcon(makeGroupIcon(g, state, zoom));
     });
 
     /* 선택 해제 시 전체 뷰로 복귀 */
@@ -734,7 +767,7 @@ const WorldCodex = () => {
                   onSelectGroup={(g) => { selectGroup(g); setSelectedPartition(null); }}
                   onSelectPartition={selectPartition}
                   loading={loadingPartitions}
-                  height={selectedGroup ? 195 : 255}
+                  height={selectedGroup ? 280 : 360}
                 />
                 {/* 선택 상태 정보 패널 */}
                 {(selectedPartition || selectedGroup) && (

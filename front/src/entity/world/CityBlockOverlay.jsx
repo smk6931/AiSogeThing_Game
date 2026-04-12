@@ -579,6 +579,7 @@ const CityBlockOverlay = ({
       partitionTexIndexMap={partitionTexIndexMap}
       zoneData={zoneData}
       dbPartitions={dbPartitions}
+      dbGroups={dbGroups}
       currentDong={currentDong}
       currentDistrict={currentDistrict}
       elevation={elevation}

@@ -120,6 +120,7 @@ async def get_codex_dong_groups(dong_id: int) -> list[dict]:
         WHERE pg.admin_area_id = :dong_id
           AND pg.is_active = true
         GROUP BY pg.id
+        HAVING COUNT(pgm.partition_id) > 0
         ORDER BY pg.group_seq NULLS LAST, pg.display_name
         """,
         {"dong_id": dong_id},
