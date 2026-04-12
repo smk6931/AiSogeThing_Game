@@ -69,21 +69,37 @@ TARGET_PIXELS    = 512 * 512
 MAX_IMAGE_SIZE   = 768   # SD 1.5 최적 (512~768)
 
 STYLE_PREFIX = (
-    "top-down RPG game texture, bird's eye view, overhead 90 degrees, "
-    "fantasy medieval korean village ground, "
-    "detailed floor texture, seamless tileable, "
-    "cobblestone paths, stone tiles, moss, grass patches, dirt roads, "
-    "rpg game asset, high quality 2D game art, "
-    "rich colors, painterly style, detailed environment"
+    "top-down RPG game map tile, directly overhead view, "
+    "flat ground surface texture only, no walls, no vertical elements, "
+    "fantasy korean village, "
+    "stone floor, clay roof tiles from above, cobblestone, packed earth, moss, "
+    "2D RPG game art style, painterly, rich warm colors, detailed"
 )
 STYLE_NEGATIVE = (
-    "blurry, low quality, watermark, text, signature, "
-    "humans, characters, animals, vehicles, UI, "
+    "blurry, low quality, watermark, text, "
+    "humans, characters, animals, vehicles, "
     "3D render, photorealistic, modern, sci-fi, "
-    "isometric, side view, perspective view, "
-    "dark, muddy colors, washed out, oversaturated, "
-    "empty space, blank areas, white background"
+    "perspective view, isometric, angled view, side view, "
+    "walls, vertical surfaces, building facade, interior, room, "
+    "dark, muddy, washed out, empty space, blank areas, white background"
 )
+
+# 랜드유즈/테마 → 바닥 텍스처 변환 힌트
+# DB append 대신 또는 보완으로 사용
+FLOOR_CONTEXT: dict[str, str] = {
+    # landuse_code 값
+    "RESIDENTIAL":          "overhead view of densely packed korean rooftops, clay tile roofs, concrete flat roofs, small inner courtyards from above, varied warm roof colors",
+    "COMMERCIAL":           "overhead view of market district, stone and tile paving, merchant stall rooftops, worn cobblestone paths from above",
+    "INDUSTRIAL":           "overhead view of industrial block, corrugated metal roofing, concrete slabs, pipes and storage tanks from above",
+    "PARK":                 "overhead view of park ground, lush grass, stone garden paths, flower beds, gravel walkways",
+    "MIXED":                "overhead view of mixed district, varied rooftop textures, stone paths and green patches",
+    # theme_code 값
+    "RESIDENTIAL_ZONE":     "overhead view of korean residential rooftops, dense clay tile roofs, narrow alleys between buildings, small rooftop gardens, concrete walkways",
+    "COMMERCIAL_ZONE":      "overhead view of commercial district rooftops, flat concrete roofs, signboard frames, stone floor paths between buildings",
+    "ACADEMY_SANCTUM":      "overhead view of korean academy stone floor, worn grey flagstone tiles, moss between paving stones, stone courtyard from above",
+    "SANCTUARY":            "overhead view of shrine stone paving, ceremonial tile patterns, sacred earth and moss, stone lantern bases",
+    "GREEN_ZONE":           "overhead view of park and garden ground, grass lawn, stone stepping paths, tree canopy tops, flower patches",
+}
 
 # persona → 프롬프트 힌트 (image_prompt_append가 없을 때 fallback)
 PERSONA_PROMPTS: dict[str, str] = {
@@ -339,14 +355,26 @@ def check_comfyui() -> bool:
 # 프롬프트 조합
 # ──────────────────────────────────────────────────────────────────────────────
 def make_positive(area_prompt: str, group_prompt: str, extra: str = "",
-                  persona_tag: str = "") -> str:
+                  persona_tag: str = "", theme: str = "", landuse: str = "") -> str:
     parts = [STYLE_PREFIX]
-    for p in [area_prompt, group_prompt, extra]:
-        if p and p.strip():
-            parts.append(p.strip())
-    # image_prompt_append가 없을 때 persona 기반 힌트 삽입
-    if not extra and persona_tag and persona_tag in PERSONA_PROMPTS:
-        parts.append(PERSONA_PROMPTS[persona_tag])
+
+    # 그룹 프롬프트 (지역 분위기)
+    if group_prompt and group_prompt.strip():
+        parts.append(group_prompt.strip())
+
+    # 바닥 컨텍스트: theme > landuse > persona > 없음 순
+    floor_hint = (
+        FLOOR_CONTEXT.get(theme)
+        or FLOOR_CONTEXT.get(landuse)
+        or (PERSONA_PROMPTS.get(persona_tag) if persona_tag else None)
+    )
+    if floor_hint:
+        parts.append(floor_hint)
+
+    # area_prompt는 지역 분위기 보조 (짧게)
+    if area_prompt and area_prompt.strip():
+        parts.append(area_prompt.strip()[:80])
+
     return ", ".join(parts)
 
 
@@ -359,9 +387,23 @@ def make_negative(area_neg: str, group_neg: str) -> str:
 
 
 def short_name(key: str) -> str:
-    """seoul.dongjak.noryangjin2.group.g04 → noryangjin2_g04"""
+    """
+    seoul.dongjak.noryangjin2.group.g04 → noryangjin2_g04
+    seoul..2.v2.0038 (v2 format, empty segment) → 0038   (folder은 group short_name 사용)
+    """
     parts = key.split(".")
-    return f"{parts[2]}_{parts[4]}" if len(parts) >= 5 else key.replace(".", "_")
+    # group key: "group" 세그먼트 포함
+    if "group" in parts:
+        idx = parts.index("group")
+        dong = parts[idx - 1] if idx > 0 else parts[2]
+        return f"{dong}_{parts[-1]}"
+    # 구분자 사이에 빈 segment가 있는 v2 포맷 (parts[1]=="")
+    if len(parts) >= 2 and parts[1] == "":
+        return parts[-1]   # "0038"
+    # 구 포맷: seoul.dongjak.noryangjin2.primary.p024
+    if len(parts) >= 5 and parts[2]:
+        return f"{parts[2]}_{parts[4]}"
+    return key.replace(".", "_")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -498,6 +540,7 @@ async def run_partition_mode(partition_keys: list[str], dry_run: bool, outline: 
                 text("""
                     SELECT p.id, p.partition_key, p.display_name,
                            p.boundary_geojson, p.persona_tag,
+                           p.theme_code, p.landuse_code,
                            p.image_prompt_append, p.image_prompt_negative,
                            g.image_prompt_base, g.image_prompt_negative as group_neg,
                            a.image_prompt_base as area_prompt_base,
@@ -525,12 +568,16 @@ async def run_partition_mode(partition_keys: list[str], dry_run: bool, outline: 
             print(f"\n[PARTITION] {part['dong_name']} / {part['display_name']} ({pk})")
 
             boundaries = [part["boundary_geojson"]]
+            theme   = (part.get("theme_code") or "").upper()
+            landuse = (part.get("landuse_code") or "").upper()
             positive   = make_positive(
                 part["area_prompt_base"] or "",
                 part["image_prompt_base"] or "",
-                part["image_prompt_append"] or "",
                 persona_tag=part.get("persona_tag") or "",
+                theme=theme,
+                landuse=landuse,
             )
+            print(f"  theme={theme}, landuse={landuse}")
             negative   = make_negative(part["area_prompt_neg"] or "", part["group_neg"] or "")
             seed       = hash(pk) % (2**32)
 

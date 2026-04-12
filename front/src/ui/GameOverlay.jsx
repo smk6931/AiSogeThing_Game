@@ -1411,7 +1411,7 @@ const GameOverlay = ({
           {sidebarMode === 'menu' && [
             { id: 'settings', Icon: Settings, label: '환경설정', color: ACCENT },
             { id: 'stats',    Icon: BarChart2, label: '스탯',    color: '#60a5fa' },
-            { id: 'items',    Icon: Package,   label: '인벤토리', color: '#a78bfa' },
+            { id: 'items',    Icon: Package,   label: '인벤토리', color: '#a78bfa', action: () => { onInventoryOpen?.(); setSidebarOpen(false); } },
             { id: 'codex',    Icon: BookOpen,  label: '도감',    color: '#fbbf24', action: () => { setShowCodex(true); setSidebarOpen(false); } },
             { id: 'editor',   Icon: Wrench,    label: '월드에디터', color: '#94a3b8' },
           ].map(({ id, Icon, label, color, action }) => (
