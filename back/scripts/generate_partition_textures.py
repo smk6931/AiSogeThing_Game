@@ -51,10 +51,10 @@ from core.database import async_session_factory
 # 설정
 # ──────────────────────────────────────────────────────────────────────────────
 COMFYUI_HOST    = "http://localhost:8188"
-CHECKPOINT_NAME = "sd_xl_base_1.0.safetensors"
-STEPS           = 20
-CFG             = 4.0
-SAMPLER         = "euler"
+CHECKPOINT_NAME = "rpg_v5.safetensors"
+STEPS           = 25
+CFG             = 7.0
+SAMPLER         = "dpm_2_ancestral"
 SCHEDULER       = "karras"
 MASK_FEATHER    = 0    # 경계 선명하게 (blur 없음)
 
@@ -64,27 +64,25 @@ LNG_TO_M = 88200
 
 # 스케일
 METERS_PER_PIXEL = 0.5   # 1px = 0.5m
-MAX_ASPECT       = 3.0   # 이 비율 초과하면 타일로 분할 (SDXL 안전 범위)
+MAX_ASPECT       = 3.0   # 이 비율 초과하면 타일로 분할
 TARGET_PIXELS    = 512 * 512
-MAX_IMAGE_SIZE   = 1536
+MAX_IMAGE_SIZE   = 768   # SD 1.5 최적 (512~768)
 
 STYLE_PREFIX = (
-    "top-down bird's eye view RPG ground texture tile, "
-    "directly overhead 90 degrees, flat seamless ground surface, "
-    "dark fantasy korean neighborhood, rich detailed floor texture, "
-    "fill entire area completely with ground detail, "
-    "polygon edges filled with natural terrain: dirt paths, grass, stone ground, forest floor "
-    "so cutting at any edge looks seamless and natural, "
-    "no characters, no people, pure environment texture, game asset, "
-    "high detail, painterly fantasy art style"
+    "top-down RPG game texture, bird's eye view, overhead 90 degrees, "
+    "fantasy medieval korean village ground, "
+    "detailed floor texture, seamless tileable, "
+    "cobblestone paths, stone tiles, moss, grass patches, dirt roads, "
+    "rpg game asset, high quality 2D game art, "
+    "rich colors, painterly style, detailed environment"
 )
 STYLE_NEGATIVE = (
     "blurry, low quality, watermark, text, signature, "
-    "humans, characters, animals, UI elements, "
-    "isometric, 3D perspective, side view, angled view, "
-    "photorealistic, modern photo, "
-    "empty black areas, unfilled regions, blank spaces, "
-    "abrupt edge cutoffs, obvious clipping, hard boundary lines"
+    "humans, characters, animals, vehicles, UI, "
+    "3D render, photorealistic, modern, sci-fi, "
+    "isometric, side view, perspective view, "
+    "dark, muddy colors, washed out, oversaturated, "
+    "empty space, blank areas, white background"
 )
 
 # persona → 프롬프트 힌트 (image_prompt_append가 없을 때 fallback)
