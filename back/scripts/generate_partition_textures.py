@@ -56,8 +56,8 @@ STEPS           = 12
 CFG             = 3.5
 SAMPLER         = "dpmpp_sde"
 SCHEDULER       = "karras"
-MASK_FEATHER    = 0
-GROW_MASK_BY    = 6   # VAEEncodeForInpaint grow_mask_by (edge blend 확대)
+MASK_FEATHER    = 12  # polygon mask Gaussian blur → ring border 방지 핵심
+GROW_MASK_BY    = 4   # VAEEncodeForInpaint grow_mask_by
 
 # 지리 좌표 → 미터 (서울 기준, mapConfig.js 동일)
 LAT_TO_M = 110940
@@ -130,6 +130,8 @@ STYLE_PRESETS: dict[str, dict] = {
 
 # 현재 활성 스타일 (None = 기본 DB 기반)
 _ACTIVE_STYLE: str | None = None
+# --override-prompt 로 직접 지정된 프롬프트 (None = DB/그룹 프롬프트 사용)
+_OVERRIDE_PROMPT: str | None = None
 
 # theme_code → Positive 추가 프롬프트 (DreamShaper XL Lightning 스타일 기준)
 # 규칙: 건물·소품·실내 표현 금지, "바닥 지형이 프레임을 꽉 채운다" 중심 묘사
@@ -315,21 +317,28 @@ def create_black_base(width: int, height: int) -> Image.Image:
 
 
 def build_workflow(positive: str, negative: str, seed: int,
-                   width: int, height: int) -> dict:
+                   mask_filename: str, base_filename: str) -> dict:
     """
-    DreamShaper XL Lightning txt2img 워크플로우 (EmptyLatentImage)
-    inpainting 방식 폐기: VAEEncodeForInpaint는 검정 base를 의식해 frame 구성을 만들어냄
-    EmptyLatentImage로 순수 노이즈에서 생성 → 경계 아티팩트 없는 seamless 지형 텍스처
+    DreamShaper XL Lightning inpainting 워크플로우
+    VAEEncodeForInpaint + feathered polygon mask + 검정 base
+    MASK_FEATHER=12 로 polygon 경계를 소프트 블러 → ring border 방지
     agents/game_design/local_image_generation.md 기준
     """
     return {
         "4":  {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT_NAME}},
         "6":  {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
         "7":  {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
-        # EmptyLatentImage: 순수 노이즈에서 시작 (inpainting 아님)
-        "5": {
-            "class_type": "EmptyLatentImage",
-            "inputs": {"width": width, "height": height, "batch_size": 1},
+        "13": {"class_type": "LoadImage", "inputs": {"image": base_filename}},
+        "10": {"class_type": "LoadImage", "inputs": {"image": mask_filename}},
+        "11": {"class_type": "ImageToMask", "inputs": {"image": ["10", 0], "channel": "red"}},
+        "14": {
+            "class_type": "VAEEncodeForInpaint",
+            "inputs": {
+                "pixels": ["13", 0],
+                "vae": ["4", 2],
+                "mask": ["11", 0],
+                "grow_mask_by": GROW_MASK_BY,
+            },
         },
         "3": {
             "class_type": "KSampler",
@@ -337,7 +346,7 @@ def build_workflow(positive: str, negative: str, seed: int,
                 "seed": seed, "steps": STEPS, "cfg": CFG,
                 "sampler_name": SAMPLER, "scheduler": SCHEDULER, "denoise": 1.0,
                 "model": ["4", 0], "positive": ["6", 0], "negative": ["7", 0],
-                "latent_image": ["5", 0],
+                "latent_image": ["14", 0],
             },
         },
         "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
@@ -442,6 +451,10 @@ def make_positive(group_prompt: str) -> str:
     if _ACTIVE_STYLE:
         return STYLE_PRESETS[_ACTIVE_STYLE]["positive"]
 
+    # --override-prompt로 직접 지정된 경우: STYLE_PREFIX 없이 그대로 사용
+    if _OVERRIDE_PROMPT:
+        return _OVERRIDE_PROMPT
+
     parts = [STYLE_PREFIX]
 
     # 그룹 프롬프트 — 분위기와 지형 묘사의 핵심. seed가 파티션별 변형을 담당.
@@ -530,8 +543,18 @@ async def generate_one(
         print(f"  [DRY-RUN] would save to {out_path}")
         return True
 
-    # txt2img: 마스크·베이스 이미지 업로드 불필요 (EmptyLatentImage 사용)
-    wf = build_workflow(pos_full, negative, seed, img_w, img_h)
+    # 타일링: 전체 흰 마스크 / 일반: feathered polygon 마스크 (MASK_FEATHER=12)
+    if is_tiled:
+        mask_img = Image.new("RGB", (img_w, img_h), (255, 255, 255))
+    else:
+        mask_img = create_mask(boundaries, bbox, img_w, img_h, feather=MASK_FEATHER)
+
+    label_short = label.lower().replace(" ", "_")
+    mask_name = upload_mask(mask_img, f"{label_short}_mask.png")
+    base_name = upload_mask(create_black_base(img_w, img_h), f"{label_short}_base.png")
+    print(f"  마스크 업로드: {mask_name} (feather={MASK_FEATHER if not is_tiled else 0})")
+
+    wf = build_workflow(pos_full, negative, seed, mask_name, base_name)
     resp = comfy_post("/prompt", {"prompt": wf})
     prompt_id = resp["prompt_id"]
     print(f"  queued: {prompt_id}")
@@ -560,9 +583,7 @@ async def run_group_mode(group_key: str, dry_run: bool):
         group_row = await session.execute(
             text("""
                 SELECT g.id, g.display_name,
-                       g.image_prompt_base, g.image_prompt_negative,
-                       a.image_prompt_base as area_prompt_base,
-                       a.image_prompt_negative as area_prompt_neg,
+                       g.image_prompt_base,
                        a.name as dong_name
                 FROM world_partition_group g
                 JOIN world_area a ON a.id = g.admin_area_id
@@ -617,12 +638,8 @@ async def run_partition_mode(partition_keys: list[str], dry_run: bool, outline: 
             row = await session.execute(
                 text("""
                     SELECT p.id, p.partition_key, p.display_name,
-                           p.boundary_geojson, p.persona_tag,
-                           p.theme_code, p.landuse_code,
-                           p.image_prompt_append, p.image_prompt_negative,
-                           g.image_prompt_base, g.image_prompt_negative as group_neg,
-                           a.image_prompt_base as area_prompt_base,
-                           a.image_prompt_negative as area_prompt_neg,
+                           p.boundary_geojson,
+                           g.image_prompt_base,
                            a.name as dong_name,
                            g.group_key
                     FROM world_partition p
@@ -765,9 +782,15 @@ if __name__ == "__main__":
                         help="--outline-only와 함께: 기존 이미지 삭제 후 빈 배경에 outline만 그림")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--override-prompt", default=None,
+                        help="그룹/DB 프롬프트 무시하고 이 프롬프트를 직접 사용 (테스트용)")
     parser.add_argument("--style", choices=["village", "nature"], default=None,
                         help="레퍼런스 스타일 프리셋 (DB 페르소나 무시). village=아이소메트릭 마을, nature=overhead 자연씬")
     args = parser.parse_args()
+
+    # --override-prompt 적용
+    if args.override_prompt:
+        _OVERRIDE_PROMPT = args.override_prompt
 
     # --style 프리셋 적용: 모듈 레벨 설정 덮어쓰기 (if __name__ 블록은 모듈 레벨이라 global 불필요)
     if args.style:

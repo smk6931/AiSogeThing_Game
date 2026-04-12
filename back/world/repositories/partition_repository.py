@@ -16,7 +16,6 @@ _PARTITION_COLUMNS = """
     group_theme_code,
     landuse_code,
     dominant_landuse,
-    persona_tag,
     texture_profile,
     texture_image_url,
     is_road,
@@ -24,8 +23,7 @@ _PARTITION_COLUMNS = """
     centroid_lat,
     centroid_lng,
     elevation_m,
-    boundary_geojson,
-    gameplay_meta
+    boundary_geojson
 """
 
 
@@ -111,7 +109,6 @@ async def get_codex_dong_groups(dong_id: int) -> list[dict]:
             pg.display_name,
             pg.summary,
             pg.theme_code,
-            pg.persona_tag,
             pg.centroid_lat,
             pg.centroid_lng,
             pg.boundary_geojson,
@@ -139,7 +136,6 @@ async def get_codex_group_partitions(group_id: int) -> list[dict]:
             p.display_name,
             p.summary,
             p.theme_code,
-            p.persona_tag,
             p.centroid_lat,
             p.centroid_lng,
             p.area_m2,
