@@ -40,11 +40,7 @@ export function useCurrentRegionInfo(playerPositionRef, enabled = true) {
         lng: GIS_ORIGIN.lng + ((pos.x || 0) / LNG_TO_M),
       };
 
-      setState((prev) => {
-        if (prev.gps.lat === gps.lat && prev.gps.lng === gps.lng) return prev;
-        return { ...prev, gps };
-      });
-
+      // 25m 미만 이동이면 fetch 불필요 — GPS state도 갱신하지 않음 (렌더 비용 절약)
       if (lastFetchGpsRef.current && distanceSqMeters(lastFetchGpsRef.current, gps) < (25 * 25)) {
         return;
       }

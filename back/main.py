@@ -78,6 +78,7 @@ async def startup_event():
         player_manager.get_all_players,
         player_manager.send_to_user,
     ))
+    asyncio.create_task(player_manager.mp_regen_loop(regen_per_tick=2, interval_sec=1.0))
     print("Monster AI loop started via app startup.")
 
 origins = [

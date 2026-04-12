@@ -1,5 +1,5 @@
-﻿import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { Home, LogOut, Settings, Shield, Sword, Users, Zap, Flame, Menu, X, BarChart2, Package, Wrench, BookOpen, Search } from 'lucide-react';
+﻿import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Home, LogOut, Settings, Sword, Users, Menu, X, BarChart2, Package, Wrench, BookOpen, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@contexts/AuthContext';
@@ -10,6 +10,8 @@ import { useSeoulDongs } from '@hooks/useSeoulDongs';
 import { useIsMobile } from '@hooks/useIsMobile';
 import { GAME_FONT, PANEL_BG, BORDER_COLOR, GOLD, ACCENT, GLOW, RARITY_COLOR } from '@ui/overlay/overlayConstants';
 import StatusPanel from '@ui/overlay/StatusPanel';
+const SkillHotbar = lazy(() => import('@ui/SkillHotbar'));
+const SkillPanel = lazy(() => import('@ui/SkillPanel'));
 
 const GameCodex = lazy(() => import('./GameCodex'));
 const LeafletMapBackground = lazy(() => import('./LeafletMapBackground'));
@@ -90,6 +92,8 @@ const GameOverlay = ({
   onSettingUpdate,
   onSettingsSave,
   onSettingsReset,
+  skillHotbar = null,
+  localMp = 100,
 }) => {
   const { user } = useAuth();
   const { moveSpeed, setMoveSpeed } = useGameConfig();
@@ -108,6 +112,7 @@ const GameOverlay = ({
   const [showRoadPanel, setShowRoadPanel] = useState(false);
   const [showCodex, setShowCodex] = useState(false);
   const [showMobileStatsPopup, setShowMobileStatsPopup] = useState(false);
+  const [showSkillPanel, setShowSkillPanel] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
   const [gpsCoords, setGpsCoords] = useState({ lat: GIS_ORIGIN.lat, lng: GIS_ORIGIN.lng });
   const [currentDistrict, setCurrentDistrict] = useState(null);
@@ -254,17 +259,6 @@ const GameOverlay = ({
   const mobileCombatBottom = '26px';
   const mobileQuickMenuWidth = isMobile ? `${minimapWidth}px` : 'auto';
 
-  const primarySkill = { key: 'R', icon: Flame, label: 'Burst', accent: '#ff7a59' };
-  const utilitySkills = [
-    { key: 'Q', icon: Sword, label: 'Slash', accent: '#f6c453' },
-    { key: 'W', icon: Shield, label: 'Guard', accent: '#7dd3fc' },
-    { key: 'E', icon: Zap, label: 'Spark', accent: '#67e8d6' },
-  ];
-
-  const quickItems = [
-    { key: '1', name: 'Potion', count: 5, icon: '🧪' },
-    { key: '2', name: 'Mana', count: 3, icon: '💧' },
-  ];
 
   const openSidebarMenu = () => {
     setSidebarMode('menu');
@@ -1033,77 +1027,64 @@ const GameOverlay = ({
         </div>
       )}
 
-      <div
-        style={{
-          position: 'absolute',
-          bottom: isMobile ? '18px' : '30px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: isMobile ? 'none' : 'flex',
-          gap: '12px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {[...utilitySkills, primarySkill].map((skill) => (
-            <div
-              key={skill.key}
-              style={{
-                width: '60px',
-                height: '60px',
-                background: PANEL_BG,
-                border: `1px solid ${skill.accent}66`,
-                borderRadius: '14px',
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <span style={{ position: 'absolute', top: '6px', left: '8px', fontSize: '10px', color: GOLD }}>
-                {skill.key}
-              </span>
-              <skill.icon size={22} color={skill.accent} />
-              <span style={{ marginTop: '4px', fontSize: '9px', color: '#eaf7f4', fontWeight: '700', letterSpacing: '0.04em' }}>
-                {skill.label}
-              </span>
-            </div>
-          ))}
-        </div>
+      {/* ── 스킬 퀵슬롯 바 (데스크탑) ── */}
+      {!isMobile && skillHotbar && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '22px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            pointerEvents: 'auto',
+            zIndex: 100,
+          }}
+        >
+          <Suspense fallback={null}>
+            <SkillHotbar
+              slots={skillHotbar.slots}
+              getCooldownFraction={skillHotbar.getCooldownFraction}
+              canUse={skillHotbar.canUse}
+              onSlotDrop={skillHotbar.setSlot}
+              mp={localMp}
+              maxMp={myStats?.maxMp ?? 100}
+              isMobile={false}
+            />
+          </Suspense>
 
-        <div style={{ width: '1px', height: '60px', background: BORDER_COLOR, opacity: 0.5 }} />
-
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {quickItems.map((item) => (
-            <div
-              key={item.key}
-              style={{
-                width: '60px',
-                height: '60px',
-                background: PANEL_BG,
-                border: `1px solid ${BORDER_COLOR}`,
-                borderRadius: '14px',
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px',
-              }}
-            >
-              <span style={{ position: 'absolute', top: '2px', left: '4px', fontSize: '9px', color: '#888' }}>
-                {item.key}
-              </span>
-              {item.icon}
-              {item.count > 0 && (
-                <span style={{ position: 'absolute', bottom: '2px', right: '4px', fontSize: '10px', color: GOLD, fontWeight: 'bold' }}>
-                  {item.count}
-                </span>
-              )}
-            </div>
-          ))}
+          {/* 스킬 패널 토글 버튼 */}
+          <button
+            onClick={() => setShowSkillPanel(prev => !prev)}
+            title="스킬 목록"
+            style={{
+              background: showSkillPanel ? 'rgba(60,100,80,0.85)' : 'rgba(16,26,20,0.75)',
+              border: `1px solid ${showSkillPanel ? 'rgba(100,210,150,0.55)' : 'rgba(80,110,90,0.35)'}`,
+              borderRadius: 8,
+              color: showSkillPanel ? '#80ffb0' : '#8aaa9a',
+              fontSize: 11,
+              padding: '6px 9px',
+              cursor: 'pointer',
+              fontFamily: GAME_FONT,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            스킬 ▲
+          </button>
         </div>
-      </div>
+      )}
+
+      {/* ── 스킬 패널 (데스크탑, 토글) ── */}
+      {!isMobile && showSkillPanel && skillHotbar && (
+        <Suspense fallback={null}>
+          <SkillPanel
+            playerLevel={myStats?.level ?? 1}
+            onClose={() => setShowSkillPanel(false)}
+            isMobile={false}
+          />
+        </Suspense>
+      )}
 
       {/* ===== 이동속도 컨트롤 (우측 하단) ===== */}
       {!isMobile && <div
@@ -1151,38 +1132,37 @@ const GameOverlay = ({
               zIndex: 101,
             }}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', width: '100%' }}>
-              {utilitySkills.map((skill) => (
-                <div
-                  key={skill.key}
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '14px',
-                    background: 'linear-gradient(180deg, rgba(16,24,34,0.96), rgba(8,12,18,0.94))',
-                    border: `1px solid ${skill.accent}55`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 10px 18px rgba(0,0,0,0.25)',
+            {/* 스킬 퀵슬롯 (모바일) */}
+            {skillHotbar && (
+              <Suspense fallback={null}>
+                <SkillHotbar
+                  slots={skillHotbar.slots}
+                  getCooldownFraction={skillHotbar.getCooldownFraction}
+                  canUse={skillHotbar.canUse}
+                  onSlotDrop={skillHotbar.setSlot}
+                  onSlotPress={(idx) => {
+                    const keyMap = ['q', 'e', 'r', 'f'];
+                    onSimulateKey?.(keyMap[idx], true);
                   }}
-                >
-                  <skill.icon size={16} color={skill.accent} />
-                  <span style={{ marginTop: '2px', fontSize: '8px', color: '#dceeed', fontWeight: '700' }}>
-                    {skill.key}
-                  </span>
-                </div>
-              ))}
-            </div>
+                  onSlotRelease={(idx) => {
+                    const keyMap = ['q', 'e', 'r', 'f'];
+                    onSimulateKey?.(keyMap[idx], false);
+                  }}
+                  mp={localMp}
+                  maxMp={myStats?.maxMp ?? 100}
+                  isMobile
+                  style={{ flexWrap: 'wrap', width: '110px', justifyContent: 'flex-end' }}
+                />
+              </Suspense>
+            )}
 
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '10px', width: '100%' }}>
               <button
                 onClick={onAutoModeToggle}
                 style={{
-                  width: '58px',
-                  height: '58px',
-                  borderRadius: '18px',
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '16px',
                   border: `1px solid ${isAutoMode ? 'rgba(255,170,68,0.8)' : BORDER_COLOR}`,
                   background: isAutoMode ? 'linear-gradient(180deg, rgba(255,140,55,0.25), rgba(120,40,10,0.88))' : 'linear-gradient(180deg, rgba(12,18,26,0.96), rgba(6,10,16,0.94))',
                   boxShadow: isAutoMode ? '0 12px 26px rgba(255,140,55,0.28)' : '0 10px 18px rgba(0,0,0,0.24)',
@@ -1196,39 +1176,9 @@ const GameOverlay = ({
                   fontFamily: GAME_FONT,
                 }}
               >
-                <Sword size={17} color={isAutoMode ? '#ffd39d' : '#9db7b2'} />
+                <Sword size={16} color={isAutoMode ? '#ffd39d' : '#9db7b2'} />
                 <span style={{ fontSize: '8px', fontWeight: '700' }}>{isAutoMode ? '자동ON' : '자동'}</span>
-                <span style={{ fontSize: '7px', color: GOLD }}>Z</span>
               </button>
-
-              <div
-                onPointerDown={() => onSimulateKey('r', true)}
-                onPointerUp={() => onSimulateKey('r', false)}
-                onPointerCancel={() => onSimulateKey('r', false)}
-                onPointerLeave={() => onSimulateKey('r', false)}
-                style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '24px',
-                  background: 'radial-gradient(circle at 30% 30%, rgba(255,150,110,0.98), rgba(214,45,32,0.86))',
-                  border: '1px solid rgba(255,221,185,0.34)',
-                  boxShadow: '0 14px 32px rgba(214,45,32,0.42)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  touchAction: 'none',
-                  position: 'relative',
-                }}
-              >
-                <Flame size={30} color="#fff4db" />
-                <span style={{ marginTop: '4px', fontSize: '10px', color: '#fff8ef', fontWeight: '800', letterSpacing: '0.08em' }}>
-                  BURST
-                </span>
-                <span style={{ position: 'absolute', top: '8px', right: '10px', fontSize: '10px', color: '#ffe0b5', fontWeight: '700' }}>
-                  R
-                </span>
-              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', width: '100%' }}>
@@ -1448,7 +1398,7 @@ const GameOverlay = ({
                 </div>
                 <button onClick={() => setMoveSpeed(p => Math.min(50, p + 5))} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER_COLOR}`, color: ACCENT, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
-              <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', margin: '12px 0 7px' }}>GROUND DIR</div>
+              <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', margin: '4px 0 7px' }}>GROUND DIR</div>
               <select
                 value={groundTextureFolder}
                 onChange={(event) => setGroundTextureFolder(event.target.value)}
@@ -1699,6 +1649,7 @@ const GameOverlay = ({
           <GameCodex onClose={() => setShowCodex(false)} />
         </Suspense>
       )}
+
     </div>
   );
 };

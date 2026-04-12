@@ -56,49 +56,100 @@ STEPS           = 25
 CFG             = 7.0
 SAMPLER         = "dpm_2_ancestral"
 SCHEDULER       = "karras"
-MASK_FEATHER    = 0    # 경계 선명하게 (blur 없음)
+MASK_FEATHER    = 0
 
 # 지리 좌표 → 미터 (서울 기준, mapConfig.js 동일)
 LAT_TO_M = 110940
 LNG_TO_M = 88200
 
 # 스케일
-METERS_PER_PIXEL = 0.5   # 1px = 0.5m
-MAX_ASPECT       = 3.0   # 이 비율 초과하면 타일로 분할
+METERS_PER_PIXEL = 0.5
+MAX_ASPECT       = 3.0
 TARGET_PIXELS    = 512 * 512
-MAX_IMAGE_SIZE   = 768   # SD 1.5 최적 (512~768)
+MAX_IMAGE_SIZE   = 1024
 
+# rpg_v5 황금 세팅 (partition_tex_00074 퀄리티 기준 — 이전 성공 프롬프트 그대로 복원)
+# 핵심: "seamless tileable" + "overhead 90 degrees" → rpg_v5가 씬을 풍부하게 그림
 STYLE_PREFIX = (
-    "top-down RPG game map tile, directly overhead view, "
-    "flat ground surface texture only, no walls, no vertical elements, "
-    "fantasy korean village, "
-    "stone floor, clay roof tiles from above, cobblestone, packed earth, moss, "
-    "2D RPG game art style, painterly, rich warm colors, detailed"
+    "top-down RPG game texture, bird's eye view, overhead 90 degrees, "
+    "fantasy medieval korean village ground, "
+    "detailed floor texture, seamless tileable, "
+    "cobblestone paths, stone tiles, moss, grass patches, dirt roads, "
+    "rpg game asset, high quality 2D game art, "
+    "rich colors, painterly style, detailed environment"
 )
 STYLE_NEGATIVE = (
-    "blurry, low quality, watermark, text, "
-    "humans, characters, animals, vehicles, "
+    "blurry, low quality, watermark, text, signature, "
+    "humans, characters, animals, vehicles, UI, "
     "3D render, photorealistic, modern, sci-fi, "
-    "perspective view, isometric, angled view, side view, "
-    "walls, vertical surfaces, building facade, interior, room, "
-    "dark, muddy, washed out, empty space, blank areas, white background"
+    "isometric, side view, perspective view, "
+    "dark, muddy colors, washed out, oversaturated, "
+    "empty space, blank areas, white background"
 )
 
-# 랜드유즈/테마 → 바닥 텍스처 변환 힌트
-# DB append 대신 또는 보완으로 사용
+# ── 레퍼런스 스타일 프리셋 ──────────────────────────────────────────────────
+# --style village : 이미지1 기준 — rpg_v5 아이소메트릭 판타지 한국 마을
+# --style nature  : 이미지2 기준 — sdxl overhead 자연 씬 (바위+돌길+나무)
+
+STYLE_PRESETS: dict[str, dict] = {
+    # 이미지1 기준: rpg_v5 아이소메트릭 45° 한국 판타지 마을
+    "village": {
+        "checkpoint": "rpg_v5.safetensors",
+        "steps": 35, "cfg": 7.5, "sampler": "dpm_2_ancestral", "scheduler": "karras",
+        "positive": (
+            "isometric 45 degree top-down view fantasy korean village, "
+            "traditional wooden buildings rooftops and facades visible from above, "
+            "cobblestone streets between houses, large oak trees, "
+            "warm golden afternoon lighting, vibrant colors, "
+            "hand-painted RPG game art style, high detail, rich environment, "
+            "overhead isometric angle, bird's eye diagonal view"
+        ),
+        "negative": (
+            "blurry, low quality, watermark, text, ui, signature, "
+            "humans, characters, animals, vehicles, "
+            "photorealistic, modern, sci-fi, "
+            "circular pattern, mandala, medallion, ornament, symbol, "
+            "street level, first person, side view, side-scrolling, horizon, panorama, "
+            "dark background, empty space, black border"
+        ),
+    },
+    # 이미지2 기준: sdxl overhead 자연씬 (바위+돌길+나무, 70-80° 내려다보기)
+    "nature": {
+        "checkpoint": "sd_xl_base_1.0.safetensors",
+        "steps": 35, "cfg": 7.0, "sampler": "euler", "scheduler": "karras",
+        "positive": (
+            "bird's eye overhead view looking down, fantasy forest clearing, "
+            "large granite boulders seen from above, stone pathway winding through, "
+            "lush green grass and clover ground cover, ancient tree canopy and roots from above, "
+            "dappled sunlight on ground, high quality painterly 3D art, "
+            "fantasy RPG environment, aerial top-down shot, overhead perspective, rich detail"
+        ),
+        "negative": (
+            "blurry, low quality, watermark, text, ui, signature, "
+            "humans, characters, animals, vehicles, "
+            "modern, sci-fi, "
+            "circular pattern, mandala, medallion, ornament, symbol, "
+            "street level, first person, side view, side-scrolling, horizon, panorama, "
+            "interior, dark background, empty space, black border, solid fill"
+        ),
+    },
+}
+
+# 현재 활성 스타일 (None = 기본 DB 기반)
+_ACTIVE_STYLE: str | None = None
+
+# theme/landuse → 씬 묘사 (overhead view 중심, rpg_v5가 씬을 풍부하게 그리도록 유도)
 FLOOR_CONTEXT: dict[str, str] = {
-    # landuse_code 값
-    "RESIDENTIAL":          "overhead view of densely packed korean rooftops, clay tile roofs, concrete flat roofs, small inner courtyards from above, varied warm roof colors",
-    "COMMERCIAL":           "overhead view of market district, stone and tile paving, merchant stall rooftops, worn cobblestone paths from above",
-    "INDUSTRIAL":           "overhead view of industrial block, corrugated metal roofing, concrete slabs, pipes and storage tanks from above",
-    "PARK":                 "overhead view of park ground, lush grass, stone garden paths, flower beds, gravel walkways",
-    "MIXED":                "overhead view of mixed district, varied rooftop textures, stone paths and green patches",
-    # theme_code 값
-    "RESIDENTIAL_ZONE":     "overhead view of korean residential rooftops, dense clay tile roofs, narrow alleys between buildings, small rooftop gardens, concrete walkways",
-    "COMMERCIAL_ZONE":      "overhead view of commercial district rooftops, flat concrete roofs, signboard frames, stone floor paths between buildings",
-    "ACADEMY_SANCTUM":      "overhead view of korean academy stone floor, worn grey flagstone tiles, moss between paving stones, stone courtyard from above",
-    "SANCTUARY":            "overhead view of shrine stone paving, ceremonial tile patterns, sacred earth and moss, stone lantern bases",
-    "GREEN_ZONE":           "overhead view of park and garden ground, grass lawn, stone stepping paths, tree canopy tops, flower patches",
+    "RESIDENTIAL":      "overhead view of densely packed korean rooftops, clay tile roofs, concrete flat roofs, small inner courtyards from above, varied warm roof colors",
+    "COMMERCIAL":       "overhead view of market district, stone and tile paving, merchant stall rooftops, worn cobblestone paths from above",
+    "INDUSTRIAL":       "overhead view of industrial block, corrugated metal roofing, concrete slabs, pipes and storage tanks from above",
+    "PARK":             "overhead view of park ground, lush grass, stone garden paths, flower beds, gravel walkways",
+    "MIXED":            "overhead view of mixed district, varied rooftop textures, stone paths and green patches",
+    "RESIDENTIAL_ZONE": "overhead view of korean residential rooftops, dense clay tile roofs, narrow alleys between buildings, small rooftop gardens, concrete walkways",
+    "COMMERCIAL_ZONE":  "overhead view of commercial district rooftops, flat concrete roofs, signboard frames, stone floor paths between buildings",
+    "ACADEMY_SANCTUM":  "overhead view of korean academy stone floor, worn grey flagstone tiles, moss between paving stones, stone courtyard from above",
+    "SANCTUARY":        "overhead view of shrine stone paving, ceremonial tile patterns, sacred earth and moss, stone lantern bases",
+    "GREEN_ZONE":       "overhead view of park and garden ground, grass lawn, stone stepping paths, tree canopy tops, flower patches",
 }
 
 # persona → 프롬프트 힌트 (image_prompt_append가 없을 때 fallback)
@@ -356,6 +407,10 @@ def check_comfyui() -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 def make_positive(area_prompt: str, group_prompt: str, extra: str = "",
                   persona_tag: str = "", theme: str = "", landuse: str = "") -> str:
+    # --style 프리셋이 활성화된 경우: DB 페르소나/테마 무시, 프리셋 프롬프트 직접 사용
+    if _ACTIVE_STYLE:
+        return STYLE_PRESETS[_ACTIVE_STYLE]["positive"]
+
     parts = [STYLE_PREFIX]
 
     # 그룹 프롬프트 (지역 분위기)
@@ -379,6 +434,10 @@ def make_positive(area_prompt: str, group_prompt: str, extra: str = "",
 
 
 def make_negative(area_neg: str, group_neg: str) -> str:
+    # --style 프리셋이 활성화된 경우: 프리셋 네거티브 사용
+    if _ACTIVE_STYLE:
+        return STYLE_PRESETS[_ACTIVE_STYLE]["negative"]
+
     parts = [STYLE_NEGATIVE]
     for n in [area_neg, group_neg]:
         if n and n.strip():
@@ -433,8 +492,6 @@ async def generate_one(
     is_tiled = repeat_x > 1.05 or repeat_y > 1.05
 
     scale_hint = f"seamless tileable ground texture, tile covers {tile_w_m:.0f}m x {tile_h_m:.0f}m"
-    if is_tiled:
-        scale_hint += f", tiles {repeat_x:.1f}x{repeat_y:.1f} times to fill area"
     pos_full = positive + f", {scale_hint}"
 
     tile_info = f" (tile {tile_w_m:.0f}m×{tile_h_m:.0f}m, repeat {repeat_x:.1f}×{repeat_y:.1f})" if is_tiled else ""
@@ -695,10 +752,22 @@ if __name__ == "__main__":
     parser.add_argument("--blank", action="store_true",
                         help="--outline-only와 함께: 기존 이미지 삭제 후 빈 배경에 outline만 그림")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--checkpoint", default=CHECKPOINT_NAME)
+    parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--style", choices=["village", "nature"], default=None,
+                        help="레퍼런스 스타일 프리셋 (DB 페르소나 무시). village=아이소메트릭 마을, nature=overhead 자연씬")
     args = parser.parse_args()
 
-    if args.checkpoint != CHECKPOINT_NAME:
+    # --style 프리셋 적용: 모듈 레벨 설정 덮어쓰기 (if __name__ 블록은 모듈 레벨이라 global 불필요)
+    if args.style:
+        _ACTIVE_STYLE = args.style
+        p = STYLE_PRESETS[args.style]
+        CHECKPOINT_NAME = p["checkpoint"]
+        STEPS      = p["steps"]
+        CFG        = p["cfg"]
+        SAMPLER    = p["sampler"]
+        SCHEDULER  = p["scheduler"]
+        print(f"[STYLE] '{args.style}' 프리셋 적용: {CHECKPOINT_NAME}, steps={STEPS}, cfg={CFG}")
+    elif args.checkpoint:
         CHECKPOINT_NAME = args.checkpoint
 
     if not args.outline_only and not check_comfyui():

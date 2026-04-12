@@ -6,12 +6,11 @@
  *  showGroupArea    — 그룹별 fill + 면적(m²) 라벨
  *  showPartitionFill— 개별 파티션 landuse 색 fill + 경계선
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Html } from '@react-three/drei';
 
-import worldApi from '@api/world';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
 // ── 좌표 변환 ─────────────────────────────────────────────────────────────────
@@ -169,24 +168,13 @@ const labelBox = (borderColor) => ({
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════════════════════
 const GroupColorOverlay = ({
-  currentDong,
+  partitions = [],
   showGroupColors = false,
   showGroupArea = false,
   showPartitionFill = false,
   elevation = 0.36,
 }) => {
-  const [partitions, setPartitions] = useState([]);
-
   const anyVisible = showGroupColors || showGroupArea || showPartitionFill;
-
-  useEffect(() => {
-    if (!anyVisible || !currentDong?.id) { setPartitions([]); return; }
-    let cancelled = false;
-    worldApi.getDongPartitions(currentDong.id)
-      .then((res) => { if (!cancelled) setPartitions(Array.isArray(res.data) ? res.data : []); })
-      .catch(() => { if (!cancelled) setPartitions([]); });
-    return () => { cancelled = true; };
-  }, [anyVisible, currentDong?.id]);
 
   // ── 그룹별 데이터 ────────────────────────────────────────────────────────
   const groupData = useMemo(() => {

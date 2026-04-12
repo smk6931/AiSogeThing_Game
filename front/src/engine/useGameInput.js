@@ -3,21 +3,23 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 // 입력 상태 관리 훅 (키보드 + 조이스틱 통합)
 export const useGameInput = () => {
   const [input, setInput] = useState({ x: 0, y: 0, isMoving: false, source: 'keyboard' });
-  const [keys, setKeys] = useState({ w: false, a: false, s: false, d: false, r: false });
+  const [keys, setKeys] = useState({ w: false, a: false, s: false, d: false, q: false, e: false, r: false, f: false });
   const joystickActiveRef = useRef(false);
 
   // 키보드 이벤트 리스너
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 채팅/인풋 포커스 중 스킬키 무시
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       const key = e.key.toLowerCase();
-      if (['w', 'a', 's', 'd', 'r'].includes(key)) {
+      if (['w', 'a', 's', 'd', 'q', 'e', 'r', 'f'].includes(key)) {
         setKeys(prev => prev[key] === true ? prev : { ...prev, [key]: true });
       }
     };
 
     const handleKeyUp = (e) => {
       const key = e.key.toLowerCase();
-      if (['w', 'a', 's', 'd', 'r'].includes(key)) {
+      if (['w', 'a', 's', 'd', 'q', 'e', 'r', 'f'].includes(key)) {
         setKeys(prev => prev[key] === false ? prev : { ...prev, [key]: false });
       }
     };
@@ -80,7 +82,12 @@ export const useGameInput = () => {
     setSkillInput({ x: 0, y: 0, active: false });
   }, []);
 
-  const actions = { skill1: keys.r || skillInput.active };
+  const actions = {
+    skill1: keys.q || skillInput.active, // Q — 슬롯 1
+    skill2: keys.e,                       // E — 슬롯 2
+    skill3: keys.r,                       // R — 슬롯 3
+    skill4: keys.f,                       // F — 슬롯 4
+  };
 
   const simulateKey = useCallback((key, pressed) => {
     setKeys(prev => prev[key] === pressed ? prev : { ...prev, [key]: pressed });

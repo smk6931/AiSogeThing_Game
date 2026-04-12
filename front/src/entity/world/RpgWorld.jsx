@@ -9,15 +9,18 @@ import RemotePlayer from '@entity/player/RemotePlayer';
 import { useAuth } from '@contexts/AuthContext';
 import { PunchProjectile } from '@entity/player/projectile/PunchProjectile';
 import { MagicOrbProjectile } from '@entity/player/projectile/MagicOrbProjectile';
+import { LightningBoltProjectile } from '@entity/player/projectile/LightningBoltProjectile';
+import { FrostNovaEffect } from '@entity/player/projectile/FrostNovaEffect';
 import Monster from '@entity/monster/Monster';
 import { DamageNumber } from '@entity/monster/DamageNumber';
-import { useAutoAttack } from '@hooks/useAutoAttack';
+import { useSkillRotation } from '@hooks/useSkillRotation';
 import { useAutoFarm } from '@hooks/useAutoFarm';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 import CameraRig from '@entity/world/CameraRig';
 import CullRadiusIndicator from '@entity/world/CullRadiusIndicator';
+import worldApi from '@api/world';
 
 const MapTiles = lazy(() => import('@entity/world/MapTiles'));
 const ZoneOverlay = lazy(() => import('@entity/world/ZoneOverlay'));
@@ -50,6 +53,7 @@ const RpgWorld = ({
   monsters = {},
   spawnPosition,
   sendHit,
+  skillHotbar = null,
   mapSettings = {},
   orbitRef,
   onMonsterClick,
@@ -139,9 +143,13 @@ const RpgWorld = ({
   const [currentDongId, setCurrentDongId] = useState(null);
   const [currentDong, setCurrentDong] = useState(null);
   const [worldLoadStage, setWorldLoadStage] = useState(0);
+  // 파티션 데이터: PartitionBoundaryOverlay + GroupColorOverlay 공유 (dong당 1회 fetch)
+  const [sharedPartitions, setSharedPartitions] = useState([]);
   const [, setTick] = useState(0);
   const [selectedTargetId, setSelectedTargetId] = useState(null);
+  const selectedTargetIdRef = useRef(null);
   const [damageNumbers, setDamageNumbers] = useState([]);
+
 
   const playerRef = useRef();
   const projectilePositions = useRef({});
@@ -158,6 +166,10 @@ const RpgWorld = ({
   const { user } = useAuth();
   const { districts, getDistrictAt } = useSeoulDistricts();
   const { getDongAt } = useSeoulDongs();
+
+  // 스킬 퀵슬롯 — GameEntry에서 주입
+  const useSkill = skillHotbar?.useSkill ?? (() => null);
+  const skillSlots = skillHotbar?.slots ?? ['magic_orb', 'pyramid_punch', 'lightning_bolt', 'frost_nova'];
 
   const debuggerControls = useMemo(() => ({
     mode: controlMode,
@@ -222,6 +234,9 @@ const RpgWorld = ({
     }
   }, [playerDamageEvents]);
 
+  // selectedTargetIdRef 최신값 유지 (useSkillRotation stale closure 방지)
+  useEffect(() => { selectedTargetIdRef.current = selectedTargetId; }, [selectedTargetId]);
+
   // 타겟 몬스터 사망 시 자동 해제
   useEffect(() => {
     if (!selectedTargetId) return;
@@ -258,20 +273,34 @@ const RpgWorld = ({
     range: autoFarmRange,
   });
 
-  // 자동 공격 훅
-  useAutoAttack({
-    targetMonsterId: selectedTargetId,
-    monstersRef,
+  // 자동사냥 스킬 순환 — 슬롯 0~2를 쿨다운 기반으로 자동 발사 (frost_nova 제외)
+  useSkillRotation({
+    isAutoMode,
+    skillHotbar,
     playerRef,
+    selectedTargetIdRef,
+    monstersRef,
     addProjectile,
-    attackRange: autoAttackRange,
   });
 
   useEffect(() => {
+    // 마지막으로 체크한 위치 추적 — 5m 이내 이동 시 polygon 연산 스킵
+    const lastChecked = { x: null, z: null };
+    const MOVE_THRESHOLD_SQ = 25; // 5m²
+
     const interval = setInterval(() => {
       if (!playerRef.current) return;
 
       const { x, z } = playerRef.current.position;
+
+      // 거의 안 움직였으면 polygon 연산 생략
+      if (
+        lastChecked.x !== null &&
+        (x - lastChecked.x) ** 2 + (z - lastChecked.z) ** 2 < MOVE_THRESHOLD_SQ
+      ) return;
+      lastChecked.x = x;
+      lastChecked.z = z;
+
       const lat = GIS_ORIGIN.lat - (z / LAT_TO_M);
       const lng = GIS_ORIGIN.lng + (x / LNG_TO_M);
 
@@ -279,16 +308,14 @@ const RpgWorld = ({
       if (nextDistrict && nextDistrict.id !== currentDistrictId) {
         setCurrentDistrictId(nextDistrict.id);
         setCurrentDistrict(nextDistrict);
-        console.log(`[RpgWorld] district changed: ${nextDistrict.name}`);
       }
 
       const nextDong = getDongAt(lat, lng);
       if (nextDong && nextDong.id !== currentDongId) {
         setCurrentDongId(nextDong.id);
         setCurrentDong(nextDong);
-        console.log(`[RpgWorld] dong changed: ${nextDong.name}`);
       }
-    }, 1000);
+    }, 1500);
 
     return () => clearInterval(interval);
   }, [currentDistrictId, currentDongId, getDistrictAt, getDongAt]);
@@ -301,20 +328,28 @@ const RpgWorld = ({
     return () => timers.forEach(window.clearTimeout);
   }, [currentDistrictId, currentDongId]);
 
+  // 파티션 데이터 단일 fetch — PartitionBoundaryOverlay + GroupColorOverlay 공유
+  useEffect(() => {
+    if (!currentDong?.id) { setSharedPartitions([]); return; }
+    let cancelled = false;
+    worldApi.getDongPartitions(currentDong.id)
+      .then((res) => { if (!cancelled) setSharedPartitions(Array.isArray(res.data) ? res.data : []); })
+      .catch(() => { if (!cancelled) setSharedPartitions([]); });
+    return () => { cancelled = true; };
+  }, [currentDong?.id]);
+
+  // playerScale은 ref로 관리 — 스케일 변경이 전체 몬스터 리스트 재계산을 유발하지 않도록
+  const monsterScaleRef = useRef(debugConfig.playerScale);
+  monsterScaleRef.current = debugConfig.playerScale;
+
   const visibleMonsterElements = useMemo(() => {
     const monsterKeys = Object.keys(monsters);
     if (monsterKeys.length === 0) return null;
 
-    const playerPos = playerRef.current?.position;
-
+    // 서버가 이미 반경 내 몬스터만 전송하므로 클라이언트 컬링은 최소화
     return monsterKeys.map((key) => {
       const monster = monsters[key];
       if (!monster?.position) return null;
-
-      if (playerPos) {
-        const distSq = (monster.position.x - playerPos.x) ** 2 + (monster.position.z - playerPos.z) ** 2;
-        if (distSq > MONSTER_CULL_SQ) return null;
-      }
 
       return (
         <group key={monster.id} onClick={(event) => { event.stopPropagation(); handleMonsterClick(monster); }}>
@@ -326,14 +361,14 @@ const RpgWorld = ({
             state={monster.state}
             modelPath={monster.modelPath || null}
             tier={monster.tier || 'normal'}
-            scale={debugConfig.playerScale}
+            scale={monsterScaleRef.current}
             isTargeted={String(selectedTargetId) === String(monster.id)}
             onInfoClick={() => handleMonsterInfoClick(monster)}
           />
         </group>
       );
     });
-  }, [monsters, selectedTargetId, handleMonsterClick, handleMonsterInfoClick, debugConfig.playerScale]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [monsters, selectedTargetId, handleMonsterClick, handleMonsterInfoClick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleProjectileUpdate = (id, pos) => {
     projectilePositions.current[id] = pos;
@@ -351,8 +386,10 @@ const RpgWorld = ({
     if (projectiles.length === 0 || Object.keys(monsters).length === 0) return;
 
     projectiles.forEach((projectile) => {
-      // magic_orb는 컴포넌트 내부에서 자체 충돌 처리
+      // magic_orb, lightning_bolt, frost_nova는 컴포넌트 내부에서 자체 충돌 처리
       if (projectile.type === 'magic_orb') return;
+      if (projectile.type === 'lightning_bolt') return;
+      if (projectile.type === 'frost_nova') return;
       if (projectile.isRemote) return;
       const currentPos = projectilePositions.current[projectile.id] || projectile.position;
       if (!currentPos) return;
@@ -600,7 +637,7 @@ const RpgWorld = ({
       {worldLoadStage >= 1 && (
         <Suspense fallback={null}>
           <PartitionBoundaryOverlay
-            currentDong={currentDong}
+            partitions={sharedPartitions}
             visibleMicro={showMicroBoundaries || showGroupArea || showGroupColors}
             visibleGroup={showGroupBoundaries || showGroupArea || showGroupColors}
             highlightCurrentGroup={highlightCurrentGroup}
@@ -615,7 +652,7 @@ const RpgWorld = ({
       {worldLoadStage >= 1 && (showGroupColors || showGroupArea || showPartitionFill) && (
         <Suspense fallback={null}>
           <GroupColorOverlay
-            currentDong={currentDong}
+            partitions={sharedPartitions}
             showGroupColors={showGroupColors}
             showGroupArea={showGroupArea}
             showPartitionFill={showPartitionFill}
@@ -666,15 +703,35 @@ const RpgWorld = ({
         zoomLevel={zoomLevel}
         scale={debugConfig.playerScale}
         nickname={user?.nickname}
-        onAction={(pos, rot) => {
-          const params = { startPos: { x: pos.x, y: pos.y + 1.5, z: pos.z }, playerRot: rot };
-          addProjectile({ ...params, side: 'left' });
-          addProjectile({ ...params, side: 'right' });
-          sendSkill?.({
-            skillName: 'pyramid_punch',
-            startPos: { x: pos.x, y: pos.y + 1.5, z: pos.z },
-            playerRot: rot,
-          });
+        onAction={(slotIdx, pos, rot) => {
+          const skillId = useSkill(slotIdx);
+          if (!skillId) return; // 쿨다운/MP 부족
+
+          const startPos = { x: pos.x, y: pos.y + 1.5, z: pos.z };
+
+          if (skillId === 'pyramid_punch') {
+            addProjectile({ type: 'pyramid_punch', startPos, playerRot: rot, side: 'left' });
+            addProjectile({ type: 'pyramid_punch', startPos, playerRot: rot, side: 'right' });
+            sendSkill?.({ skillName: 'pyramid_punch', startPos, playerRot: rot });
+          } else if (skillId === 'lightning_bolt') {
+            addProjectile({ type: 'lightning_bolt', startPos, playerRot: rot });
+            sendSkill?.({ skillName: 'lightning_bolt', startPos, playerRot: rot });
+          } else if (skillId === 'frost_nova') {
+            addProjectile({ type: 'frost_nova', position: pos });
+            sendSkill?.({ skillName: 'frost_nova' });
+            // AoE 피격은 FrostNovaEffect 내부에서 sendHit 호출
+          } else if (skillId === 'magic_orb') {
+            // magic_orb는 타겟 필요 — 타겟 있을 때만
+            if (selectedTargetId && monsters[selectedTargetId]) {
+              const m = monsters[selectedTargetId];
+              addProjectile({
+                type: 'magic_orb',
+                startPos,
+                targetPos: { x: m.position.x, y: 1.5, z: m.position.z },
+                targetMonsterId: selectedTargetId,
+              });
+            }
+          }
         }}
         chat={user && latestChatMap ? latestChatMap[user.id] : null}
       />
@@ -688,6 +745,29 @@ const RpgWorld = ({
               remove={handleRemoveProjectile}
               sendHit={sendHit}
               {...projectile}
+            />
+          );
+        }
+        if (projectile.type === 'lightning_bolt') {
+          return (
+            <LightningBoltProjectile
+              key={projectile.id}
+              id={projectile.id}
+              remove={handleRemoveProjectile}
+              sendHit={sendHit}
+              monsters={projectile.isRemote ? {} : monsters}
+              {...projectile}
+            />
+          );
+        }
+        if (projectile.type === 'frost_nova') {
+          return (
+            <FrostNovaEffect
+              key={projectile.id}
+              id={projectile.id}
+              remove={handleRemoveProjectile}
+              sendHit={projectile.isRemote ? null : sendHit}
+              position={projectile.position || projectile.startPos || { x: 0, y: 0, z: 0 }}
             />
           );
         }

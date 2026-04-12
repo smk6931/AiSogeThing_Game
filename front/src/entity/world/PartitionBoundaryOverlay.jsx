@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import worldApi from '@api/world';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from './mapConfig';
 
 const gpsToXZ = (lat, lng) => ({
@@ -82,7 +81,7 @@ const buildGroupBoundaryGeometry = (partitions, height = 2.5, thickness = 3.0) =
 };
 
 const PartitionBoundaryOverlay = ({
-  currentDong,
+  partitions = [],
   visibleMicro = false,
   visibleGroup = false,
   highlightCurrentGroup = true,
@@ -91,30 +90,6 @@ const PartitionBoundaryOverlay = ({
   elevation = 0.42,
   microOpacity = 0.24,
 }) => {
-  const [partitions, setPartitions] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      if ((!visibleMicro && !visibleGroup && !highlightCurrentGroup) || !currentDong?.id) {
-        setPartitions([]);
-        return;
-      }
-
-      try {
-        const res = await worldApi.getDongPartitions(currentDong.id);
-        if (!cancelled) setPartitions(Array.isArray(res.data) ? res.data : []);
-      } catch (_) {
-        if (!cancelled) setPartitions([]);
-      }
-    };
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [visibleMicro, visibleGroup, highlightCurrentGroup, currentDong?.id]);
 
   const microMeshes = useMemo(
     () =>

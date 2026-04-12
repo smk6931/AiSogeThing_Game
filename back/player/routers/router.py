@@ -113,9 +113,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                     last_sync = player.get("_last_monster_sync_pos")
                     moved_far = (
                         last_sync is None or
-                        (px - last_sync[0]) ** 2 + (pz - last_sync[1]) ** 2 >= 225
+                        (px - last_sync[0]) ** 2 + (pz - last_sync[1]) ** 2 >= 625  # 25m
                     )
-                    if moved_far or (now_ts - player.get("_last_monster_sync_time", 0)) >= 2.0:
+                    if moved_far or (now_ts - player.get("_last_monster_sync_time", 0)) >= 3.0:
                         player["_last_monster_sync_pos"] = (px, pz)
                         player["_last_monster_sync_time"] = now_ts
                         await _send_visible_monsters(websocket, player)
@@ -136,8 +136,44 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, nickname: str):
                 )
 
             elif msg_type == "hit_monster":
+                skill_name = data.get("skillName", "basic")
+
+                # frost_nova AoE — 서버에서 반경 내 전체 처리
+                if skill_name == "frost_nova":
+                    aoe_result = await player_service.handle_frost_nova(
+                        user_id, player_manager, monster_manager
+                    )
+                    if not aoe_result.get("ok"):
+                        continue
+                    hits = aoe_result.get("hits", [])
+                    if hits:
+                        # 맞은 몬스터 전체 브로드캐스트
+                        await player_manager.broadcast_nearby(
+                            {"type": "frost_nova_hits",
+                             "attackerId": user_id,
+                             "hits": hits,
+                             "killedIds": aoe_result.get("killed_ids", [])},
+                            origin_user_id=user_id,
+                            radius=player_manager.skill_sync_radius,
+                            include_self=True,
+                        )
+                    reward_result = aoe_result.get("reward_result")
+                    if reward_result:
+                        player = player_manager.get_player(user_id)
+                        if player:
+                            await player["socket"].send_json({
+                                "type": "player_reward",
+                                "monsterId": -1,
+                                "expGained": reward_result["expGained"],
+                                "goldGained": reward_result["goldGained"],
+                                "leveledUp": reward_result["leveledUp"],
+                                "stats": reward_result["stats"],
+                            })
+                    continue
+
+                # 단일 타겟 스킬 (기존 로직)
                 result = await player_service.handle_hit(
-                    user_id, data.get("monsterId"), data.get("skillName", "basic"),
+                    user_id, data.get("monsterId"), skill_name,
                     player_manager, monster_manager,
                 )
                 if not result.get("ok"):

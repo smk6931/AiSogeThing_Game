@@ -103,6 +103,10 @@ export const useGameSocket = (addProjectile) => {
                     setMyStats(prev => prev ? { ...prev, hp: message.hp } : prev);
                     break;
 
+                case 'mp_regen':
+                    setMyStats(prev => prev ? { ...prev, mp: message.mp, maxMp: message.maxMp } : prev);
+                    break;
+
                 case 'player_reward':
                     setMyStats(message.stats);
                     if (message.goldGained > 0) {
@@ -116,36 +120,37 @@ export const useGameSocket = (addProjectile) => {
                     }
                     break;
 
-                // [NEW] 다른 유저의 스킬 사용 수신
+                // 다른 유저의 스킬 사용 수신
                 case 'skill':
                     if (addProjectile) {
                         const skillData = message.data;
 
-                        // ★ 스킬 종류에 따른 처리 분기
                         if (skillData.skillName === 'pyramid_punch') {
-                            // 피라미드 펀치는 양손(Left/Right) 두 번 생성해야 함
-                            addProjectile({
-                                ...skillData,
-                                id: crypto.randomUUID(),
-                                side: 'left',
-                                isRemote: true
-                            });
-                            addProjectile({
-                                ...skillData,
-                                id: crypto.randomUUID(),
-                                side: 'right',
-                                isRemote: true
-                            });
+                            addProjectile({ ...skillData, id: crypto.randomUUID(), side: 'left',  isRemote: true });
+                            addProjectile({ ...skillData, id: crypto.randomUUID(), side: 'right', isRemote: true });
+                        } else if (skillData.skillName === 'frost_nova') {
+                            // frost_nova는 별도 AoE 이펙트 타입
+                            addProjectile({ ...skillData, type: 'frost_nova', id: crypto.randomUUID(), isRemote: true });
                         } else {
-                            // 일반 스킬 (단발)
-                            addProjectile({
-                                ...skillData,
-                                id: skillData.id || crypto.randomUUID(),
-                                isRemote: true
-                            });
+                            addProjectile({ ...skillData, id: skillData.id || crypto.randomUUID(), isRemote: true });
                         }
                     }
                     break;
+
+                // frost_nova AoE 피격 결과 — 몬스터 상태 일괄 갱신
+                case 'frost_nova_hits': {
+                    const hits = message.hits || [];
+                    const next = { ...monstersRef.current };
+                    hits.forEach(h => {
+                        const m = next[h.monsterId];
+                        if (m) {
+                            next[h.monsterId] = { ...m, hp: h.hp, maxHp: h.maxHp, state: h.state };
+                        }
+                    });
+                    monstersRef.current = next;
+                    scheduleMonsterFlush();
+                    break;
+                }
 
                 // 1. 초기 접속 시 기존 유저 목록 동기화
                 case 'sync_players':

@@ -35,10 +35,10 @@ async def get_ui_settings(user_id: int) -> dict | None:
 
 
 async def save_ui_settings(user_id: int, settings: dict) -> None:
-    """게임 UI/전투 설정 저장"""
+    """게임 UI/전투 설정 저장 (JSONB merge — 기존 키 보존, 전달한 키만 덮어씀)"""
     import json
     await execute(
-        "UPDATE char SET ui_settings = CAST(:s AS jsonb) WHERE user_id = :uid",
+        "UPDATE char SET ui_settings = COALESCE(ui_settings, '{}'::jsonb) || CAST(:s AS jsonb) WHERE user_id = :uid",
         {"uid": user_id, "s": json.dumps(settings)}
     )
 

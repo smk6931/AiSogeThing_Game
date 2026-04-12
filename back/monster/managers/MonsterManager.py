@@ -126,6 +126,36 @@ MONSTER_TEMPLATES = [
      "drops": [{"item_id": 26, "rate": 0.45, "quantity": 1}, {"item_id": 5, "rate": 0.35, "quantity": 2}, {"item_id": 27, "rate": 0.12, "quantity": 1}]},
 ]
 
+# ── Grid Bucket 공간 인덱싱 ────────────────────────────────────────────────────
+# 감지 범위(25m)보다 약간 큰 셀 크기 → 9개 인접 셀만 탐색하면 25m 반경 커버
+_GRID_CELL = 30.0
+
+
+def _build_player_grid(player_list: list) -> dict:
+    """플레이어 위치를 그리드 버킷으로 분류 — O(n)"""
+    grid: dict = {}
+    for entry in player_list:
+        uid, px, pz, defense = entry
+        key = (int(px // _GRID_CELL), int(pz // _GRID_CELL))
+        if key not in grid:
+            grid[key] = []
+        grid[key].append(entry)
+    return grid
+
+
+def _nearby_players(grid: dict, mx: float, mz: float) -> list:
+    """몬스터 위치 기준 인접 9셀 플레이어만 반환 — 평균 O(1)"""
+    cx = int(mx // _GRID_CELL)
+    cz = int(mz // _GRID_CELL)
+    result = []
+    for dcx in (-1, 0, 1):
+        for dcz in (-1, 0, 1):
+            bucket = grid.get((cx + dcx, cz + dcz))
+            if bucket:
+                result.extend(bucket)
+    return result
+
+
 class MonsterManager:
     def __init__(self):
         self.monsters: Dict[int, Monster] = {}
@@ -134,6 +164,8 @@ class MonsterManager:
         self.sync_radius = 180.0
         # 활성 스폰 template_id 목록 (None = 전체 허용)
         self.enabled_template_ids: Optional[set[int]] = None
+        # 일반 몬스터 수 캐시 — 매 루프 sum() 대신 스폰/삭제 시점에만 갱신
+        self._normal_count: int = 0
         self._spawn_all_at_start()
 
     def get_active_templates(self) -> list[dict]:
@@ -174,15 +206,16 @@ class MonsterManager:
             m.speed = tmpl["speed"]
             m.drops = tmpl.get("drops", [])
             self.monsters[m.id] = m
+            if tmpl["tier"] != "boss":
+                self._normal_count += 1
             self.next_id += 1
         print(f"Monster spawn complete: {len(MONSTER_TEMPLATES)} monsters spawned.")
 
     def spawn_random(self, count: int = 5, center_x: float = 0.0, center_z: float = 0.0):
         """죽은 일반 몬스터 보충 스폰"""
-        normal_count = sum(1 for m in self.monsters.values() if m.tier == "normal")
-        if normal_count >= 5:
+        if self._normal_count >= 5:
             return []
-        to_spawn = min(count, 5 - normal_count)
+        to_spawn = min(count, 5 - self._normal_count)
         start_id = max(self.monsters.keys()) + 1 if self.monsters else self.next_id
         normal_templates = [t for t in self.get_active_templates() if t["tier"] == "normal"]
         spawned_ids = []
@@ -207,6 +240,7 @@ class MonsterManager:
             m.speed = tmpl["speed"]
             m.drops = tmpl.get("drops", [])
             self.monsters[m.id] = m
+            self._normal_count += 1
             spawned_ids.append(m.id)
         self.next_id = start_id + to_spawn
         print(f"Respawn: {to_spawn} normal monsters.")
@@ -243,6 +277,34 @@ class MonsterManager:
             return {"ok": False, "reason": "monster_not_found"}
         return player_service.apply_hit_to_monster(self.monsters[monster_id], player_attack, skill_name)
 
+    def batch_hit(self, monster_ids: list, damage: int) -> list:
+        """여러 몬스터 일괄 피격 (frost_nova 등 AoE용). damage는 이미 계산된 최종값."""
+        results = []
+        for mid in monster_ids:
+            monster = self.monsters.get(mid)
+            if not monster or monster.state == "dead" or monster.hp <= 0:
+                continue
+            monster.hp -= damage
+            monster.state = "hit"
+            killed = monster.hp <= 0
+            if killed:
+                monster.hp = 0
+                monster.state = "dead"
+                if monster.tier != "boss":
+                    self._normal_count = max(0, self._normal_count - 1)
+            results.append({
+                "ok": True,
+                "monsterId": monster.id,
+                "damage": damage,
+                "hp": max(0, monster.hp),
+                "maxHp": monster.max_hp,
+                "state": monster.state,
+                "killed": killed,
+                "expReward": monster.exp_reward if killed else 0,
+                "goldReward": monster.gold_reward if killed else 0,
+            })
+        return results
+
     def remove_dead_monsters(self):
         dead_ids = [mid for mid, m in self.monsters.items() if m.state == "dead" and m.hp <= 0]
         for mid in dead_ids:
@@ -258,7 +320,7 @@ class MonsterManager:
             removed_monster_ids = []
             now = time.time()
 
-            # 플레이어 위치 + ID 수집
+            # 플레이어 위치 + ID 수집 → Grid Bucket 구성 (O(n))
             player_list = []  # [(user_id, x, z, defense)]
             if get_players_func:
                 for uid, pdata in get_players_func().items():
@@ -266,12 +328,11 @@ class MonsterManager:
                     defense = pdata.get("stats", {}).get("defense", 0)
                     player_list.append((uid, pos.get("x", 0), pos.get("z", 0), defense))
 
-            player_positions = [(px, pz) for _, px, pz, _ in player_list]
+            player_grid = _build_player_grid(player_list)
 
-            # 일반 몬스터 보충
-            normal_count = sum(1 for m in self.monsters.values() if m.tier != "boss")
-            if normal_count < 5:
-                spawned_ids = self.spawn_random(count=5 - normal_count)
+            # 일반 몬스터 보충 (_normal_count 캐시 사용 — O(1))
+            if self._normal_count < 5:
+                spawned_ids = self.spawn_random(count=5 - self._normal_count)
                 for mid in spawned_ids:
                     changed_monsters[mid] = self.monsters[mid].to_dict()
                 await asyncio.sleep(1)
@@ -300,19 +361,19 @@ class MonsterManager:
                         changed_monsters[m_id] = monster.to_dict()
                     continue
 
-                # 가장 가까운 플레이어 탐색 (감지 범위 내에서만)
-                DETECT_RANGE = 25.0
-                nearest_uid, nearest_dist, nearest_px, nearest_pz, nearest_def = None, float('inf'), 0, 0, 0
-                for uid, px, pz, defense in player_list:
-                    d = math.sqrt((monster.x - px) ** 2 + (monster.z - pz) ** 2)
-                    if d <= DETECT_RANGE and d < nearest_dist:
-                        nearest_dist = d
+                # 가장 가까운 플레이어 탐색 (Grid Bucket — 인접 9셀만, distSq 비교)
+                DETECT_RANGE_SQ = 625.0  # 25m²
+                nearest_uid, nearest_dist_sq, nearest_px, nearest_pz, nearest_def = None, float('inf'), 0, 0, 0
+                for uid, px, pz, defense in _nearby_players(player_grid, monster.x, monster.z):
+                    d_sq = (monster.x - px) ** 2 + (monster.z - pz) ** 2
+                    if d_sq <= DETECT_RANGE_SQ and d_sq < nearest_dist_sq:
+                        nearest_dist_sq = d_sq
                         nearest_uid = uid
                         nearest_px, nearest_pz = px, pz
                         nearest_def = defense
 
                 # 공격 범위 내 플레이어가 있으면 공격
-                if nearest_uid and nearest_dist <= monster.attack_range:
+                if nearest_uid and nearest_dist_sq <= monster.attack_range * monster.attack_range:
                     if now - monster.last_attack_time >= monster.attack_cooldown:
                         monster.last_attack_time = now
                         raw_dmg = monster.attack_power + random.randint(-2, 2)
@@ -331,7 +392,7 @@ class MonsterManager:
                 if monster.state == "idle":
                     if random.random() < 0.05:
                         monster.state = "move"
-                        if nearest_uid and nearest_dist > 3:
+                        if nearest_uid and nearest_dist_sq > 9:  # 3m² = 9
                             angle = math.atan2(nearest_pz - monster.z, nearest_px - monster.x)
                         else:
                             angle = random.uniform(0, math.pi * 2)
@@ -348,7 +409,9 @@ class MonsterManager:
                         changed_monsters[m_id] = monster.to_dict()
 
             for mid in to_delete:
-                self.monsters.pop(mid, None)
+                m = self.monsters.pop(mid, None)
+                if m and m.tier != "boss":
+                    self._normal_count = max(0, self._normal_count - 1)
                 removed_monster_ids.append(mid)
 
             if (changed_monsters or removed_monster_ids) and broadcast_func:

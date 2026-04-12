@@ -3,6 +3,7 @@ import { Joystick } from 'react-joystick-component';
 import { useGameInput } from '@engine/useGameInput';
 import { useProjectiles } from '@hooks/useProjectiles';
 import { useGameSocket } from '@engine/useGameSocket';
+import { useSkillHotbar } from '@hooks/useSkillHotbar';
 import { useCurrentRegionInfo } from '@hooks/useCurrentRegionInfo';
 import { useGameSettings } from '@hooks/useGameSettings';
 import { useIsMobile } from '@hooks/useIsMobile';
@@ -64,6 +65,19 @@ const GameEntry = () => {
 
   // 2. 소켓에 addProjectile 함수 전달 (남이 쏜 스킬 그리기용)
   const { otherPlayers, sendPosition: originalSendPosition, chatMessages, sendChatMessage, latestChatMap, myStats, setMyStats, sendSkill, monsters, sendHit, sendUseItem, droppedItems, setDroppedItems, playerDamageEvents, clearPlayerDamageEvent } = useGameSocket(addProjectile);
+
+  // 로컬 MP 상태 — 서버 myStats와 동기화, 스킬 발동 시 차감
+  const [localMp, setLocalMp] = useState(() => 100);
+  useEffect(() => {
+    if (myStats?.mp !== undefined) setLocalMp(myStats.mp);
+  }, [myStats?.mp]);
+
+  // 스킬 퀵슬롯 — 쿨다운 + MP 관리 (GameOverlay + RpgWorld 공유)
+  const skillHotbar = useSkillHotbar({
+    mp: localMp,
+    maxMp: myStats?.maxMp ?? 100,
+    onMpChange: setLocalMp,
+  });
 
   // 알림 자동 제거 (3초 후)
   useEffect(() => {
@@ -179,6 +193,8 @@ const GameEntry = () => {
           sendSkill={sendSkill}
           monsters={monsters}
           sendHit={sendHit}
+          myStats={myStats}
+          skillHotbar={skillHotbar}
           latestChatMap={latestChatMap}
           inputActions={actions}
           projectiles={projectiles}
@@ -231,6 +247,8 @@ const GameEntry = () => {
         onSettingsSave={saveToDb}
         onSettingsReset={resetSettings}
         mapSettings={mapSettings}
+        skillHotbar={skillHotbar}
+        localMp={localMp}
       />
 
       {/* ================= Monster Info Panel ================= */}

@@ -118,6 +118,7 @@ def _resolve_ground_root() -> str:
     return os.path.join(base_path, "front", "public", "ground")
 
 
+
 def _resolve_road_root() -> str:
     base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     return os.path.join(base_path, "front", "public", "road")
@@ -158,6 +159,7 @@ def _list_texture_folders(asset_root: str) -> list[str]:
         entry for entry in os.listdir(asset_root)
         if os.path.isdir(os.path.join(asset_root, entry))
     )
+
 
 
 @router.get("/block-textures")

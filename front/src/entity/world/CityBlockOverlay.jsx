@@ -11,6 +11,7 @@ const groupBoundaryCache = new Map();
 // group_key 기준 geometry 캐시 (세션 전체 유지 — 재방문 시 rebuild 없음)
 const groupGeometryCache = new Map(); // key: `${group_key}:${texCount}` → [{geo, texIdx, order}]
 
+
 const hashString = (value = '') => {
   let hash = 0;
   for (let i = 0; i < value.length; i += 1) {
@@ -263,6 +264,7 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
       texIdx = partitionTexIndexMap.get(partition.partition_key);
     } else {
       const seed = hashString([
+        partition.partition_key || '',
         partition.group_key || '',
         partition.group_theme_code || '',
         partition.texture_profile || '',
@@ -387,7 +389,8 @@ const CityBlockContent = ({
       });
     }
 
-    if (showSectorBlocks && dbGroups?.length > 0 && activeGroupKeys.size > 0) {
+    // 그룹 boundary 렌더링: currentGroupOnly 모드에서는 파티션 단위로 폴백
+    if (showSectorBlocks && dbGroups?.length > 0 && activeGroupKeys.size > 0 && !currentGroupOnly) {
       // ── 그룹 boundary 단위 렌더링 (unioned polygon 사용) ──────────────
       for (const g of dbGroups) {
         if (!activeGroupKeys.has(g.group_key)) continue;
@@ -540,15 +543,15 @@ const CityBlockOverlay = ({
     return () => { cancelled = true; };
   }, [showSectorBlocks, currentDong?.id]);
 
-  // partition별 개별 이미지 경로 추출 및 합산 텍스처 경로 구성 (hooks — early return 이전)
+  // partition별 개별 이미지 경로 추출
   const partitionUrls = useMemo(() => {
     const seen = new Set();
     const urls = [];
     for (const p of dbPartitions) {
-      if (p.texture_image_url && !seen.has(p.texture_image_url)) {
-        seen.add(p.texture_image_url);
-        urls.push(p.texture_image_url);
-      }
+      if (!p.texture_image_url) continue;
+      if (seen.has(p.texture_image_url)) continue;
+      seen.add(p.texture_image_url);
+      urls.push(p.texture_image_url);
     }
     return urls;
   }, [dbPartitions]);

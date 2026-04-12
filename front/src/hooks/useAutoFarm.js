@@ -5,12 +5,24 @@ const AUTO_RETARGET_MS = 1500;  // 타겟 없을 때 재탐색 주기
 
 export const useAutoFarm = ({ isAutoMode, monstersRef, playerRef, setTargetMonsterId, range = 60 }) => {
   const retargetRef = useRef(null);
+  const currentTargetRef = useRef(null);
 
   const findNearestMonster = useCallback(() => {
     if (!playerRef.current || !monstersRef.current) return null;
     const px = playerRef.current.position.x;
     const pz = playerRef.current.position.z;
     const rangeSq = range * range;
+
+    // 현재 타겟이 여전히 살아있고 범위 내에 있으면 재탐색 생략
+    const curId = currentTargetRef.current;
+    if (curId !== null) {
+      const cur = monstersRef.current[curId];
+      if (cur && cur.state !== 'dead' && cur.hp > 0) {
+        const mx = cur.position?.x ?? 0;
+        const mz = cur.position?.z ?? 0;
+        if ((px - mx) ** 2 + (pz - mz) ** 2 <= rangeSq) return String(curId);
+      }
+    }
 
     let nearest = null;
     let nearestDistSq = Infinity;
@@ -35,6 +47,7 @@ export const useAutoFarm = ({ isAutoMode, monstersRef, playerRef, setTargetMonst
     }
 
     if (!isAutoMode) {
+      currentTargetRef.current = null;
       setTargetMonsterId(null);
       return;
     }
@@ -42,7 +55,9 @@ export const useAutoFarm = ({ isAutoMode, monstersRef, playerRef, setTargetMonst
     // 자동사냥 ON: 즉시 타겟 탐색 + 주기적 재탐색
     const retarget = () => {
       const nearest = findNearestMonster();
-      setTargetMonsterId(nearest ? Number(nearest) : null);
+      const nextId = nearest ? Number(nearest) : null;
+      currentTargetRef.current = nextId;
+      setTargetMonsterId(nextId);
     };
 
     retarget();

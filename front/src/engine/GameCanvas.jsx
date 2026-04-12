@@ -16,6 +16,8 @@ const GameCanvas = ({
   input, active = true, otherPlayers, sendPosition, latestChatMap, inputActions,
   sendSkill, projectiles, addProjectile, updateProjectile, removeProjectile, monsters,
   sendHit,
+  myStats = null,
+  skillHotbar = null,
   currentMapId, spawnPosition, onPortalEncounter,
   mapSettings = {},
   onMonsterClick,
@@ -67,6 +69,7 @@ const GameCanvas = ({
           removeProjectile={removeProjectile}
           monsters={monsters}
           sendHit={sendHit}
+          skillHotbar={skillHotbar}
           currentMapId={currentMapId}
           spawnPosition={spawnPosition}
           onPortalEncounter={onPortalEncounter}

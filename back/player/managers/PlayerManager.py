@@ -209,5 +209,28 @@ class PlayerManager:
         user_ids = [uid for uid in self.active_connections if uid != exclude_user_id]
         await self.broadcast_to_users(message, user_ids)
 
+    async def mp_regen_loop(self, regen_per_tick: int = 2, interval_sec: float = 1.0):
+        """MP 자동 회복 루프 — 1초마다 2 MP 회복, 변화 있으면 클라이언트에 전송"""
+        while True:
+            await asyncio.sleep(interval_sec)
+            for user_id, player in list(self.active_connections.items()):
+                stats = player.get("stats")
+                if not stats:
+                    continue
+                mp = stats.get("mp", 0)
+                max_mp = stats.get("maxMp", 50)
+                if mp >= max_mp:
+                    continue
+                new_mp = min(max_mp, mp + regen_per_tick)
+                stats["mp"] = new_mp
+                try:
+                    await player["socket"].send_json({
+                        "type": "mp_regen",
+                        "mp": new_mp,
+                        "maxMp": max_mp,
+                    })
+                except Exception:
+                    pass
+
 # 싱글톤 인스턴스
 player_manager = PlayerManager()

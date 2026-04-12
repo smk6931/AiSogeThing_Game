@@ -7,15 +7,32 @@ from item.services.service import roll_drops, grant_items_to_user
 
 # ── 전투 / 스킬 계산 (pure functions) ─────────────────────────
 
-SKILL_POWER = {
-    "basic": 0,
-    "pyramid_punch": 8,
-    "magic_orb": 10,
+# 프론트 front/src/data/skillCatalog.js 와 동기화 유지
+SKILL_CATALOG = {
+    "magic_orb":      {"power": 10, "mp_cost": 10, "multiplier": 1.0, "type": "target"},
+    "pyramid_punch":  {"power": 8,  "mp_cost": 5,  "multiplier": 0.8, "type": "spread"},
+    "lightning_bolt": {"power": 20, "mp_cost": 15, "multiplier": 1.2, "type": "linear"},
+    "frost_nova":     {"power": 15, "mp_cost": 25, "multiplier": 0.9, "type": "aoe_self"},
+    "basic":          {"power": 0,  "mp_cost": 0,  "multiplier": 1.0, "type": "target"},
 }
 
 
 def calc_damage(player_attack: int, skill_name: str) -> int:
-    return max(1, player_attack + SKILL_POWER.get(skill_name, 0))
+    skill = SKILL_CATALOG.get(skill_name, SKILL_CATALOG["basic"])
+    return max(1, int(player_attack * skill["multiplier"]) + skill["power"])
+
+
+def deduct_mp_for_skill(stats: dict, skill_name: str) -> bool:
+    """MP 소모 처리. 충분하면 차감 후 True, 부족하면 False 반환."""
+    skill = SKILL_CATALOG.get(skill_name, SKILL_CATALOG["basic"])
+    mp_cost = skill.get("mp_cost", 0)
+    if mp_cost == 0:
+        return True
+    current_mp = stats.get("mp", 0)
+    if current_mp < mp_cost:
+        return False
+    stats["mp"] = current_mp - mp_cost
+    return True
 
 
 def apply_hit_to_monster(monster, player_attack: int, skill_name: str) -> dict:
@@ -125,6 +142,10 @@ async def handle_hit(
     player_stats = player_manager.get_player_stats(user_id) or {}
     player_attack = player_stats.get("attack", 10)
 
+    # MP 검증 + 차감 (부족하면 거부)
+    if not deduct_mp_for_skill(player_stats, skill_name):
+        return {"ok": False, "reason": "insufficient_mp"}
+
     hit_result = monster_manager.handle_hit(monster_id, player_attack, skill_name)
     if not hit_result or not hit_result.get("ok"):
         return {"ok": False}
@@ -201,6 +222,80 @@ async def handle_hit(
             }
 
     return result
+
+
+async def handle_frost_nova(
+    user_id: str,
+    player_manager,
+    monster_manager,
+) -> dict:
+    """
+    frost_nova AoE 처리 — 플레이어 위치 기준 반경 8m 내 몬스터 전체 피격.
+    클라이언트는 반경 계산을 하지 않고 서버에 위임 (보안).
+
+    반환: { ok, hits: [hit_result, ...], killed_ids: [...] }
+    """
+    skill = SKILL_CATALOG["frost_nova"]
+    player_stats = player_manager.get_player_stats(user_id) or {}
+    player_attack = player_stats.get("attack", 10)
+
+    # MP 검증 + 차감
+    if not deduct_mp_for_skill(player_stats, "frost_nova"):
+        return {"ok": False, "reason": "insufficient_mp"}
+
+    damage = calc_damage(player_attack, "frost_nova")
+
+    player = player_manager.get_player(user_id)
+    if not player:
+        return {"ok": False}
+
+    pos = player.get("position") or {}
+    px = float(pos.get("x", 0) or 0)
+    pz = float(pos.get("z", 0) or 0)
+
+    radius_sq = skill["power"] * 1.0  # range = power값을 m 반경으로 사용 (8m)
+    # frost_nova range는 8m → 반경²
+    FROST_RADIUS_SQ = 64.0  # 8m²
+
+    monster_ids = [
+        mid for mid, m in monster_manager.monsters.items()
+        if m.state != "dead" and m.hp > 0
+        and (m.x - px) ** 2 + (m.z - pz) ** 2 <= FROST_RADIUS_SQ
+    ]
+
+    if not monster_ids:
+        return {"ok": True, "hits": [], "killed_ids": []}
+
+    batch_results = monster_manager.batch_hit(monster_ids, damage)
+    killed_ids = [r["monsterId"] for r in batch_results if r.get("killed")]
+
+    # 보상: 킬된 몬스터들에 대해 보상 처리
+    total_exp = 0
+    total_gold = 0
+    for r in batch_results:
+        if r.get("killed"):
+            total_exp += r.get("expReward", 0)
+            total_gold += r.get("goldReward", 0)
+
+    reward_result = None
+    if total_exp > 0 or total_gold > 0:
+        reward_result = player_manager.add_rewards(
+            user_id, exp_gain=total_exp, gold_gain=total_gold
+        )
+        if reward_result:
+            try:
+                uid_int = int(user_id)
+                if uid_int < 50000:
+                    await char_repo.save_character(uid_int, reward_result["stats"])
+            except Exception as e:
+                print(f"[WARN] frost_nova save_character failed for {user_id}: {e}")
+
+    return {
+        "ok": True,
+        "hits": batch_results,
+        "killed_ids": killed_ids,
+        "reward_result": reward_result,
+    }
 
 
 async def handle_use_item(user_id: str, item_id: int, player_manager) -> dict | None:

@@ -34,6 +34,7 @@ export default defineConfig({
       '@entity': path.resolve(__dirname, './src/entity'),
       '@ui': path.resolve(__dirname, './src/ui'),
       '@screens': path.resolve(__dirname, './src/screens'),
+      '@data': path.resolve(__dirname, './src/data'),
     }
   },
   server: {
