@@ -2,16 +2,18 @@
 // 모든 레이어와 플레이어/몬스터는 이 값을 기준으로 오프셋을 더한다.
 // 변경 시 이 파일 한 곳만 수정하면 된다.
 export const LAYER_Y = {
+  // ── 지면 렌더링 레이어 (낮은 순서 = 먼저 깔리는 레이어) ─────────────────
   base:              0,      // MapTiles 기준 바닥
-  ground_mesh:       0.02,   // DongGroundMesh
-  road:              0.05,   // SeoulTerrain (도로/석재)
-  landuse:           0.08,   // CityBlockOverlay (토지이용 텍스처)
-  road_split:        0.09,   // CityBlockOverlay (도로분할 섹터)
-  current_group_tex: 0.11,   // CityBlockOverlay (현재그룹 텍스처)
-  zone:              0.12,   // ZoneOverlay (공원·자연·수계)
-  character:         0.35,   // 플레이어·몬스터 서있는 기준 Y (AI 텍스처 시각 높이 포함)
-  district_boundary: 0.34,   // PartitionBoundaryOverlay
-  group_color:       0.38,   // GroupColorOverlay
+  ground_mesh:       0.01,   // DongGroundMesh
+  zone:              0.02,   // ZoneOverlay (공원·자연·수계) — 블록 아래
+  landuse:           0.03,   // CityBlockOverlay (토지이용 텍스처)
+  road_split:        0.04,   // CityBlockOverlay (도로분할 섹터)
+  current_group_tex: 0.05,   // CityBlockOverlay (현재그룹 텍스처)
+  road:              0.06,   // SeoulTerrain (도로) — 블록 위에 깔림
+  district_boundary: 0.07,   // PartitionBoundaryOverlay
+  group_color:       0.08,   // GroupColorOverlay
+  // ── 캐릭터/몬스터 — 지면 레이어 전체보다 위 ────────────────────────────
+  character:         0.5,    // 플레이어·몬스터 (AI 텍스처 시각 높이 + 여유)
 };
 
 // 맵 크기 정의 (1m = 1 unit)

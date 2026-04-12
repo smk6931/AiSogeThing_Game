@@ -52,12 +52,12 @@ from core.database import async_session_factory
 # ──────────────────────────────────────────────────────────────────────────────
 COMFYUI_HOST    = "http://localhost:8188"
 CHECKPOINT_NAME = "dreamshaperXL_lightningDPMSDE.safetensors"
-STEPS           = 8
-CFG             = 2.0
+STEPS           = 12
+CFG             = 3.5
 SAMPLER         = "dpmpp_sde"
 SCHEDULER       = "karras"
 MASK_FEATHER    = 0
-GROW_MASK_BY    = 4   # VAEEncodeForInpaint grow_mask_by
+GROW_MASK_BY    = 6   # VAEEncodeForInpaint grow_mask_by (edge blend 확대)
 
 # 지리 좌표 → 미터 (서울 기준, mapConfig.js 동일)
 LAT_TO_M = 110940
@@ -70,16 +70,15 @@ TARGET_PIXELS    = 512 * 512
 MAX_IMAGE_SIZE   = 1024
 
 # DreamShaper XL Lightning 기본 설정 (agents/game_design/local_image_generation.md 기준)
-# soft painterly anime RPG style, top-down 90도 overhead
+# soft painterly anime RPG style, top-down 90도 overhead, 지형 중심, 프레임 꽉 채움
 STYLE_PREFIX = (
-    "top-down 90 degree overhead, fantasy RPG game map ground tile, "
-    "soft painterly anime RPG art style, vibrant colors, clean readable game asset, "
-    "no characters, no buildings"
+    "top-down 90 degree overhead view, fantasy RPG world ground surface, "
+    "soft painterly anime art style, vibrant natural colors, "
+    "seamless organic terrain texture"
 )
-STYLE_NEGATIVE = (
-    "photorealistic, 3d render, isometric, side view, building, character, "
-    "text, watermark, dark gloomy, blurry, border, frame, bad quality"
-)
+# negative 프롬프트 사용 안 함 — 모델 자유도를 제한해서 패턴 왜곡 유발
+# 그룹 image_prompt_base + seed 조합이 분위기와 변형을 담당
+STYLE_NEGATIVE = ""
 
 # ── 레퍼런스 스타일 프리셋 ──────────────────────────────────────────────────
 # --style village : 이미지1 기준 — rpg_v5 아이소메트릭 판타지 한국 마을
@@ -133,31 +132,33 @@ STYLE_PRESETS: dict[str, dict] = {
 _ACTIVE_STYLE: str | None = None
 
 # theme_code → Positive 추가 프롬프트 (DreamShaper XL Lightning 스타일 기준)
+# 규칙: 건물·소품·실내 표현 금지, "바닥 지형이 프레임을 꽉 채운다" 중심 묘사
 # agents/game_design/local_image_generation.md 참조
 FLOOR_CONTEXT: dict[str, str] = {
-    "RESIDENTIAL":      "warm rooftop view, clay tile roofs, small courtyards, mossy stone paths, cozy residential ground",
-    "COMMERCIAL":       "market stone floor, worn cobblestone, merchant district ground, colorful awning shadows",
-    "INDUSTRIAL":       "industrial stone floor, metal grates, forge ash ground, dark worn cobblestone, heat-cracked earth",
-    "PARK":             "lush grass, garden path, flower beds, soft natural ground, dappled light on grass",
-    "MIXED":            "mixed ground texture, stone paths and green patches, varied surface materials",
-    "RESIDENTIAL_ZONE": "warm rooftop view, clay tile roofs, small courtyards, mossy stone paths, cozy residential ground",
-    "COMMERCIAL_ZONE":  "market stone floor, worn cobblestone, merchant district ground, colorful awning shadows",
-    "FORGE_DISTRICT":   "industrial stone floor, metal grates, forge ash ground, dark worn cobblestone, heat-cracked earth",
-    "ACADEMY_SANCTUM":  "stone courtyard, worn flagstone, ancient academy ground, moss between tiles, scholarly stone plaza",
-    "SANCTUARY":        "sacred stone paving, ceremonial tile patterns, soft earth and moss, stone lantern bases",
-    "GREEN_ZONE":       "lush grass, garden path, flower beds, soft natural ground, tree canopy tops",
+    "RESIDENTIAL":      "worn stone pathways and packed earth, moss between stone cracks, scattered gravel and dry soil, soft grass patches at edges, warm stone tile ground fills entire frame",
+    "COMMERCIAL":       "busy cobblestone ground fills frame, merchant district worn stone, dusty trade route dirt paths, earthy gravel between paving stones, stone tile market floor",
+    "INDUSTRIAL":       "dark compacted earth fills frame, forge-scorched stone ground, heat-cracked dry soil, dark ash-mixed dirt, industrial district floor surface texture",
+    "PARK":             "lush green grass fills entire frame edge to edge, garden soil path, flower bed ground patches, soft natural earth, moss and clover ground cover, dappled light on grass",
+    "MIXED":            "mixed stone and organic earth fills frame, natural terrain transition, moss-covered rocks on dirt, varied natural ground texture, stone and soil blend",
+    "RESIDENTIAL_ZONE": "worn stone pathways and packed earth, moss between stone cracks, scattered gravel and dry soil, soft grass patches at edges, warm stone tile ground fills entire frame",
+    "COMMERCIAL_ZONE":  "busy cobblestone ground fills frame, merchant district worn stone, dusty trade route dirt paths, earthy gravel between paving stones, stone tile market floor",
+    "FORGE_DISTRICT":   "dark compacted earth fills frame, forge-scorched stone ground, heat-cracked dry soil, dark ash-mixed dirt, industrial district floor surface texture",
+    "ACADEMY_SANCTUM":  "ancient stone flagstone fills entire frame, worn scholarly stone plaza, moss between tile cracks, aged stone ground surface, ink-stained paving stones",
+    "SANCTUARY":        "sacred stone floor fills entire frame edge to edge, ceremonial tile ground pattern, soft earth and moss between stones, sacred soil and stone blend",
+    "GREEN_ZONE":       "lush green grass fills entire frame edge to edge, garden soil path, flower bed ground patches, soft natural earth, moss and clover ground cover, dappled light on grass",
 }
 
 # persona → 프롬프트 힌트 (image_prompt_append가 없을 때 fallback)
+# 규칙: 오브젝트·소품 제거, 바닥 지형이 프레임 전체를 채우는 표현으로
 PERSONA_PROMPTS: dict[str, str] = {
-    "grove_keeper":      "lush forest floor, dense moss and undergrowth, hidden garden stone paths, gnarled tree roots covering ground, korean garden courtyard center, natural grass and foliage fills edges seamlessly",
-    "route_keeper":      "cobblestone road network from above, worn dirt paths branching outward, stone lantern bases, weathered paving stones, road edges fade naturally to dirt and gravel",
-    "crossroad_runner":  "busy market alley floor, stained cobblestones, wooden stall platforms, scattered goods and crates on ground, alley edges blend into dusty stone terrain",
-    "academy_watcher":   "ancient stone courtyard floor, worn flagstone tiles, ink-stained paving, scholarly stone plaza, edges transition naturally to aged stone and mossy ground",
-    "sanctuary_ward":    "sacred stone shrine floor, ceremonial tile patterns, moss between stones, offerings scattered on ground, edges fade into natural stone and sacred earth",
-    "merchant_runner":   "busy marketplace ground, packed earth and cobblestone, merchant stall footprints, dusty trade routes, edges blend into dirt and stone naturally",
-    "elder_watcher":     "calm hanok courtyard floor, aged stone tiles, garden soil patches, garden well base, edges naturally transition to earth and old stone paths",
-    "shadow_warden":     "dark narrow alley floor, shadowed wet cobblestones, cracked stone ground, edges dissolve into dark earth and broken pavement",
+    "grove_keeper":     "lush forest floor fills entire frame, dense moss and undergrowth, gnarled tree roots on dark soil, soft grass and fern ground cover, dappled light on natural earth, organic woodland ground texture",
+    "route_keeper":     "worn stone road ground fills frame, packed dirt paths winding through terrain, weathered paving mixed with soil and gravel, organic stone and earth blend throughout",
+    "crossroad_runner": "busy market stone ground fills frame, stained cobblestones mixed with dusty packed earth, varied stone and dirt surface, organic ground texture throughout frame",
+    "academy_watcher":  "worn scholarly stone ground fills frame, aged flagstone mixed with patches of moss and soil, ink-stained stone tiles varied throughout, organic scholarly terrain, slate-blue stone with earthy gaps",
+    "sanctuary_ward":   "sacred earthy ground fills frame, soft sacred soil with stone patterns woven throughout, moss and gentle stone blend, organic sacred terrain texture",
+    "merchant_runner":  "busy market ground fills frame, packed earth and worn cobblestone mixed throughout, dusty organic trade ground texture, stone and dirt blend naturally",
+    "elder_watcher":    "calm aged earth fills frame, garden soil and weathered stone patches blend organically, worn natural ground texture, soft earth and old stone throughout",
+    "shadow_warden":    "dark earth and stone fills frame, shadowed cracked soil and broken stone blend throughout, dark compacted ground texture, organic dark terrain fills frame",
 }
 
 
@@ -314,31 +315,21 @@ def create_black_base(width: int, height: int) -> Image.Image:
 
 
 def build_workflow(positive: str, negative: str, seed: int,
-                   mask_filename: str, base_filename: str,
                    width: int, height: int) -> dict:
     """
-    DreamShaper XL Lightning 인페인팅 워크플로우
-    VAEEncodeForInpaint(grow_mask_by=GROW_MASK_BY) + 검정 base + polygon mask
+    DreamShaper XL Lightning txt2img 워크플로우 (EmptyLatentImage)
+    inpainting 방식 폐기: VAEEncodeForInpaint는 검정 base를 의식해 frame 구성을 만들어냄
+    EmptyLatentImage로 순수 노이즈에서 생성 → 경계 아티팩트 없는 seamless 지형 텍스처
     agents/game_design/local_image_generation.md 기준
     """
     return {
         "4":  {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT_NAME}},
         "6":  {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
         "7":  {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
-        # base image (검정)
-        "13": {"class_type": "LoadImage", "inputs": {"image": base_filename}},
-        # mask image (흰 polygon on 검정)
-        "10": {"class_type": "LoadImage", "inputs": {"image": mask_filename}},
-        "11": {"class_type": "ImageToMask", "inputs": {"image": ["10", 0], "channel": "red"}},
-        # VAEEncodeForInpaint: base + mask → latent
-        "14": {
-            "class_type": "VAEEncodeForInpaint",
-            "inputs": {
-                "pixels": ["13", 0],
-                "vae": ["4", 2],
-                "mask": ["11", 0],
-                "grow_mask_by": GROW_MASK_BY,
-            },
+        # EmptyLatentImage: 순수 노이즈에서 시작 (inpainting 아님)
+        "5": {
+            "class_type": "EmptyLatentImage",
+            "inputs": {"width": width, "height": height, "batch_size": 1},
         },
         "3": {
             "class_type": "KSampler",
@@ -346,7 +337,7 @@ def build_workflow(positive: str, negative: str, seed: int,
                 "seed": seed, "steps": STEPS, "cfg": CFG,
                 "sampler_name": SAMPLER, "scheduler": SCHEDULER, "denoise": 1.0,
                 "model": ["4", 0], "positive": ["6", 0], "negative": ["7", 0],
-                "latent_image": ["14", 0],
+                "latent_image": ["5", 0],
             },
         },
         "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
@@ -412,6 +403,29 @@ def draw_polygon_outline(
     img.save(out_path, format="PNG")
 
 
+def fill_black_border(img: Image.Image, mask: Image.Image, iterations: int = 40) -> Image.Image:
+    """
+    polygon 외부(마스크 검정 영역)를 인접 polygon 내부 픽셀 색으로 팽창 채움.
+    VAEEncodeForInpaint 방식에서 polygon 외부가 검정으로 남는 문제를 해결한다.
+
+    1단계: MaxFilter 팽창으로 외부 영역 채움
+    2단계: 마스크 경계 주변을 GaussianBlur로 소프트 블렌딩 (경계선 제거)
+    """
+    mask_l = mask.convert("L")
+    result = img.copy()
+
+    # 1단계: 팽창으로 검정 영역 채움
+    for _ in range(iterations):
+        expanded = result.filter(ImageFilter.MaxFilter(3))
+        result = Image.composite(result, expanded, mask_l)
+
+    # 2단계: 마스크 경계 소프트 블렌딩 (경계 부근 4px 블러로 자연스럽게)
+    soft_mask = mask_l.filter(ImageFilter.GaussianBlur(radius=4))
+    result = Image.composite(img, result, soft_mask)
+
+    return result
+
+
 def check_comfyui() -> bool:
     try:
         comfy_get("/system_stats")
@@ -423,44 +437,26 @@ def check_comfyui() -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 # 프롬프트 조합
 # ──────────────────────────────────────────────────────────────────────────────
-def make_positive(area_prompt: str, group_prompt: str, extra: str = "",
-                  persona_tag: str = "", theme: str = "", landuse: str = "") -> str:
-    # --style 프리셋이 활성화된 경우: DB 페르소나/테마 무시, 프리셋 프롬프트 직접 사용
+def make_positive(group_prompt: str) -> str:
+    # --style 프리셋이 활성화된 경우: 프리셋 프롬프트 직접 사용
     if _ACTIVE_STYLE:
         return STYLE_PRESETS[_ACTIVE_STYLE]["positive"]
 
     parts = [STYLE_PREFIX]
 
-    # 그룹 프롬프트 (지역 분위기)
+    # 그룹 프롬프트 — 분위기와 지형 묘사의 핵심. seed가 파티션별 변형을 담당.
     if group_prompt and group_prompt.strip():
         parts.append(group_prompt.strip())
 
-    # 바닥 컨텍스트: theme > landuse > persona > 없음 순
-    floor_hint = (
-        FLOOR_CONTEXT.get(theme)
-        or FLOOR_CONTEXT.get(landuse)
-        or (PERSONA_PROMPTS.get(persona_tag) if persona_tag else None)
-    )
-    if floor_hint:
-        parts.append(floor_hint)
-
-    # area_prompt는 지역 분위기 보조 (짧게)
-    if area_prompt and area_prompt.strip():
-        parts.append(area_prompt.strip()[:80])
-
     return ", ".join(parts)
 
 
-def make_negative(area_neg: str, group_neg: str) -> str:
+def make_negative() -> str:
     # --style 프리셋이 활성화된 경우: 프리셋 네거티브 사용
     if _ACTIVE_STYLE:
         return STYLE_PRESETS[_ACTIVE_STYLE]["negative"]
-
-    parts = [STYLE_NEGATIVE]
-    for n in [area_neg, group_neg]:
-        if n and n.strip():
-            parts.append(n.strip())
-    return ", ".join(parts)
+    # negative 비활성화 — 모델 자유도 확보
+    return ""
 
 
 def short_name(key: str) -> str:
@@ -493,7 +489,6 @@ async def generate_one(
     negative: str,
     seed: int,
     out_path: Path,
-    mask_upload_name: str,
     label: str,
     dry_run: bool,
     outline: bool = False,
@@ -509,7 +504,23 @@ async def generate_one(
     repeat_y = height_m / tile_h_m
     is_tiled = repeat_x > 1.05 or repeat_y > 1.05
 
-    scale_hint = f"seamless tileable ground texture, tile covers {tile_w_m:.0f}m x {tile_h_m:.0f}m"
+    # 파티션 실제 면적 → scale hint (작을수록 세밀한 석재/이끼, 클수록 넓은 자연 지형)
+    area_m2 = width_m * height_m
+    if area_m2 < 1000:
+        scale_hint = (
+            f"small {width_m:.0f}x{height_m:.0f} meter ground area, "
+            "detailed moss and stone surface, seamless organic terrain"
+        )
+    elif area_m2 < 10000:
+        scale_hint = (
+            f"medium {width_m:.0f}x{height_m:.0f} meter ground area, "
+            "varied natural ground surface, seamless organic terrain"
+        )
+    else:
+        scale_hint = (
+            f"large {width_m:.0f}x{height_m:.0f} meter ground area, "
+            "wide natural terrain with organic color variation, seamless"
+        )
     pos_full = positive + f", {scale_hint}"
 
     tile_info = f" (tile {tile_w_m:.0f}m×{tile_h_m:.0f}m, repeat {repeat_x:.1f}×{repeat_y:.1f})" if is_tiled else ""
@@ -519,21 +530,8 @@ async def generate_one(
         print(f"  [DRY-RUN] would save to {out_path}")
         return True
 
-    # 타일링 모드: 전체 흰 마스크 (polygon 경계 무관, 타일 전체 채움)
-    # 단일 모드: polygon 마스크 (경계 내부만 생성)
-    if is_tiled:
-        mask_img = Image.new("RGB", (img_w, img_h), (255, 255, 255))
-    else:
-        mask_img = create_mask(boundaries, bbox, img_w, img_h)
-    mask_name = upload_mask(mask_img, mask_upload_name)
-    print(f"  마스크 업로드: {mask_name}")
-
-    # 검정 베이스 이미지 업로드 (VAEEncodeForInpaint용)
-    base_img  = create_black_base(img_w, img_h)
-    base_upload_name = mask_upload_name.replace("_mask.png", "_base.png")
-    base_name = upload_mask(base_img, base_upload_name)
-
-    wf = build_workflow(pos_full, negative, seed, mask_name, base_name, img_w, img_h)
+    # txt2img: 마스크·베이스 이미지 업로드 불필요 (EmptyLatentImage 사용)
+    wf = build_workflow(pos_full, negative, seed, img_w, img_h)
     resp = comfy_post("/prompt", {"prompt": wf})
     prompt_id = resp["prompt_id"]
     print(f"  queued: {prompt_id}")
@@ -592,13 +590,13 @@ async def run_group_mode(group_key: str, dry_run: bool):
         print(f"[GROUP MODE] {group['dong_name']} / {group['display_name']} — {len(partitions)}개 파티션")
 
         boundaries = [p["boundary_geojson"] for p in partitions]
-        positive   = make_positive(group["area_prompt_base"] or "", group["image_prompt_base"] or "")
-        negative   = make_negative(group["area_prompt_neg"] or "", group["image_prompt_negative"] or "")
+        positive   = make_positive(group["image_prompt_base"] or "")
+        negative   = make_negative()
         seed       = hash(group_key) % (2**32)
 
         ok = await generate_one(
             session, boundaries, positive, negative, seed,
-            out_path, f"{g_short}_mask.png", "GROUP", dry_run,
+            out_path, "GROUP", dry_run,
         )
         if ok and not dry_run:
             for p in partitions:
@@ -648,22 +646,13 @@ async def run_partition_mode(partition_keys: list[str], dry_run: bool, outline: 
             print(f"\n[PARTITION] {part['dong_name']} / {part['display_name']} ({pk})")
 
             boundaries = [part["boundary_geojson"]]
-            theme   = (part.get("theme_code") or "").upper()
-            landuse = (part.get("landuse_code") or "").upper()
-            positive   = make_positive(
-                part["area_prompt_base"] or "",
-                part["image_prompt_base"] or "",
-                persona_tag=part.get("persona_tag") or "",
-                theme=theme,
-                landuse=landuse,
-            )
-            print(f"  theme={theme}, landuse={landuse}")
-            negative   = make_negative(part["area_prompt_neg"] or "", part["group_neg"] or "")
+            positive   = make_positive(part["image_prompt_base"] or "")
+            negative   = make_negative()
             seed       = hash(pk) % (2**32)
 
             ok = await generate_one(
                 session, boundaries, positive, negative, seed,
-                out_path, f"{p_short}_mask.png", p_short, dry_run,
+                out_path, p_short, dry_run,
                 outline=outline,
             )
             if ok and not dry_run:

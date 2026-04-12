@@ -325,7 +325,7 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
   } : isRoad ? {
     color: roadStyle.color,
     map: texture ?? null,
-    transparent: false,
+    transparent: true,   // Transparent 패스로 이동 → renderOrder가 파티션 텍스처보다 높아서 위에 그려짐
     opacity: roadStyle.opacity,
     depthWrite: false,
     depthTest: false,

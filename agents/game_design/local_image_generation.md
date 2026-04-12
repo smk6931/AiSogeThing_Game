@@ -24,12 +24,12 @@ Priority: high
 
 ### DreamShaper XL Lightning (SDXL 기반) — 기본값 ★
 ```
-STEPS    = 8
-CFG      = 2.0
+STEPS    = 12
+CFG      = 3.5
 SAMPLER  = dpmpp_sde
 SCHEDULER= karras
 DENOISE  = 1.0
-WORKFLOW = VAEEncodeForInpaint (grow_mask_by=4) + 검정 base 이미지 + polygon mask
+WORKFLOW = VAEEncodeForInpaint (grow_mask_by=6) + 검정 base 이미지 + polygon mask
 MAX_SIZE = 1024px
 ```
 
@@ -83,39 +83,69 @@ python back/scripts/generate_partition_textures.py \
 
 ### 공통 Positive 접두어
 ```
-top-down 90 degree overhead, fantasy RPG game map ground tile,
+top-down 90 degree overhead view, fantasy RPG game map ground texture,
 soft painterly anime RPG art style, vibrant colors, clean readable game asset,
-no characters, no buildings
+natural organic ground terrain fills entire frame,
+seamless blend at all edges, varied terrain, no uniform stone ring,
+no black border, no empty space, no objects, no furniture, no props,
+no characters, no buildings, no rooftops, no interior
 ```
 
 ### 공통 Negative
 ```
-photorealistic, 3d render, isometric, side view, building, character,
-text, watermark, dark gloomy, blurry, border, frame, bad quality
+photorealistic, 3d render, isometric, side view, building interior, rooftop view,
+courtyard interior, indoor scene, room, furniture, objects, props, items,
+character, text, watermark, dark gloomy, blurry,
+stone ring border, uniform border ring, edge outline,
+black background, black border, black corner, empty corner, unfilled area,
+frame, border, bad quality, low quality
 ```
+
+### 프롬프트 작성 원칙
+- 건물·소품·실내 표현 금지 ("rooftop", "courtyard interior", "clay tile roofs" 등)
+- "uniform border ring", "edge outline" 유발 표현 금지 — 지형은 프레임 전체에 유기적으로 분포
+- 바닥 지형 재질(stone, moss, dirt, grass 등)이 프레임 전체에 혼합되도록 묘사
+- "edges transition to" 같은 표현 사용 금지 — border ring 효과 유발
 
 ### texture_profile → Positive 추가 프롬프트
 | texture_profile | 추가 Positive |
 |----------------|--------------|
-| `forest_path_02` | forest floor, dirt path, mossy ground, tree roots, leaf litter, dappled light |
-| `green_courtyard` | soft grass courtyard, stone tiles, flower beds, warm sunlight |
-| `dense_block_ground` | urban dirt ground, worn stone, compacted earth, gravel |
-| `fantasy_stone_road` | ancient cobblestone road, moss cracks, old stone pavement |
-| `frozen_bank` | frost-covered ground, icy soil, bare winter earth, snow patches |
-| `event_surface` | magical rune circle, glowing stone floor, mystical ground |
+| `forest_path_02` | forest floor fills frame, dirt path, mossy ground, tree roots on earth, leaf litter, dappled light on ground |
+| `green_courtyard` | soft grass fills entire frame, stone tile path, flower bed ground, warm sunlight on grass |
+| `dense_block_ground` | urban dirt ground fills frame, worn stone, compacted earth, gravel |
+| `fantasy_stone_road` | ancient cobblestone fills frame, moss cracks, old stone pavement ground |
+| `frozen_bank` | frost-covered ground fills frame, icy soil, bare winter earth, snow patches |
+| `event_surface` | magical rune stone floor fills frame, glowing stone ground, mystical earth |
 
 ### theme_code → Positive 추가 프롬프트 (texture_profile 없을 때)
 | theme_code | 추가 Positive |
 |-----------|--------------|
-| `RESIDENTIAL_ZONE` | warm rooftop view, clay tile roofs, small courtyards, mossy stone paths, cozy residential ground |
-| `FORGE_DISTRICT` | industrial stone floor, metal grates, forge ash ground, dark worn cobblestone, heat-cracked earth |
-| `ACADEMY_SANCTUM` | stone courtyard, worn flagstone, ancient academy ground, moss between tiles |
-| `SANCTUARY` | sacred stone paving, ceremonial tile patterns, soft earth and moss |
-| `GREEN_ZONE` | lush grass, garden path, flower beds, soft natural ground |
-| `COMMERCIAL_ZONE` | market stone floor, worn cobblestone, merchant district ground |
+| `RESIDENTIAL` / `RESIDENTIAL_ZONE` | worn stone pathways and packed earth, moss between stone cracks, scattered gravel and dry soil, soft grass patches at edges, warm stone tile ground fills entire frame |
+| `COMMERCIAL` / `COMMERCIAL_ZONE` | busy cobblestone ground fills frame, merchant district worn stone, dusty trade route dirt paths, earthy gravel between paving stones |
+| `INDUSTRIAL` / `FORGE_DISTRICT` | dark compacted earth fills frame, forge-scorched stone ground, heat-cracked dry soil, dark ash-mixed dirt |
+| `ACADEMY_SANCTUM` | ancient stone flagstone fills entire frame, worn scholarly stone plaza, moss between tile cracks, aged stone ground surface |
+| `SANCTUARY` | sacred stone floor fills entire frame edge to edge, ceremonial tile ground pattern, soft earth and moss between stones |
+| `GREEN_ZONE` / `PARK` | lush green grass fills entire frame edge to edge, garden soil path, flower bed ground patches, moss and clover ground cover |
+| `MIXED` | mixed stone and organic earth fills frame, natural terrain transition, moss-covered rocks on dirt, varied natural ground texture |
+
+### 파티션 면적 → scale hint (자동 삽입)
+스크립트가 `tile_w_m × tile_h_m` 값을 기반으로 자동 추가:
+| 면적 | 추가 힌트 |
+|------|---------|
+| < 1,000 m² | `small ground area NxNm, fine detailed stone tiles and moss, close-up ground surface` |
+| 1,000~10,000 m² | `medium ground area NxNm, varied ground surface with natural terrain details` |
+| > 10,000 m² | `large ground area NxNm, wide natural terrain with color variation and organic texture` |
 
 ### image_prompt_append 활용
 DB의 `image_prompt_append` 값을 Positive에 추가 (파티션별 고유 디테일).
+
+## 마스크 전략
+
+**모든 파티션(타일링·일반 공통): 전체 흰 마스크 사용**
+
+- polygon 마스크를 사용하면 마스크 경계에서 AI가 stone/rock ring border를 생성함
+- Three.js polygon geometry가 실제 클리핑을 담당하므로 텍스처는 직사각형 전체로 생성하면 OK
+- 결과: 경계 아티팩트 없음, 자연스러운 지형 텍스처
 
 ## 이미지 생성 핵심 설계
 

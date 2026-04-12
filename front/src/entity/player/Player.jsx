@@ -34,7 +34,8 @@ const Player = forwardRef(({ input, actions: inputActions, onMove, onAction, cha
 
   return (
     <group ref={ref} {...props}>
-      <group ref={modelGroupRef} scale={finalScale} rotation={[0, Math.PI, 0]}>
+      {/* yOffset: GLB 원점이 발바닥 기준이면 0, 배꼽 기준이면 -(모델 절반 높이) */}
+      <group ref={modelGroupRef} scale={finalScale} rotation={[0, Math.PI, 0]} position={[0, 0, 0]}>
         <primitive object={scene} />
       </group>
 
