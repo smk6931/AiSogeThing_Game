@@ -114,6 +114,7 @@ const RpgWorld = ({
     showGroupColors = false,
     showGroupArea = false,
     showPartitionFill = false,
+    showElevation = false,
     groundTextureFolder = '',
     roadTextureFolder = '',
     worldEditorOpen = false,
@@ -614,6 +615,7 @@ const RpgWorld = ({
             elevation={debugConfig.mapElevation + LAYER_Y.road_split}
             playerPositionRef={playerRef}
             partitions={sharedPartitions}
+            showElevation={showElevation}
           />
         </Suspense>
       )}
@@ -633,6 +635,7 @@ const RpgWorld = ({
             elevation={debugConfig.mapElevation + LAYER_Y.current_group_tex}
             playerPositionRef={playerRef}
             partitions={sharedPartitions}
+            showElevation={showElevation}
           />
         </Suspense>
       )}

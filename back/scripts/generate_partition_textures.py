@@ -51,13 +51,14 @@ from core.database import async_session_factory
 # 설정
 # ──────────────────────────────────────────────────────────────────────────────
 COMFYUI_HOST    = "http://localhost:8188"
-CHECKPOINT_NAME = "dreamshaperXL_lightningDPMSDE.safetensors"
-STEPS           = 12
-CFG             = 3.5
-SAMPLER         = "dpmpp_sde"
-SCHEDULER       = "karras"
-MASK_FEATHER    = 12  # polygon mask Gaussian blur → ring border 방지 핵심
-GROW_MASK_BY    = 4   # VAEEncodeForInpaint grow_mask_by
+CHECKPOINT_NAME   = "dreamshaperXL_lightningDPMSDE.safetensors"
+STEPS             = 8              # Lightning 최적 스텝
+CFG               = 2.0           # Lightning 최적 CFG
+SAMPLER           = "dpmpp_sde"
+SCHEDULER         = "karras"
+HIRESFIX_DENOISE  = 0.5           # hi-res fix 2nd pass denoise
+UPSCALE_MODEL     = "4xUltrasharp_4xUltrasharpV10.pt"
+POLY_MASK_FEATHER = 6             # PIL post-process polygon clip 경계 feather
 
 # 지리 좌표 → 미터 (서울 기준, mapConfig.js 동일)
 LAT_TO_M = 110940
@@ -233,7 +234,7 @@ def compute_bbox(boundaries: list[dict]) -> tuple[float, float, float, float]:
 # 마스크 생성
 # ──────────────────────────────────────────────────────────────────────────────
 def create_mask(boundaries: list[dict], bbox: tuple, width: int, height: int,
-                feather: int = MASK_FEATHER) -> Image.Image:
+                feather: int = POLY_MASK_FEATHER) -> Image.Image:
     """
     주어진 polygon(들)을 흰색으로 채운 마스크 생성.
     bbox 기준으로 정규화 (Three.js UV flipY=true 좌표계와 일치).
@@ -317,40 +318,54 @@ def create_black_base(width: int, height: int) -> Image.Image:
 
 
 def build_workflow(positive: str, negative: str, seed: int,
-                   mask_filename: str, base_filename: str) -> dict:
+                   img_w: int, img_h: int) -> dict:
     """
-    DreamShaper XL Lightning inpainting 워크플로우
-    VAEEncodeForInpaint + feathered polygon mask + 검정 base
-    MASK_FEATHER=12 로 polygon 경계를 소프트 블러 → ring border 방지
+    DreamShaper XL Lightning  hi-res fix + 4xUltrasharp 업스케일 워크플로우
+    Pass 1: EmptyLatentImage → KSampler (STEPS=8, CFG=2.0, denoise=1.0) → VAEDecode
+    Pass 2: ImageScaleBy 1.5x → VAEEncode → KSampler (denoise=0.5, hi-res fix) → VAEDecode
+    Pass 3: 4xUltrasharp → ImageScale 2x → SaveImage
+    polygon 클리핑은 PIL post-process로 (AI 생성 후 잘라냄 → ring border 없음)
     agents/game_design/local_image_generation.md 기준
     """
+    out_w = min(img_w * 2, 2048)
+    out_h = min(img_h * 2, 2048)
     return {
-        "4":  {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT_NAME}},
-        "6":  {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
-        "7":  {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
-        "13": {"class_type": "LoadImage", "inputs": {"image": base_filename}},
-        "10": {"class_type": "LoadImage", "inputs": {"image": mask_filename}},
-        "11": {"class_type": "ImageToMask", "inputs": {"image": ["10", 0], "channel": "red"}},
-        "14": {
-            "class_type": "VAEEncodeForInpaint",
-            "inputs": {
-                "pixels": ["13", 0],
-                "vae": ["4", 2],
-                "mask": ["11", 0],
-                "grow_mask_by": GROW_MASK_BY,
-            },
-        },
-        "3": {
+        "1":  {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT_NAME}},
+        "2":  {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["1", 1]}},
+        "3":  {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["1", 1]}},
+        "4":  {"class_type": "EmptyLatentImage", "inputs": {"width": img_w, "height": img_h, "batch_size": 1}},
+        # Pass 1: txt2img
+        "5": {
             "class_type": "KSampler",
             "inputs": {
                 "seed": seed, "steps": STEPS, "cfg": CFG,
                 "sampler_name": SAMPLER, "scheduler": SCHEDULER, "denoise": 1.0,
-                "model": ["4", 0], "positive": ["6", 0], "negative": ["7", 0],
-                "latent_image": ["14", 0],
+                "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0],
+                "latent_image": ["4", 0],
             },
         },
-        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
-        "9": {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "partition_tex"}},
+        "6":  {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+        # Pass 2: hi-res fix (1.5x scale → re-encode → denoise 0.5)
+        "7":  {"class_type": "ImageScaleBy", "inputs": {"image": ["6", 0], "upscale_method": "lanczos", "scale_by": 1.5}},
+        "8":  {"class_type": "VAEEncode", "inputs": {"pixels": ["7", 0], "vae": ["1", 2]}},
+        "9": {
+            "class_type": "KSampler",
+            "inputs": {
+                "seed": seed, "steps": STEPS, "cfg": CFG,
+                "sampler_name": SAMPLER, "scheduler": SCHEDULER, "denoise": HIRESFIX_DENOISE,
+                "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0],
+                "latent_image": ["8", 0],
+            },
+        },
+        "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
+        # Pass 3: 4xUltrasharp → 2x 최종 출력
+        "11": {"class_type": "UpscaleModelLoader", "inputs": {"model_name": UPSCALE_MODEL}},
+        "12": {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["11", 0], "image": ["10", 0]}},
+        "13": {"class_type": "ImageScale", "inputs": {
+            "image": ["12", 0], "upscale_method": "lanczos",
+            "width": out_w, "height": out_h, "crop": "disabled",
+        }},
+        "14": {"class_type": "SaveImage", "inputs": {"images": ["13", 0], "filename_prefix": "partition_tex"}},
     }
 
 
@@ -464,12 +479,18 @@ def make_positive(group_prompt: str) -> str:
     return ", ".join(parts)
 
 
+STYLE_NEGATIVE = (
+    "cartoon, anime, flat colors, isometric, bright daylight, cheerful, "
+    "blurry, watermark, text, logo, frame, border, bad quality, ugly, deformed, duplicate, "
+    "building interior, room, furniture, indoor, rooftop view"
+)
+
+
 def make_negative() -> str:
     # --style 프리셋이 활성화된 경우: 프리셋 네거티브 사용
     if _ACTIVE_STYLE:
         return STYLE_PRESETS[_ACTIVE_STYLE]["negative"]
-    # negative 비활성화 — 모델 자유도 확보
-    return ""
+    return STYLE_NEGATIVE
 
 
 def short_name(key: str) -> str:
@@ -543,18 +564,8 @@ async def generate_one(
         print(f"  [DRY-RUN] would save to {out_path}")
         return True
 
-    # 타일링: 전체 흰 마스크 / 일반: feathered polygon 마스크 (MASK_FEATHER=12)
-    if is_tiled:
-        mask_img = Image.new("RGB", (img_w, img_h), (255, 255, 255))
-    else:
-        mask_img = create_mask(boundaries, bbox, img_w, img_h, feather=MASK_FEATHER)
-
-    label_short = label.lower().replace(" ", "_")
-    mask_name = upload_mask(mask_img, f"{label_short}_mask.png")
-    base_name = upload_mask(create_black_base(img_w, img_h), f"{label_short}_base.png")
-    print(f"  마스크 업로드: {mask_name} (feather={MASK_FEATHER if not is_tiled else 0})")
-
-    wf = build_workflow(pos_full, negative, seed, mask_name, base_name)
+    # hi-res fix + 4xUltrasharp 워크플로우 (polygon 클리핑은 PIL post-process)
+    wf = build_workflow(pos_full, negative, seed, img_w, img_h)
     resp = comfy_post("/prompt", {"prompt": wf})
     prompt_id = resp["prompt_id"]
     print(f"  queued: {prompt_id}")
@@ -566,6 +577,17 @@ async def generate_one(
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     download_image(images[0]["filename"], images[0].get("subfolder", ""), out_path)
+
+    # polygon 클리핑: 생성된 이미지를 다운로드 후 PIL로 polygon 외부를 검정으로 마스킹
+    # (VAEEncodeForInpaint 방식 대비: ring border 없음, 퀄 손실 없음)
+    if not is_tiled:
+        gen_img = Image.open(out_path).convert("RGB")
+        gen_w, gen_h = gen_img.size
+        poly_mask = create_mask(boundaries, bbox, gen_w, gen_h, feather=POLY_MASK_FEATHER)
+        black = Image.new("RGB", gen_img.size, (0, 0, 0))
+        clipped = Image.composite(gen_img, black, poly_mask.convert("L"))
+        clipped.save(out_path, format="PNG")
+        print(f"  polygon clip: {gen_w}×{gen_h}px (feather={POLY_MASK_FEATHER})")
 
     if outline:
         draw_polygon_outline(out_path, boundaries, bbox)

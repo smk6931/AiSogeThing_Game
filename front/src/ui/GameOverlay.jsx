@@ -65,6 +65,7 @@ const LAYER_BUTTONS = [
   { key: 'showGroupColors',         label: '그룹색', icon: '🌈', colorOn: 'rgba(180,80,220,0.75)' },
   { key: 'showGroupArea',           label: '그룹영역', icon: '◩', colorOn: 'rgba(100,180,255,0.75)' },
   { key: 'showPartitionFill',       label: '파티션', icon: '▦', colorOn: 'rgba(255,200,60,0.75)' },
+  { key: 'showElevation',           label: '등고선', icon: '⛰', colorOn: 'rgba(139,90,43,0.85)' },
 ];
 const ROAD_TYPE_BUTTONS = [
   { key: 'major', label: '큰길', icon: '═', colorOn: 'rgba(180,185,195,0.78)' },

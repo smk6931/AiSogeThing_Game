@@ -81,8 +81,9 @@ const findAdjacentGroupKeys = (currentGroupKey, partitions, radius = 700) => {
 // 파티션 종횡비 캡 (Python 동일 값)
 const MAX_PARTITION_ASPECT = 3.0;
 
-// 고도 스케일: 실제 100m → 0.3 world unit (서울 0~836m → 게임 내 0~2.5 unit)
-const ELEV_SCALE = 0.003;
+// 고도 스케일: 실제 100m → 10 world unit (노량진1동 5~92m → 게임 내 0.5~9.2 unit)
+// showElevation=false 시 effective scale = 0 → 전체 평지
+const ELEV_SCALE = 1.0;
 const BASE_Y = 0.55;
 
 /**
@@ -224,13 +225,13 @@ const buildGroupBoundaryGeometries = (boundaryGeoJson, elevY = BASE_Y) => {
 // group_key 단위 geometry 빌드 (캐시 우선)
 // partitionTexIndexMap: Map<partition_key, texIndex> — ComfyUI 생성 이미지가 있는 파티션의 텍스처 인덱스
 // poolCount: 풀 텍스처 개수 (fallback hash 계산에 사용)
-const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndexMap, poolCount) => {
+const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndexMap, poolCount, effectiveScale = ELEV_SCALE) => {
   const mapSize = partitionTexIndexMap ? partitionTexIndexMap.size : 0;
-  // elevation 합산을 캐시 키에 포함 — 고도 데이터 갱신 시 geometry 재빌드
+  // elevation 합산 + scale을 캐시 키에 포함 — 고도 on/off 전환 시 geometry 재빌드
   const elevSum = allPartitions
     .filter(p => p.group_key === groupKey)
     .reduce((s, p) => s + (p.elevation_m ?? 0), 0);
-  const cacheKey = `${groupKey}:${texCount}:${mapSize}:${elevSum.toFixed(1)}`;
+  const cacheKey = `${groupKey}:${texCount}:${mapSize}:${elevSum.toFixed(1)}:${effectiveScale}`;
   if (groupGeometryCache.has(cacheKey)) return groupGeometryCache.get(cacheKey);
 
   const fallbackCount = poolCount || texCount;
@@ -275,7 +276,7 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
     const uvRepeat = (hasOwnImage && !isSharedGroupImage)
       ? computePartitionRepeat(partition)
       : null;
-    const elevY = BASE_Y + (partition.elevation_m ?? 0) * ELEV_SCALE;
+    const elevY = BASE_Y + (partition.elevation_m ?? 0) * effectiveScale;
     const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds, uvRepeat, elevY);
     if (!geo) continue;
 
@@ -384,6 +385,7 @@ const CityBlockContent = ({
   showSectorBlocks = true,
   playerPositionRef,
   currentGroupOnly = false,
+  showElevation = false,
 }) => {
   const textures = useTexture(texturePaths);  // pool 텍스처 — 항상 존재하므로 안전
   const texCount = Array.isArray(textures) ? textures.length : 1;
@@ -447,6 +449,9 @@ const CityBlockContent = ({
       });
     }
 
+    // showElevation on/off에 따른 effective scale
+    const effectiveScale = showElevation ? ELEV_SCALE : 0;
+
     // 그룹 boundary 렌더링: currentGroupOnly 모드에서는 파티션 단위로 폴백
     if (showSectorBlocks && dbGroups?.length > 0 && activeGroupKeys.size > 0 && !currentGroupOnly) {
       // ── 그룹 평균 elevation 계산 (파티션별 elevation_m 평균) ──────────
@@ -466,7 +471,7 @@ const CityBlockContent = ({
 
         const groupElev = groupElevMap.get(g.group_key);
         const avgElev = groupElev && groupElev.count > 0 ? groupElev.sum / groupElev.count : 0;
-        const groupElevY = BASE_Y + avgElev * ELEV_SCALE;
+        const groupElevY = BASE_Y + avgElev * effectiveScale;
 
         const geoList = buildGroupBoundaryGeometries(g.boundary_geojson, groupElevY);
         if (!geoList.length) continue;
@@ -492,7 +497,7 @@ const CityBlockContent = ({
           })();
 
       for (const groupKey of targetGroupKeys) {
-        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexUrlMap, poolCount);
+        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexUrlMap, poolCount, effectiveScale);
         result.push(...geos);
       }
     } else if (showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
@@ -508,7 +513,7 @@ const CityBlockContent = ({
     }
 
     return result;
-  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount]);
+  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation]);
 
   return (
     <group>
@@ -553,6 +558,7 @@ const CityBlockOverlay = ({
   currentGroupOnly = false,
   textureFolder = '',
   partitions = null,  // RpgWorld에서 주입 — null이면 자체 fetch
+  showElevation = false,
 }) => {
   const [texturePaths, setTexturePaths] = useState([]);
   const [dbPartitions, setDbPartitions] = useState([]);
@@ -668,6 +674,7 @@ const CityBlockOverlay = ({
       showSectorBlocks={showSectorBlocks}
       playerPositionRef={playerPositionRef}
       currentGroupOnly={currentGroupOnly}
+      showElevation={showElevation}
     />
   );
 };
