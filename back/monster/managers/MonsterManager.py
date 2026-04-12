@@ -311,7 +311,7 @@ class MonsterManager:
             self.monsters.pop(mid, None)
 
     async def game_loop(self, broadcast_func, get_players_func=None, send_to_player_func=None):
-        """몬스터 AI 루프 (0.1초마다 실행, 10 FPS)"""
+        """몬스터 AI 루프 (0.2초마다 실행, 5 FPS)"""
         self.is_running = True
         print("Monster AI loop started.")
 
@@ -396,8 +396,8 @@ class MonsterManager:
                             angle = math.atan2(nearest_pz - monster.z, nearest_px - monster.x)
                         else:
                             angle = random.uniform(0, math.pi * 2)
-                        monster.dx = math.cos(angle) * monster.speed * 0.1
-                        monster.dz = math.sin(angle) * monster.speed * 0.1
+                        monster.dx = math.cos(angle) * monster.speed * 0.2
+                        monster.dz = math.sin(angle) * monster.speed * 0.2
                         changed_monsters[m_id] = monster.to_dict()
 
                 elif monster.state == "move":
@@ -421,7 +421,7 @@ class MonsterManager:
                     "remove": removed_monster_ids
                 })
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.2)
 
 
 monster_manager = MonsterManager()

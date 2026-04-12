@@ -23,6 +23,7 @@ _PARTITION_COLUMNS = """
     area_m2,
     centroid_lat,
     centroid_lng,
+    elevation_m,
     boundary_geojson,
     gameplay_meta
 """

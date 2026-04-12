@@ -17,7 +17,7 @@ export const PunchProjectile = ({
   const texture = useTexture('/golden_punch.png');// 임시 이미지
   // const texture = useTexture('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png'); // 임시 이미지
 
-  const MAX_GEN = 5; // 2^4 = 16발까지 증식
+  const MAX_GEN = 3; // 최대 16발 (2→4→8→16), 64발 지수폭발 방지
   const speed = 2.5;
 
   useEffect(() => { if (velocity) vel.current = velocity; }, [velocity]);

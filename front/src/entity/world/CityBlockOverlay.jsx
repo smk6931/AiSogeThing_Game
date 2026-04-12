@@ -70,6 +70,10 @@ const findAdjacentGroupKeys = (currentGroupKey, partitions, radius = 700) => {
 // 파티션 종횡비 캡 (Python 동일 값)
 const MAX_PARTITION_ASPECT = 3.0;
 
+// 고도 스케일: 실제 100m → 0.3 world unit (서울 0~836m → 게임 내 0~2.5 unit)
+const ELEV_SCALE = 0.003;
+const BASE_Y = 0.55;
+
 /**
  * per-partition 이미지의 UV repeat 계산
  * Python compute_image_size 와 동일한 로직: MAX_ASPECT:1 초과 → 타일링
@@ -108,7 +112,7 @@ const computePartitionRepeat = (partition) => {
 // fitUV=true + uvBounds: group bounding box 기준 UV (group 이미지 공유용)
 // fitUV=true + uvBounds=null: 개별 polygon bounding box에 맞춤
 // uvRepeat: per-partition 타일링 반복 횟수 (기본 {x:1,z:1})
-const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null, uvRepeat = null) => {
+const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null, uvRepeat = null, elevY = BASE_Y) => {
   if (!coords || coords.length < 3) return null;
 
   const pts = coords.map(([lat, lng]) => gpsToGame(lat, lng));
@@ -154,7 +158,7 @@ const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null, u
     for (const idx of [a, b, c]) {
       const p = triangulationPts[idx];
       positions[vi++] = p.x;
-      positions[vi++] = 0.55;
+      positions[vi++] = elevY;
       positions[vi++] = p.z;
       if (fitUV) {
         const rx = uvRepeat ? uvRepeat.x : 1;
@@ -174,17 +178,17 @@ const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null, u
   return geo;
 };
 
-const buildTerrainBlockFromGeoJson = (boundaryGeoJson, fitUV = false, uvBounds = null, uvRepeat = null) => {
+const buildTerrainBlockFromGeoJson = (boundaryGeoJson, fitUV = false, uvBounds = null, uvRepeat = null, elevY = BASE_Y) => {
   if (!boundaryGeoJson?.coordinates?.length) return null;
   const [outer, ...holes] = boundaryGeoJson.coordinates;
   const outerCoords = outer.map(([lng, lat]) => [lat, lng]);
   const holeCoords = holes.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
-  return buildTerrainBlock(outerCoords, holeCoords, fitUV, uvBounds, uvRepeat);
+  return buildTerrainBlock(outerCoords, holeCoords, fitUV, uvBounds, uvRepeat, elevY);
 };
 
 // Polygon / MultiPolygon GeoJSON → 하나의 merged BufferGeometry (그룹 단위 바닥용)
 // MultiPolygon은 각 조각을 별도 geometry로 만들어 합침
-const buildGroupBoundaryGeometries = (boundaryGeoJson) => {
+const buildGroupBoundaryGeometries = (boundaryGeoJson, elevY = BASE_Y) => {
   if (!boundaryGeoJson) return [];
   const { type, coordinates } = boundaryGeoJson;
   const rings = [];
@@ -200,7 +204,7 @@ const buildGroupBoundaryGeometries = (boundaryGeoJson) => {
     if (!outer || outer.length < 3) continue;
     const outerCoords = outer.map(([lng, lat]) => [lat, lng]);
     const holeCoords = holes.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
-    const geo = buildTerrainBlock(outerCoords, holeCoords, false);
+    const geo = buildTerrainBlock(outerCoords, holeCoords, false, null, null, elevY);
     if (geo) result.push(geo);
   }
   return result;
@@ -211,7 +215,11 @@ const buildGroupBoundaryGeometries = (boundaryGeoJson) => {
 // poolCount: 풀 텍스처 개수 (fallback hash 계산에 사용)
 const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndexMap, poolCount) => {
   const mapSize = partitionTexIndexMap ? partitionTexIndexMap.size : 0;
-  const cacheKey = `${groupKey}:${texCount}:${mapSize}`;
+  // elevation 합산을 캐시 키에 포함 — 고도 데이터 갱신 시 geometry 재빌드
+  const elevSum = allPartitions
+    .filter(p => p.group_key === groupKey)
+    .reduce((s, p) => s + (p.elevation_m ?? 0), 0);
+  const cacheKey = `${groupKey}:${texCount}:${mapSize}:${elevSum.toFixed(1)}`;
   if (groupGeometryCache.has(cacheKey)) return groupGeometryCache.get(cacheKey);
 
   const fallbackCount = poolCount || texCount;
@@ -256,7 +264,8 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
     const uvRepeat = (hasOwnImage && !isSharedGroupImage)
       ? computePartitionRepeat(partition)
       : null;
-    const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds, uvRepeat);
+    const elevY = BASE_Y + (partition.elevation_m ?? 0) * ELEV_SCALE;
+    const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds, uvRepeat, elevY);
     if (!geo) continue;
 
     let texIdx;
@@ -391,12 +400,26 @@ const CityBlockContent = ({
 
     // 그룹 boundary 렌더링: currentGroupOnly 모드에서는 파티션 단위로 폴백
     if (showSectorBlocks && dbGroups?.length > 0 && activeGroupKeys.size > 0 && !currentGroupOnly) {
+      // ── 그룹 평균 elevation 계산 (파티션별 elevation_m 평균) ──────────
+      const groupElevMap = new Map();
+      for (const p of dbPartitions) {
+        if (!p.group_key) continue;
+        const e = groupElevMap.get(p.group_key) ?? { sum: 0, count: 0 };
+        e.sum += p.elevation_m ?? 0;
+        e.count++;
+        groupElevMap.set(p.group_key, e);
+      }
+
       // ── 그룹 boundary 단위 렌더링 (unioned polygon 사용) ──────────────
       for (const g of dbGroups) {
         if (!activeGroupKeys.has(g.group_key)) continue;
         if (!g.boundary_geojson || g.partition_count === 0) continue;
 
-        const geoList = buildGroupBoundaryGeometries(g.boundary_geojson);
+        const groupElev = groupElevMap.get(g.group_key);
+        const avgElev = groupElev && groupElev.count > 0 ? groupElev.sum / groupElev.count : 0;
+        const groupElevY = BASE_Y + avgElev * ELEV_SCALE;
+
+        const geoList = buildGroupBoundaryGeometries(g.boundary_geojson, groupElevY);
         if (!geoList.length) continue;
 
         const seed = hashString([g.group_key, g.theme_code, g.group_seq].join('|'));

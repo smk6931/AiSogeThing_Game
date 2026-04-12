@@ -22,12 +22,40 @@ import CameraRig from '@entity/world/CameraRig';
 import CullRadiusIndicator from '@entity/world/CullRadiusIndicator';
 import worldApi from '@api/world';
 
+// 개별 몬스터 — 자기 자신의 hp/state/position/targeting만 변경될 때 리렌더
+const MonsterItem = React.memo(
+  ({ monster, isTargeted, scale, onMonsterClick, onInfoClick }) => (
+    <group onClick={(e) => { e.stopPropagation(); onMonsterClick(monster); }}>
+      <Monster
+        id={monster.id}
+        position={monster.position}
+        hp={monster.hp}
+        maxHp={monster.maxHp}
+        state={monster.state}
+        modelPath={monster.modelPath || null}
+        tier={monster.tier || 'normal'}
+        scale={scale}
+        isTargeted={isTargeted}
+        onInfoClick={() => onInfoClick(monster)}
+      />
+    </group>
+  ),
+  (prev, next) =>
+    prev.isTargeted === next.isTargeted &&
+    prev.monster.hp === next.monster.hp &&
+    prev.monster.state === next.monster.state &&
+    prev.monster.position?.x === next.monster.position?.x &&
+    prev.monster.position?.z === next.monster.position?.z &&
+    prev.scale === next.scale,
+);
+
 const MapTiles = lazy(() => import('@entity/world/MapTiles'));
 const ZoneOverlay = lazy(() => import('@entity/world/ZoneOverlay'));
 const CityBlockOverlay = lazy(() => import('@entity/world/CityBlockOverlay'));
 const SeoulDistrictOverlay = lazy(() => import('@entity/world/SeoulDistrictOverlay'));
 const PartitionBoundaryOverlay = lazy(() => import('@entity/world/PartitionBoundaryOverlay'));
 const GroupColorOverlay = lazy(() => import('@entity/world/GroupColorOverlay'));
+const PartitionTextureOverlay = lazy(() => import('@entity/world/PartitionTextureOverlay'));
 const SeoulTerrain = lazy(() => import('@entity/world/SeoulTerrain'));
 const DongGroundMesh = lazy(() => import('@entity/world/DongGroundMesh'));
 const WorldDebugger = lazy(() => import('@entity/world/WorldDebugger'));
@@ -87,6 +115,7 @@ const RpgWorld = ({
     showGroupColors = false,
     showGroupArea = false,
     showPartitionFill = false,
+    showPartitionTextures = false,
     groundTextureFolder = '',
     roadTextureFolder = '',
     worldEditorOpen = false,
@@ -103,10 +132,10 @@ const RpgWorld = ({
 
     return {
       fogNear: 10,
-      fogFar: 800,
+      fogFar: 400,
       fogColor: '#88ccee',
       ambientIntensity: 0.4,
-      hdriUrl: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/industrial_sunset_02_1k.hdr',
+      hdriUrl: '',
       playerHeightMeters: 2.0,
       playerScale: 0.625,
       isOrthographic: true,
@@ -346,26 +375,18 @@ const RpgWorld = ({
     const monsterKeys = Object.keys(monsters);
     if (monsterKeys.length === 0) return null;
 
-    // 서버가 이미 반경 내 몬스터만 전송하므로 클라이언트 컬링은 최소화
     return monsterKeys.map((key) => {
       const monster = monsters[key];
       if (!monster?.position) return null;
-
       return (
-        <group key={monster.id} onClick={(event) => { event.stopPropagation(); handleMonsterClick(monster); }}>
-          <Monster
-            id={monster.id}
-            position={monster.position}
-            hp={monster.hp}
-            maxHp={monster.maxHp}
-            state={monster.state}
-            modelPath={monster.modelPath || null}
-            tier={monster.tier || 'normal'}
-            scale={monsterScaleRef.current}
-            isTargeted={String(selectedTargetId) === String(monster.id)}
-            onInfoClick={() => handleMonsterInfoClick(monster)}
-          />
-        </group>
+        <MonsterItem
+          key={monster.id}
+          monster={monster}
+          isTargeted={String(selectedTargetId) === String(monster.id)}
+          scale={monsterScaleRef.current}
+          onMonsterClick={handleMonsterClick}
+          onInfoClick={handleMonsterInfoClick}
+        />
       );
     });
   }, [monsters, selectedTargetId, handleMonsterClick, handleMonsterInfoClick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -485,6 +506,18 @@ const RpgWorld = ({
             currentDistrict={currentDistrict}
             elevation={debugConfig.mapElevation + 0.02}
             visible={showGroundMesh}
+          />
+        </Suspense>
+      )}
+
+      {worldLoadStage >= 1 && (
+        <Suspense fallback={null}>
+          <PartitionTextureOverlay
+            partitions={sharedPartitions}
+            visible={showPartitionTextures}
+            textureFolder="ground/noryangjin2_g04"
+            texturePrefix="g04"
+            elevation={debugConfig.mapElevation + 0.06}
           />
         </Suspense>
       )}
@@ -795,4 +828,4 @@ const RpgWorld = ({
   );
 };
 
-export default RpgWorld;
+export default React.memo(RpgWorld);

@@ -40,7 +40,7 @@ const Player = forwardRef(({ input, actions: inputActions, onMove, onAction, cha
 
       {/* 그림자 원 */}
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[0.7, 32]} />
+        <circleGeometry args={[0.7, 12]} />
         <meshBasicMaterial color="black" opacity={0.25} transparent />
       </mesh>
 

@@ -9,6 +9,7 @@ export const usePlayerMovement = (ref, input, onMove, zoomLevel = 16) => {
   const lastSendTime = useRef(0);
   const forward = useRef(new THREE.Vector3());
   const right = useRef(new THREE.Vector3());
+  const up = useRef(new THREE.Vector3(0, 1, 0));
 
   useFrame((state) => {
     if (!ref.current) return;
@@ -28,7 +29,7 @@ export const usePlayerMovement = (ref, input, onMove, zoomLevel = 16) => {
       }
 
       // 2. 카메라 오른쪽 방향 계산
-      right.current.crossVectors(forward.current, new THREE.Vector3(0, 1, 0));
+      right.current.crossVectors(forward.current, up.current);
 
       // 3. 입력을 카메라 기준 방향으로 변환
       // input.y: -1(W), 1(S) | input.x: -1(A), 1(D)

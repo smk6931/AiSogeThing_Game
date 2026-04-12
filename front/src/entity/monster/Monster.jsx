@@ -35,8 +35,8 @@ const MODEL_CONFIG = {
 const DEFAULT_CONFIG_HP_BAR = 4;
 const DEFAULT_CONFIG = { scale: 0.6, yOffset: 0, hpBarHeight: 4 };
 
-/** GLB 3D 몬스터 */
-const MonsterGLB = ({ modelPath, scale: playerScale, state }) => {
+/** GLB 3D 몬스터 — state 변화 시에만 리렌더 */
+const MonsterGLB = React.memo(({ modelPath, scale: playerScale, state }) => {
   const { scene, animations } = useGLTF(BASE_MODEL_URL + modelPath);
   const cloned = useMemo(() => cloneSkeleton(scene), [scene]);
   const groupRef = useRef();
@@ -82,7 +82,7 @@ const MonsterGLB = ({ modelPath, scale: playerScale, state }) => {
       <primitive object={cloned} />
     </group>
   );
-};
+});
 
 /** HP바 — geometry는 고정 크기, scale.x로 너비 조절 (geometry 재생성 없음) */
 const HpBar = ({ hp, maxHp, name, hpBarHeight, tier, isTargeted, onInfoClick }) => {
@@ -161,6 +161,13 @@ const Monster = ({ id, position, hp, maxHp, state, modelPath, tier = 'normal', s
       />
     </group>
   );
+};
+
+/** 알려진 몬스터 모델 사전 로드 — 처음 화면에 나타날 때 GLB fetch 버벅임 방지 */
+export const preloadMonsterModels = (modelPaths) => {
+  modelPaths.forEach((p) => {
+    if (p) useGLTF.preload(BASE_MODEL_URL + p);
+  });
 };
 
 export default Monster;

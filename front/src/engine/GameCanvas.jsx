@@ -35,8 +35,7 @@ const GameCanvas = ({
   return (
     <Canvas
       frameloop={active ? 'always' : 'never'}
-      shadows
-      gl={{ preserveDrawingBuffer: false, alpha: true, antialias: true, stencil: true }}
+      gl={{ preserveDrawingBuffer: false, alpha: true, antialias: false, stencil: false }}
       onCreated={({ gl }) => {
         gl.setClearColor(0x0a0a0a, 1);
       }}

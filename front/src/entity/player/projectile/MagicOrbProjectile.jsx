@@ -11,6 +11,7 @@ export const MagicOrbProjectile = ({ id, startPos, targetPos, targetMonsterId, r
   const meshRef = useRef();
   const pos = useRef(new THREE.Vector3(startPos.x, startPos.y ?? 1.5, startPos.z));
   const target = useRef(new THREE.Vector3(targetPos.x, targetPos.y ?? 1.5, targetPos.z));
+  const dir = useRef(new THREE.Vector3());
   const lifetime = useRef(0);
   const hit = useRef(false);
 
@@ -23,8 +24,8 @@ export const MagicOrbProjectile = ({ id, startPos, targetPos, targetMonsterId, r
       return;
     }
 
-    const dir = new THREE.Vector3().subVectors(target.current, pos.current);
-    const dist = dir.length();
+    dir.current.subVectors(target.current, pos.current);
+    const dist = dir.current.length();
 
     if (dist < HIT_DISTANCE) {
       hit.current = true;
@@ -33,8 +34,8 @@ export const MagicOrbProjectile = ({ id, startPos, targetPos, targetMonsterId, r
       return;
     }
 
-    dir.normalize().multiplyScalar(ORB_SPEED * delta);
-    pos.current.add(dir);
+    dir.current.normalize().multiplyScalar(ORB_SPEED * delta);
+    pos.current.add(dir.current);
     meshRef.current.position.copy(pos.current);
 
     // 구체 회전 (시각 효과)

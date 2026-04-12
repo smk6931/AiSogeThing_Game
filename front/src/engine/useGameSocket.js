@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import gameApi from '@api/game';
+import { preloadMonsterModels } from '@entity/monster/Monster';
 
 export const useGameSocket = (addProjectile) => {
     const { user } = useAuth();
@@ -43,6 +44,12 @@ export const useGameSocket = (addProjectile) => {
                 case 'sync_monsters':
                     monstersRef.current = message.monsters;
                     setMonsters(message.monsters); // 전체 동기화는 즉시 반영
+                    // 수신된 몬스터 모델 사전 로드 (처음 등장 시 GLB fetch 버벅임 방지)
+                    preloadMonsterModels(
+                        Object.values(message.monsters)
+                            .map(m => m.modelPath)
+                            .filter(Boolean)
+                    );
                     break;
 
                 case 'monster_delta': {

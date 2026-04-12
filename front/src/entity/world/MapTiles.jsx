@@ -108,12 +108,12 @@ const MapTiles = ({
     const isPortrait = viewportHeight > viewportWidth;
     const zoomSlack = zoom <= 14 ? 2 : zoom <= 15 ? 1 : 0;
 
-    let radiusX = cameraMode === 'isometric' ? 5 : 5;
-    let radiusY = cameraMode === 'isometric' ? 8 : 5;
+    let radiusX = cameraMode === 'isometric' ? 3 : 3;
+    let radiusY = cameraMode === 'isometric' ? 5 : 4;
 
     if (isPortrait) {
       radiusX += 1;
-      radiusY += cameraMode === 'isometric' ? 4 : 2;
+      radiusY += cameraMode === 'isometric' ? 2 : 1;
     }
 
     radiusX += zoomSlack;
