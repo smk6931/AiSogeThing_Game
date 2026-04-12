@@ -462,7 +462,8 @@ const SeoulTerrain = ({
   districtId = null, dongId = null, currentDistrict = null, currentDong = null,
   clipToCurrentGroup = false, playerPositionRef = null,
   elevation = 0, shiftX = -450, shiftZ = 320,
-  roadWidthMajor = 18, roadWidthMid = 10, roadWidthMinor = 6
+  roadWidthMajor = 18, roadWidthMid = 10, roadWidthMinor = 6,
+  partitions = null,  // RpgWorld에서 주입 — null이면 자체 fetch
 }) => {
   const [data, setData] = useState(null);
   const [geos, setGeos] = useState(null);
@@ -530,7 +531,12 @@ const SeoulTerrain = ({
     return () => { cancelled = true; };
   }, [roadTextureFolder]);
 
+  // partitions prop이 주입되면 fetch 스킵 (RpgWorld가 이미 보유한 데이터 재사용)
   useEffect(() => {
+    if (partitions !== null) {
+      setGroupPartitions(Array.isArray(partitions) ? partitions : []);
+      return;
+    }
     let cancelled = false;
 
     const loadPartitions = async () => {

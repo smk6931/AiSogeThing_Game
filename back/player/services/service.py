@@ -43,7 +43,6 @@ def apply_hit_to_monster(monster, player_attack: int, skill_name: str) -> dict:
     damage = calc_damage(player_attack, skill_name)
     monster.hp -= damage
     monster.state = "hit"
-    print(f"Monster {monster.id} hit! Damage: {damage}, HP: {monster.hp}/{monster.max_hp}")
 
     result = {
         "ok": True,

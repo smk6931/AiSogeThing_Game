@@ -40,7 +40,6 @@ export function useSeoulDongs() {
         if (cachedRes) {
           const data = await cachedRes.json();
           if (data?.dongs?.length > 0) {
-            console.log(`[useSeoulDongs] 캐시 로드 (${data.dongs.length}개 동)`);
             setDongs(data.dongs);
             dongsRef.current = data.dongs;
             return;
@@ -54,7 +53,6 @@ export function useSeoulDongs() {
         const response = await worldApi.getDongs();
         const data = response.data;
         const list = data.dongs || [];
-        console.log(`[useSeoulDongs] 서버 로드 (${list.length}개 동)`);
         setDongs(list);
         dongsRef.current = list;
 

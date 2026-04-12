@@ -51,12 +51,13 @@ from core.database import async_session_factory
 # 설정
 # ──────────────────────────────────────────────────────────────────────────────
 COMFYUI_HOST    = "http://localhost:8188"
-CHECKPOINT_NAME = "rpg_v5.safetensors"
-STEPS           = 25
-CFG             = 7.0
-SAMPLER         = "dpm_2_ancestral"
+CHECKPOINT_NAME = "dreamshaperXL_lightningDPMSDE.safetensors"
+STEPS           = 8
+CFG             = 2.0
+SAMPLER         = "dpmpp_sde"
 SCHEDULER       = "karras"
 MASK_FEATHER    = 0
+GROW_MASK_BY    = 4   # VAEEncodeForInpaint grow_mask_by
 
 # 지리 좌표 → 미터 (서울 기준, mapConfig.js 동일)
 LAT_TO_M = 110940
@@ -68,23 +69,16 @@ MAX_ASPECT       = 3.0
 TARGET_PIXELS    = 512 * 512
 MAX_IMAGE_SIZE   = 1024
 
-# rpg_v5 황금 세팅 (partition_tex_00074 퀄리티 기준 — 이전 성공 프롬프트 그대로 복원)
-# 핵심: "seamless tileable" + "overhead 90 degrees" → rpg_v5가 씬을 풍부하게 그림
+# DreamShaper XL Lightning 기본 설정 (agents/game_design/local_image_generation.md 기준)
+# soft painterly anime RPG style, top-down 90도 overhead
 STYLE_PREFIX = (
-    "top-down RPG game texture, bird's eye view, overhead 90 degrees, "
-    "fantasy medieval korean village ground, "
-    "detailed floor texture, seamless tileable, "
-    "cobblestone paths, stone tiles, moss, grass patches, dirt roads, "
-    "rpg game asset, high quality 2D game art, "
-    "rich colors, painterly style, detailed environment"
+    "top-down 90 degree overhead, fantasy RPG game map ground tile, "
+    "soft painterly anime RPG art style, vibrant colors, clean readable game asset, "
+    "no characters, no buildings"
 )
 STYLE_NEGATIVE = (
-    "blurry, low quality, watermark, text, signature, "
-    "humans, characters, animals, vehicles, UI, "
-    "3D render, photorealistic, modern, sci-fi, "
-    "isometric, side view, perspective view, "
-    "dark, muddy colors, washed out, oversaturated, "
-    "empty space, blank areas, white background"
+    "photorealistic, 3d render, isometric, side view, building, character, "
+    "text, watermark, dark gloomy, blurry, border, frame, bad quality"
 )
 
 # ── 레퍼런스 스타일 프리셋 ──────────────────────────────────────────────────
@@ -138,18 +132,20 @@ STYLE_PRESETS: dict[str, dict] = {
 # 현재 활성 스타일 (None = 기본 DB 기반)
 _ACTIVE_STYLE: str | None = None
 
-# theme/landuse → 씬 묘사 (overhead view 중심, rpg_v5가 씬을 풍부하게 그리도록 유도)
+# theme_code → Positive 추가 프롬프트 (DreamShaper XL Lightning 스타일 기준)
+# agents/game_design/local_image_generation.md 참조
 FLOOR_CONTEXT: dict[str, str] = {
-    "RESIDENTIAL":      "overhead view of densely packed korean rooftops, clay tile roofs, concrete flat roofs, small inner courtyards from above, varied warm roof colors",
-    "COMMERCIAL":       "overhead view of market district, stone and tile paving, merchant stall rooftops, worn cobblestone paths from above",
-    "INDUSTRIAL":       "overhead view of industrial block, corrugated metal roofing, concrete slabs, pipes and storage tanks from above",
-    "PARK":             "overhead view of park ground, lush grass, stone garden paths, flower beds, gravel walkways",
-    "MIXED":            "overhead view of mixed district, varied rooftop textures, stone paths and green patches",
-    "RESIDENTIAL_ZONE": "overhead view of korean residential rooftops, dense clay tile roofs, narrow alleys between buildings, small rooftop gardens, concrete walkways",
-    "COMMERCIAL_ZONE":  "overhead view of commercial district rooftops, flat concrete roofs, signboard frames, stone floor paths between buildings",
-    "ACADEMY_SANCTUM":  "overhead view of korean academy stone floor, worn grey flagstone tiles, moss between paving stones, stone courtyard from above",
-    "SANCTUARY":        "overhead view of shrine stone paving, ceremonial tile patterns, sacred earth and moss, stone lantern bases",
-    "GREEN_ZONE":       "overhead view of park and garden ground, grass lawn, stone stepping paths, tree canopy tops, flower patches",
+    "RESIDENTIAL":      "warm rooftop view, clay tile roofs, small courtyards, mossy stone paths, cozy residential ground",
+    "COMMERCIAL":       "market stone floor, worn cobblestone, merchant district ground, colorful awning shadows",
+    "INDUSTRIAL":       "industrial stone floor, metal grates, forge ash ground, dark worn cobblestone, heat-cracked earth",
+    "PARK":             "lush grass, garden path, flower beds, soft natural ground, dappled light on grass",
+    "MIXED":            "mixed ground texture, stone paths and green patches, varied surface materials",
+    "RESIDENTIAL_ZONE": "warm rooftop view, clay tile roofs, small courtyards, mossy stone paths, cozy residential ground",
+    "COMMERCIAL_ZONE":  "market stone floor, worn cobblestone, merchant district ground, colorful awning shadows",
+    "FORGE_DISTRICT":   "industrial stone floor, metal grates, forge ash ground, dark worn cobblestone, heat-cracked earth",
+    "ACADEMY_SANCTUM":  "stone courtyard, worn flagstone, ancient academy ground, moss between tiles, scholarly stone plaza",
+    "SANCTUARY":        "sacred stone paving, ceremonial tile patterns, soft earth and moss, stone lantern bases",
+    "GREEN_ZONE":       "lush grass, garden path, flower beds, soft natural ground, tree canopy tops",
 }
 
 # persona → 프롬프트 힌트 (image_prompt_append가 없을 때 fallback)
@@ -312,23 +308,45 @@ def upload_mask(mask_img: Image.Image, filename: str) -> str:
         return json.loads(resp.read())["name"]
 
 
+def create_black_base(width: int, height: int) -> Image.Image:
+    """VAEEncodeForInpaint 용 검정 베이스 이미지 (RGB)"""
+    return Image.new("RGB", (width, height), (0, 0, 0))
+
+
 def build_workflow(positive: str, negative: str, seed: int,
-                   mask_filename: str, width: int, height: int) -> dict:
+                   mask_filename: str, base_filename: str,
+                   width: int, height: int) -> dict:
+    """
+    DreamShaper XL Lightning 인페인팅 워크플로우
+    VAEEncodeForInpaint(grow_mask_by=GROW_MASK_BY) + 검정 base + polygon mask
+    agents/game_design/local_image_generation.md 기준
+    """
     return {
-        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT_NAME}},
-        "5": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
-        "6": {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
-        "7": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
+        "4":  {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT_NAME}},
+        "6":  {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["4", 1]}},
+        "7":  {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["4", 1]}},
+        # base image (검정)
+        "13": {"class_type": "LoadImage", "inputs": {"image": base_filename}},
+        # mask image (흰 polygon on 검정)
         "10": {"class_type": "LoadImage", "inputs": {"image": mask_filename}},
         "11": {"class_type": "ImageToMask", "inputs": {"image": ["10", 0], "channel": "red"}},
-        "12": {"class_type": "SetLatentNoiseMask", "inputs": {"samples": ["5", 0], "mask": ["11", 0]}},
+        # VAEEncodeForInpaint: base + mask → latent
+        "14": {
+            "class_type": "VAEEncodeForInpaint",
+            "inputs": {
+                "pixels": ["13", 0],
+                "vae": ["4", 2],
+                "mask": ["11", 0],
+                "grow_mask_by": GROW_MASK_BY,
+            },
+        },
         "3": {
             "class_type": "KSampler",
             "inputs": {
                 "seed": seed, "steps": STEPS, "cfg": CFG,
                 "sampler_name": SAMPLER, "scheduler": SCHEDULER, "denoise": 1.0,
                 "model": ["4", 0], "positive": ["6", 0], "negative": ["7", 0],
-                "latent_image": ["12", 0],
+                "latent_image": ["14", 0],
             },
         },
         "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
@@ -510,7 +528,12 @@ async def generate_one(
     mask_name = upload_mask(mask_img, mask_upload_name)
     print(f"  마스크 업로드: {mask_name}")
 
-    wf = build_workflow(pos_full, negative, seed, mask_name, img_w, img_h)
+    # 검정 베이스 이미지 업로드 (VAEEncodeForInpaint용)
+    base_img  = create_black_base(img_w, img_h)
+    base_upload_name = mask_upload_name.replace("_mask.png", "_base.png")
+    base_name = upload_mask(base_img, base_upload_name)
+
+    wf = build_workflow(pos_full, negative, seed, mask_name, base_name, img_w, img_h)
     resp = comfy_post("/prompt", {"prompt": wf})
     prompt_id = resp["prompt_id"]
     print(f"  queued: {prompt_id}")

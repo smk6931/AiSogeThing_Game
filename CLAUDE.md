@@ -30,6 +30,9 @@
 - [`agents/frontend/ui_rules.md`](C:/GitHub/AiSogeThing_Game/agents/frontend/ui_rules.md)
 - [`agents/game_design/world_partition_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_partition_rules.md)
 - [`agents/game_design/road_design_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
+- [`agents/game_design/local_image_generation.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/local_image_generation.md) — 파티션 텍스처 생성 스크립트, 모델, 출력 경로 규칙 (파티션 이미지 생성 작업 시 필독)
+- [`agents/frontend/asset_cache_rules.md`](C:/GitHub/AiSogeThing_Game/agents/frontend/asset_cache_rules.md) — Service Worker 에셋 영구 캐시, manifest 해시 갱신 절차 (GLB/텍스처 추가·변경 시 필독)
+- [`agents/game_design/world_texture_terrain_direction.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_texture_terrain_direction.md) — 바닥/파티션 텍스처 방향, 폴리곤별 이미지 방식 주의사항 (텍스처 구조 변경 시 필독)
 - [`agents/process/workflow_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/workflow_rules.md)
 - [`agents/process/tool_split_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/tool_split_rules.md)
 - [`agents/process/global_tooling_scope_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/global_tooling_scope_rules.md)
@@ -71,6 +74,20 @@
 - `debugger`: 원인 분석
 - `code-reviewer`: 품질과 보안 리뷰
 - `architect`: 구조 선택 검토
+
+## agents/ 추가 규칙
+
+새 문서를 `agents/`에 추가하기 전에 반드시 아래 절차를 따른다.
+
+1. `agents/README.md`를 읽어 현재 문서 목록과 분류를 파악한다.
+2. 관련 카테고리 폴더 안의 기존 파일들의 메타 헤더(`Title`, `Description`, `Keywords`)를 읽는다.
+3. 추가하려는 내용과 기존 파일 내용을 비교해 겹치는 항목이 있는지 확인한다.
+4. 판단 기준:
+   - **겹치는 내용 없음** → 새 파일 추가, `agents/README.md`와 `CLAUDE.md` Core Index에 등록
+   - **일부 겹침** → 기존 파일에 내용 보강, 새 파일 추가 안 함
+   - **완전히 동일** → 스킵, 기존 파일로 충분
+5. 새 파일을 추가할 때는 반드시 메타 헤더(`Title`, `Description`, `When-To-Read`, `Keywords`, `Priority`)를 포함한다.
+6. `agents/README.md`의 현재 문서 분류 목록을 최신 상태로 유지한다.
 
 ## Guardrails
 

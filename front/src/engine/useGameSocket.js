@@ -230,7 +230,6 @@ export const useGameSocket = (addProjectile) => {
                     break;
 
                 case 'item_drop':
-                    console.log('[item_drop] received:', message.items);
                     if (message.items?.length > 0) {
                         const newDrops = message.items.map(item => ({
                             ...item,
@@ -245,8 +244,8 @@ export const useGameSocket = (addProjectile) => {
             }
         };
 
-        socket.onopen = () => console.log('[OK] Game Socket Connected');
-        socket.onclose = () => console.log('[LEAVE] Game Socket Disconnected');
+        socket.onopen = () => {};
+        socket.onclose = () => {};
         socket.onerror = (err) => console.error('[ERROR] Game Socket Error:', err);
 
         return () => {

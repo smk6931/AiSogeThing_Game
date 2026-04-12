@@ -94,7 +94,7 @@ const WorldDebugger = ({ config, onUpdate, resetToDefaults, controls, options })
         console.log(JSON.stringify(config, null, 2));
         
         // 브라우저 로컬 저장소에 반영구적 저장
-        localStorage.setItem('world_debug_config', JSON.stringify(config));
+        localStorage.setItem('world_debug_config', JSON.stringify({ ...config, _version: 2 }));
         
         alert('모든 설정값이 브라우저 저장소(localStorage)에 저장되었습니다! 이제 새로고침해도 유지됩니다.');
       },

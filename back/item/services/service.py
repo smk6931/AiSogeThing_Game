@@ -13,7 +13,6 @@ async def roll_drops(drop_table: list[dict]) -> list[dict]:
     for entry in (drop_table or []):
         roll = random.random()
         rate = entry.get("rate", 0)
-        print(f"[ROLL] item_id={entry.get('item_id')} rate={rate:.2f} roll={roll:.2f} hit={roll < rate}")
         if roll < rate:
             try:
                 item = await repository.get_item(entry["item_id"])

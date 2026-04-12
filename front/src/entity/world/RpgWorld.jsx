@@ -17,7 +17,7 @@ import { useSkillRotation } from '@hooks/useSkillRotation';
 import { useAutoFarm } from '@hooks/useAutoFarm';
 import { useSeoulDistricts } from '@hooks/useSeoulDistricts';
 import { useSeoulDongs } from '@hooks/useSeoulDongs';
-import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
+import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M, LAYER_Y } from '@entity/world/mapConfig';
 import CameraRig from '@entity/world/CameraRig';
 import CullRadiusIndicator from '@entity/world/CullRadiusIndicator';
 import worldApi from '@api/world';
@@ -55,7 +55,6 @@ const CityBlockOverlay = lazy(() => import('@entity/world/CityBlockOverlay'));
 const SeoulDistrictOverlay = lazy(() => import('@entity/world/SeoulDistrictOverlay'));
 const PartitionBoundaryOverlay = lazy(() => import('@entity/world/PartitionBoundaryOverlay'));
 const GroupColorOverlay = lazy(() => import('@entity/world/GroupColorOverlay'));
-const PartitionTextureOverlay = lazy(() => import('@entity/world/PartitionTextureOverlay'));
 const SeoulTerrain = lazy(() => import('@entity/world/SeoulTerrain'));
 const DongGroundMesh = lazy(() => import('@entity/world/DongGroundMesh'));
 const WorldDebugger = lazy(() => import('@entity/world/WorldDebugger'));
@@ -115,22 +114,12 @@ const RpgWorld = ({
     showGroupColors = false,
     showGroupArea = false,
     showPartitionFill = false,
-    showPartitionTextures = false,
     groundTextureFolder = '',
     roadTextureFolder = '',
     worldEditorOpen = false,
   } = mapSettings;
   const [debugConfig, setDebugConfig] = useState(() => {
-    const saved = localStorage.getItem('world_debug_config');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (error) {
-        console.error('Failed to parse saved world config', error);
-      }
-    }
-
-    return {
+    const defaults = {
       fogNear: 10,
       fogFar: 400,
       fogColor: '#88ccee',
@@ -151,7 +140,7 @@ const RpgWorld = ({
       showGrid: false,
       terrainHeightScale: 1.0,
       terrainBaseHeight: 0.0,
-      mapElevation: -0.2,
+      mapElevation: 0,
       baseFloorElevation: -1.0,
       gridElevation: 0.05,
       objectState: {
@@ -164,6 +153,23 @@ const RpgWorld = ({
       roadWidthMid: 12,
       roadWidthMinor: 8,
     };
+
+    const CONFIG_VERSION = 2; // 구조 변경 시 올리면 localStorage 자동 초기화
+    const saved = localStorage.getItem('world_debug_config');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed._version === CONFIG_VERSION) {
+          return { ...defaults, ...parsed };
+        }
+        // 버전 불일치 → 구버전 삭제 후 defaults 사용
+        localStorage.removeItem('world_debug_config');
+      } catch (error) {
+        console.error('Failed to parse saved world config', error);
+        localStorage.removeItem('world_debug_config');
+      }
+    }
+    return defaults;
   });
   const [controlMode, setControlMode] = useState('translate');
   const [sharedZoneData, setSharedZoneData] = useState(null);
@@ -504,23 +510,12 @@ const RpgWorld = ({
           <DongGroundMesh
             currentDong={currentDong}
             currentDistrict={currentDistrict}
-            elevation={debugConfig.mapElevation + 0.02}
+            elevation={debugConfig.mapElevation + LAYER_Y.ground_mesh}
             visible={showGroundMesh}
           />
         </Suspense>
       )}
 
-      {worldLoadStage >= 1 && (
-        <Suspense fallback={null}>
-          <PartitionTextureOverlay
-            partitions={sharedPartitions}
-            visible={showPartitionTextures}
-            textureFolder="ground/noryangjin2_g04"
-            texturePrefix="g04"
-            elevation={debugConfig.mapElevation + 0.06}
-          />
-        </Suspense>
-      )}
 
       {worldLoadStage >= 2 && (
         <Suspense fallback={null}>
@@ -538,8 +533,9 @@ const RpgWorld = ({
             roadWidthMajor={debugConfig.roadWidthMajor}
             roadWidthMid={debugConfig.roadWidthMid}
             roadWidthMinor={debugConfig.roadWidthMinor}
-            elevation={0.05}
+            elevation={debugConfig.mapElevation + LAYER_Y.road}
             shiftZ={0}
+            partitions={sharedPartitions}
           />
         </Suspense>
       )}
@@ -554,7 +550,7 @@ const RpgWorld = ({
             dongId={currentDongId}
             currentDong={currentDong}
             onZoneLoaded={setSharedZoneData}
-            elevation={debugConfig.mapElevation + 0.1}
+            elevation={debugConfig.mapElevation + LAYER_Y.zone}
             heightScale={debugConfig.terrainHeightScale}
             zoneRadius={debugConfig.zoneFetchRadius}
             roadWidthMajor={debugConfig.roadWidthMajor}
@@ -598,7 +594,7 @@ const RpgWorld = ({
             currentDistrict={currentDistrict}
             dongId={currentDongId}
             currentDong={currentDong}
-            elevation={debugConfig.mapElevation + 0.08}
+            elevation={debugConfig.mapElevation + LAYER_Y.landuse}
           />
         </Suspense>
       )}
@@ -615,8 +611,9 @@ const RpgWorld = ({
             currentDistrict={currentDistrict}
             dongId={currentDongId}
             currentDong={currentDong}
-            elevation={debugConfig.mapElevation + 0.09}
+            elevation={debugConfig.mapElevation + LAYER_Y.road_split}
             playerPositionRef={playerRef}
+            partitions={sharedPartitions}
           />
         </Suspense>
       )}
@@ -633,8 +630,9 @@ const RpgWorld = ({
             currentDistrict={currentDistrict}
             dongId={currentDongId}
             currentDong={currentDong}
-            elevation={debugConfig.mapElevation + 0.11}
+            elevation={debugConfig.mapElevation + LAYER_Y.current_group_tex}
             playerPositionRef={playerRef}
+            partitions={sharedPartitions}
           />
         </Suspense>
       )}
@@ -662,7 +660,7 @@ const RpgWorld = ({
             currentDongId={currentDongId}
             currentDong={currentDong}
             visible={showDistrictBoundaries}
-            elevation={debugConfig.mapElevation + 0.3}
+            elevation={debugConfig.mapElevation + LAYER_Y.district_boundary - 0.04}
           />
         </Suspense>
       )}
@@ -676,7 +674,7 @@ const RpgWorld = ({
             highlightCurrentGroup={highlightCurrentGroup}
             currentPartitionKey={currentRegionInfo?.currentPartition?.partition_key || null}
             currentGroupKey={currentRegionInfo?.currentPartition?.group_key || null}
-            elevation={debugConfig.mapElevation + 0.34}
+            elevation={debugConfig.mapElevation + LAYER_Y.district_boundary}
             microOpacity={(showGroupArea || showGroupColors) ? 0.55 : 0.24}
           />
         </Suspense>
@@ -689,7 +687,7 @@ const RpgWorld = ({
             showGroupColors={showGroupColors}
             showGroupArea={showGroupArea}
             showPartitionFill={showPartitionFill}
-            elevation={debugConfig.mapElevation + 0.38}
+            elevation={debugConfig.mapElevation + LAYER_Y.group_color}
           />
         </Suspense>
       )}

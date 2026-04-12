@@ -16,12 +16,24 @@ Priority: high
 
 | 모델 | 파일 | 용도 | 품질 |
 |------|------|------|------|
-| **RPG v5** (현재 기본) | `rpg_v5.safetensors` | 파티션 바닥 텍스처 | 판타지 RPG 게임 에셋 최적 |
+| **DreamShaper XL Lightning** ★ 기본 | `dreamshaperXL_lightningDPMSDE.safetensors` | 파티션 바닥 텍스처 | soft anime RPG 스타일 최적, 빠름 |
+| RPG v5 | `rpg_v5.safetensors` | 대안 (medieval 스타일) | 판타지 RPG 게임 에셋 |
 | SDXL Base 1.0 | `sd_xl_base_1.0.safetensors` | 범용 (비추) | 게임 에셋 부적합 |
 
 ## 모델별 최적 설정
 
-### RPG v5 (SD 1.5 기반) — 기본값
+### DreamShaper XL Lightning (SDXL 기반) — 기본값 ★
+```
+STEPS    = 8
+CFG      = 2.0
+SAMPLER  = dpmpp_sde
+SCHEDULER= karras
+DENOISE  = 1.0
+WORKFLOW = VAEEncodeForInpaint (grow_mask_by=4) + 검정 base 이미지 + polygon mask
+MAX_SIZE = 1024px
+```
+
+### RPG v5 (SD 1.5 기반) — 대안
 ```
 STEPS    = 25
 CFG      = 7.0
@@ -66,6 +78,44 @@ python back/scripts/generate_partition_textures.py \
     --partition-keys ... \
     --checkpoint rpg_v5.safetensors
 ```
+
+## 파티션 텍스처 프롬프트 가이드 (DreamShaper XL Lightning 기준)
+
+### 공통 Positive 접두어
+```
+top-down 90 degree overhead, fantasy RPG game map ground tile,
+soft painterly anime RPG art style, vibrant colors, clean readable game asset,
+no characters, no buildings
+```
+
+### 공통 Negative
+```
+photorealistic, 3d render, isometric, side view, building, character,
+text, watermark, dark gloomy, blurry, border, frame, bad quality
+```
+
+### texture_profile → Positive 추가 프롬프트
+| texture_profile | 추가 Positive |
+|----------------|--------------|
+| `forest_path_02` | forest floor, dirt path, mossy ground, tree roots, leaf litter, dappled light |
+| `green_courtyard` | soft grass courtyard, stone tiles, flower beds, warm sunlight |
+| `dense_block_ground` | urban dirt ground, worn stone, compacted earth, gravel |
+| `fantasy_stone_road` | ancient cobblestone road, moss cracks, old stone pavement |
+| `frozen_bank` | frost-covered ground, icy soil, bare winter earth, snow patches |
+| `event_surface` | magical rune circle, glowing stone floor, mystical ground |
+
+### theme_code → Positive 추가 프롬프트 (texture_profile 없을 때)
+| theme_code | 추가 Positive |
+|-----------|--------------|
+| `RESIDENTIAL_ZONE` | warm rooftop view, clay tile roofs, small courtyards, mossy stone paths, cozy residential ground |
+| `FORGE_DISTRICT` | industrial stone floor, metal grates, forge ash ground, dark worn cobblestone, heat-cracked earth |
+| `ACADEMY_SANCTUM` | stone courtyard, worn flagstone, ancient academy ground, moss between tiles |
+| `SANCTUARY` | sacred stone paving, ceremonial tile patterns, soft earth and moss |
+| `GREEN_ZONE` | lush grass, garden path, flower beds, soft natural ground |
+| `COMMERCIAL_ZONE` | market stone floor, worn cobblestone, merchant district ground |
+
+### image_prompt_append 활용
+DB의 `image_prompt_append` 값을 Positive에 추가 (파티션별 고유 디테일).
 
 ## 이미지 생성 핵심 설계
 

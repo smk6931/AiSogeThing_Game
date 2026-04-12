@@ -11,6 +11,17 @@ const groupBoundaryCache = new Map();
 // group_key 기준 geometry 캐시 (세션 전체 유지 — 재방문 시 rebuild 없음)
 const groupGeometryCache = new Map(); // key: `${group_key}:${texCount}` → [{geo, texIdx, order}]
 
+export const clearPartitionCache = () => {
+  partitionCache.clear();
+  groupBoundaryCache.clear();
+  groupGeometryCache.clear();
+};
+
+// 브라우저 콘솔에서 window.clearPartitionCache() 로 바로 호출 가능
+if (typeof window !== 'undefined') {
+  window.clearPartitionCache = clearPartitionCache;
+}
+
 
 const hashString = (value = '') => {
   let hash = 0;
@@ -268,20 +279,17 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
     const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds, uvRepeat, elevY);
     if (!geo) continue;
 
-    let texIdx;
-    if (hasOwnImage) {
-      texIdx = partitionTexIndexMap.get(partition.partition_key);
-    } else {
-      const seed = hashString([
-        partition.partition_key || '',
-        partition.group_key || '',
-        partition.group_theme_code || '',
-        partition.texture_profile || '',
-        partition.partition_seq || 0,
-      ].join('|'));
-      texIdx = seed % fallbackCount;
-    }
-    result.push({ geo, texIdx, order: 5, transparent: hasOwnImage });
+    // partitionTexUrlMap: Map<partition_key, url> — 파일 존재 여부는 렌더 시점에 판단
+    const partitionUrl = hasOwnImage ? partitionTexIndexMap.get(partition.partition_key) : null;
+    const seed = hashString([
+      partition.partition_key || '',
+      partition.group_key || '',
+      partition.group_theme_code || '',
+      partition.texture_profile || '',
+      partition.partition_seq || 0,
+    ].join('|'));
+    const texIdx = seed % fallbackCount;  // fallback (partitionUrl 로드 실패 시 사용)
+    result.push({ geo, texIdx, partitionUrl, order: 5, transparent: !!partitionUrl });
   }
 
   groupGeometryCache.set(cacheKey, result);
@@ -323,10 +331,49 @@ const DongMask = ({ currentDong, currentDistrict, elevation }) => {
   );
 };
 
+// partition URL 개별 로드 — 404 시 null (useTexture는 크래시하므로 사용 불가)
+function usePartitionTextures(urls) {
+  const [texMap, setTexMap] = useState(() => new Map());
+  const urlKey = urls.join('|');
+
+  useEffect(() => {
+    if (!urls.length) { setTexMap(new Map()); return; }
+    const loader = new THREE.TextureLoader();
+    const loaded = new Map();
+    let remaining = urls.length;
+
+    const onDone = (url, tex) => {
+      loaded.set(url, tex);
+      if (--remaining === 0) setTexMap(new Map(loaded));
+    };
+
+    urls.forEach((url) => {
+      loader.load(
+        url,
+        (tex) => {
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          tex.anisotropy = 16;
+          tex.needsUpdate = true;
+          onDone(url, tex);
+        },
+        undefined,
+        () => onDone(url, null),  // 404 → null, 크래시 없음
+      );
+    });
+
+    return () => {
+      loaded.forEach((tex) => tex?.dispose());
+    };
+  }, [urlKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return texMap;
+}
+
 const CityBlockContent = ({
-  texturePaths,
+  texturePaths,     // pool 텍스처만 (항상 존재하는 파일)
   poolCount,
-  partitionTexIndexMap,
+  partitionTexUrlMap,  // Map<partition_key, url> — 존재 여부 불문, 로드 실패 시 null
+  partitionUrls,       // URL 배열 (커스텀 로딩용)
   zoneData,
   dbPartitions,
   dbGroups,
@@ -338,8 +385,9 @@ const CityBlockContent = ({
   playerPositionRef,
   currentGroupOnly = false,
 }) => {
-  const textures = useTexture(texturePaths);
+  const textures = useTexture(texturePaths);  // pool 텍스처 — 항상 존재하므로 안전
   const texCount = Array.isArray(textures) ? textures.length : 1;
+  const partitionTextureMap = usePartitionTextures(partitionUrls);  // 개별 로드, 404 무시
 
   // 현재 그룹 + 인접 그룹 key 집합 (500ms 간격 갱신)
   const [activeGroupKeys, setActiveGroupKeys] = useState(() => new Set());
@@ -376,6 +424,7 @@ const CityBlockContent = ({
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.anisotropy = 16;
       t.needsUpdate = true;
+      // partitionTextureMap 텍스처는 usePartitionTextures 내부에서 이미 설정됨
     });
   }, [textures]);
 
@@ -393,7 +442,7 @@ const CityBlockContent = ({
           const geo = buildTerrainBlock(feature.coords, feature.holes);
           if (!geo) return;
           const seed = Math.abs(feature.coords[0][0] * 12345 + feature.coords[0][1] * 67890);
-          result.push({ geo, texIdx: Math.floor(seed) % texCount, order: 3 });
+          result.push({ geo, texIdx: Math.floor(seed) % texCount, partitionUrl: null, order: 3 });
         });
       });
     }
@@ -443,7 +492,7 @@ const CityBlockContent = ({
           })();
 
       for (const groupKey of targetGroupKeys) {
-        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexIndexMap, poolCount);
+        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexUrlMap, poolCount);
         result.push(...geos);
       }
     } else if (showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
@@ -459,18 +508,23 @@ const CityBlockContent = ({
     }
 
     return result;
-  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexIndexMap, poolCount]);
+  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount]);
 
   return (
     <group>
       <DongMask currentDong={currentDong} currentDistrict={currentDistrict} elevation={elevation + 0.01} />
       <group position={[0, elevation, 0]}>
-        {blocks.map((block, index) => (
+        {blocks.map((block, index) => {
+          // partitionUrl이 있으면 개별 로드 맵에서 찾고, 없거나 로드 실패면 pool 텍스처 fallback
+          const partTex = block.partitionUrl ? partitionTextureMap.get(block.partitionUrl) : null;
+          const tex = partTex ?? (Array.isArray(textures) ? textures[block.texIdx] : textures);
+          const isTransparent = block.transparent && !!partTex;
+          return (
           <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
             <meshBasicMaterial
-              map={Array.isArray(textures) ? textures[block.texIdx] : textures}
-              transparent={block.transparent ?? false}
-              alphaTest={block.transparent ? 0.1 : 0}
+              map={tex}
+              transparent={isTransparent}
+              alphaTest={isTransparent ? 0.1 : 0}
               opacity={1}
               stencilWrite
               stencilRef={1}
@@ -480,7 +534,8 @@ const CityBlockContent = ({
               depthWrite={false}
             />
           </mesh>
-        ))}
+          );
+        })}
       </group>
     </group>
   );
@@ -497,6 +552,7 @@ const CityBlockOverlay = ({
   playerPositionRef,
   currentGroupOnly = false,
   textureFolder = '',
+  partitions = null,  // RpgWorld에서 주입 — null이면 자체 fetch
 }) => {
   const [texturePaths, setTexturePaths] = useState([]);
   const [dbPartitions, setDbPartitions] = useState([]);
@@ -521,7 +577,12 @@ const CityBlockOverlay = ({
     return () => { cancelled = true; };
   }, [textureFolder]);
 
+  // partitions prop이 주입되면 fetch 스킵 (RpgWorld sharedPartitions 재사용)
   useEffect(() => {
+    if (partitions !== null) {
+      setDbPartitions(Array.isArray(partitions) ? partitions : []);
+      return;
+    }
     let cancelled = false;
     const fetchPartitions = async () => {
       if (!showSectorBlocks || !currentDong?.id) {
@@ -543,7 +604,7 @@ const CityBlockOverlay = ({
     };
     fetchPartitions();
     return () => { cancelled = true; };
-  }, [showSectorBlocks, currentDong?.id]);
+  }, [partitions, showSectorBlocks, currentDong?.id]);
 
   // 그룹 boundary 데이터 (바닥 렌더링용 unioned polygon)
   useEffect(() => {
@@ -579,30 +640,24 @@ const CityBlockOverlay = ({
     return urls;
   }, [dbPartitions]);
 
-  const allTexturePaths = useMemo(
-    () => (partitionUrls.length > 0 ? [...texturePaths, ...partitionUrls] : texturePaths),
-    [texturePaths, partitionUrls],
-  );
-
-  const partitionTexIndexMap = useMemo(() => {
+  // partition_key → url 맵 (인덱스 불필요 — 개별 로딩으로 전환)
+  const partitionTexUrlMap = useMemo(() => {
     if (!partitionUrls.length) return null;
-    const urlToIdx = new Map(partitionUrls.map((url, i) => [url, texturePaths.length + i]));
     const map = new Map();
     for (const p of dbPartitions) {
-      if (p.texture_image_url && urlToIdx.has(p.texture_image_url)) {
-        map.set(p.partition_key, urlToIdx.get(p.texture_image_url));
-      }
+      if (p.texture_image_url) map.set(p.partition_key, p.texture_image_url);
     }
     return map.size > 0 ? map : null;
-  }, [partitionUrls, texturePaths.length, dbPartitions]);
+  }, [partitionUrls, dbPartitions]);
 
   if (!visible || loading || texturePaths.length === 0) return null;
 
   return (
     <CityBlockContent
-      texturePaths={allTexturePaths}
+      texturePaths={texturePaths}
       poolCount={texturePaths.length}
-      partitionTexIndexMap={partitionTexIndexMap}
+      partitionTexUrlMap={partitionTexUrlMap}
+      partitionUrls={partitionUrls}
       zoneData={zoneData}
       dbPartitions={dbPartitions}
       dbGroups={dbGroups}

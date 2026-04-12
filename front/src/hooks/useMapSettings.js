@@ -34,7 +34,6 @@ export const LAYER_DEFAULTS = {
   showGroupColors:         false,
   showGroupArea:           false,
   showPartitionFill:       false,
-  showPartitionTextures:   false,
   worldEditorOpen:         false,
   roadTypeFilters: { major: true, mid: true, alley: true, pedestrian: true, service: true },
   landuseFilters: {

@@ -50,7 +50,6 @@ const GameEntry = () => {
 
   // 포탈 진입/클릭 시 처리 (모달 열기)
   const handlePortalEncounter = (targetMapId) => {
-    console.log("Portal Encountered!", targetMapId);
     setIsWorldMapOpen(true);
   };
 

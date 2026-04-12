@@ -42,9 +42,11 @@ Priority: high | medium | low
   개발 구조, DB, 배포, 공통 규칙
 - `frontend/`
   UI, 레이아웃, 반응형, 인증 화면 규칙
+  - `asset_cache_rules.md` — Service Worker 에셋 영구 캐시 전략, manifest 갱신 절차 (GLB/텍스처 추가·변경 시 필독)
 - `game_design/`
   월드 구조, 파티션, 도로, 감성 규칙
-  - `local_image_generation.md` — 로컬 ComfyUI 이미지 생성 설정 (모델, 파라미터, 스크립트 사용법)
+  - `local_image_generation.md` — 로컬 ComfyUI 이미지 생성 설정 (모델, 파라미터, 스크립트 사용법, 출력 경로 규칙)
+  - `world_texture_terrain_direction.md` — 파티션 바닥 텍스처 방향 정리 (폴리곤별 이미지 방식 주의사항, 연속 지형 방향 결정)
 - `auth/`
   로그인, 회원가입, 계정 생성 흐름 규칙
 - `planning/`

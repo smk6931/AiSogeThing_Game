@@ -40,7 +40,6 @@ export function useSeoulDistricts() {
         if (cached) {
           const { data } = JSON.parse(cached);
           if (data?.districts?.length > 0) {
-            console.log(`[useSeoulDistricts] 로컬 캐시 사용 (${data.districts.length}개 구)`);
             setDistricts(data.districts);
             districtsRef.current = data.districts;
             return;
@@ -54,7 +53,6 @@ export function useSeoulDistricts() {
         const response = await worldApi.getDistricts();
         const data = response.data;
         const list = data.districts || [];
-        console.log(`[useSeoulDistricts] 서버에서 ${list.length}개 구 경계 로드`);
         setDistricts(list);
         districtsRef.current = list;
 

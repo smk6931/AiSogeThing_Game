@@ -1,5 +1,8 @@
+import { LAYER_Y } from './mapConfig';
+
 /**
  * 서울 지형(HeightMap) 데이터 기반 고도 계산 핸들러
+ * 플레이어·몬스터 기준 Y는 mapConfig.LAYER_Y.character 를 사용한다.
  */
 let heightData = null;
 
@@ -17,7 +20,7 @@ export const loadHeightMap = async () => {
 };
 
 export const getTerrainHeight = (wx, wz) => {
-  if (!heightData) return 1.0;
+  if (!heightData) return LAYER_Y.character;
 
   const { grid_size, world_width, world_height, elevations, elev_min, offset_x, offset_z } = heightData;
 
@@ -59,6 +62,6 @@ export const getTerrainHeight = (wx, wz) => {
   // 현재 RpgWorld.jsx의 debugConfig.terrainHeightScale (기본값 1.0)과 일치시킵니다.
   let finalY = relElev * 1.0;
 
-  // 캐릭터나 도로가 올라갈 최종 지표면 높이 (시각적 메시와 1:1 일치)
-  return finalY;
+  // 캐릭터나 도로가 올라갈 최종 지표면 높이 (flat 오버레이 스택 위)
+  return finalY + LAYER_Y.character;
 };
