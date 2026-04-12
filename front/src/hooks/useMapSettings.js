@@ -57,6 +57,9 @@ export function useMapSettings() {
   const [highlightCurrentGroup, setHighlightCurrentGroup] = useState(true);
   const [showCurrentGroupTexture, setShowCurrentGroupTexture] = useState(true);
   const [showCullRadius, setShowCullRadius] = useState(false);
+  const [showGroupColors, setShowGroupColors] = useState(false);
+  const [showGroupArea, setShowGroupArea] = useState(false);
+  const [showPartitionFill, setShowPartitionFill] = useState(false);
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
 
   // Texture folders
@@ -118,6 +121,9 @@ export function useMapSettings() {
     highlightCurrentGroup, setHighlightCurrentGroup,
     showCurrentGroupTexture, setShowCurrentGroupTexture,
     showCullRadius, setShowCullRadius,
+    showGroupColors, setShowGroupColors,
+    showGroupArea, setShowGroupArea,
+    showPartitionFill, setShowPartitionFill,
     worldEditorOpen, setWorldEditorOpen,
     groundTextureFolder, setGroundTextureFolder, availableGroundTextureFolders,
     roadTextureFolder, setRoadTextureFolder, availableRoadTextureFolders,

@@ -44,6 +44,7 @@ Priority: high | medium | low
   UI, 레이아웃, 반응형, 인증 화면 규칙
 - `game_design/`
   월드 구조, 파티션, 도로, 감성 규칙
+  - `local_image_generation.md` — 로컬 ComfyUI 이미지 생성 설정 (모델, 파라미터, 스크립트 사용법)
 - `auth/`
   로그인, 회원가입, 계정 생성 흐름 규칙
 - `planning/`

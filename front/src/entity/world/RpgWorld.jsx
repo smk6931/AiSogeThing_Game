@@ -24,6 +24,7 @@ const ZoneOverlay = lazy(() => import('@entity/world/ZoneOverlay'));
 const CityBlockOverlay = lazy(() => import('@entity/world/CityBlockOverlay'));
 const SeoulDistrictOverlay = lazy(() => import('@entity/world/SeoulDistrictOverlay'));
 const PartitionBoundaryOverlay = lazy(() => import('@entity/world/PartitionBoundaryOverlay'));
+const GroupColorOverlay = lazy(() => import('@entity/world/GroupColorOverlay'));
 const SeoulTerrain = lazy(() => import('@entity/world/SeoulTerrain'));
 const DongGroundMesh = lazy(() => import('@entity/world/DongGroundMesh'));
 const WorldDebugger = lazy(() => import('@entity/world/WorldDebugger'));
@@ -79,6 +80,9 @@ const RpgWorld = ({
     highlightCurrentGroup = true,
     showCurrentGroupTexture = false,
     showCullRadius = false,
+    showGroupColors = false,
+    showGroupArea = false,
+    showPartitionFill = false,
     groundTextureFolder = '',
     roadTextureFolder = '',
     worldEditorOpen = false,
@@ -603,6 +607,18 @@ const RpgWorld = ({
             currentPartitionKey={currentRegionInfo?.currentPartition?.partition_key || null}
             currentGroupKey={currentRegionInfo?.currentPartition?.group_key || null}
             elevation={debugConfig.mapElevation + 0.34}
+          />
+        </Suspense>
+      )}
+
+      {worldLoadStage >= 1 && (showGroupColors || showGroupArea || showPartitionFill) && (
+        <Suspense fallback={null}>
+          <GroupColorOverlay
+            currentDong={currentDong}
+            showGroupColors={showGroupColors}
+            showGroupArea={showGroupArea}
+            showPartitionFill={showPartitionFill}
+            elevation={debugConfig.mapElevation + 0.38}
           />
         </Suspense>
       )}
