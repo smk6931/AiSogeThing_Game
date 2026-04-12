@@ -6,6 +6,8 @@ import worldApi from '@api/world';
 
 // 동 ID 기준 파티션 데이터 캐시
 const partitionCache = new Map();
+// 동 ID 기준 그룹 boundary 캐시
+const groupBoundaryCache = new Map();
 // group_key 기준 geometry 캐시 (세션 전체 유지 — 재방문 시 rebuild 없음)
 const groupGeometryCache = new Map(); // key: `${group_key}:${texCount}` → [{geo, texIdx, order}]
 
@@ -179,6 +181,30 @@ const buildTerrainBlockFromGeoJson = (boundaryGeoJson, fitUV = false, uvBounds =
   return buildTerrainBlock(outerCoords, holeCoords, fitUV, uvBounds, uvRepeat);
 };
 
+// Polygon / MultiPolygon GeoJSON → 하나의 merged BufferGeometry (그룹 단위 바닥용)
+// MultiPolygon은 각 조각을 별도 geometry로 만들어 합침
+const buildGroupBoundaryGeometries = (boundaryGeoJson) => {
+  if (!boundaryGeoJson) return [];
+  const { type, coordinates } = boundaryGeoJson;
+  const rings = [];
+  if (type === 'Polygon') {
+    rings.push(coordinates);
+  } else if (type === 'MultiPolygon') {
+    for (const poly of coordinates) rings.push(poly);
+  } else {
+    return [];
+  }
+  const result = [];
+  for (const [outer, ...holes] of rings) {
+    if (!outer || outer.length < 3) continue;
+    const outerCoords = outer.map(([lng, lat]) => [lat, lng]);
+    const holeCoords = holes.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
+    const geo = buildTerrainBlock(outerCoords, holeCoords, false);
+    if (geo) result.push(geo);
+  }
+  return result;
+};
+
 // group_key 단위 geometry 빌드 (캐시 우선)
 // partitionTexIndexMap: Map<partition_key, texIndex> — ComfyUI 생성 이미지가 있는 파티션의 텍스처 인덱스
 // poolCount: 풀 텍스처 개수 (fallback hash 계산에 사용)
@@ -292,6 +318,7 @@ const CityBlockContent = ({
   partitionTexIndexMap,
   zoneData,
   dbPartitions,
+  dbGroups,
   currentDong,
   currentDistrict,
   elevation,
@@ -360,8 +387,24 @@ const CityBlockContent = ({
       });
     }
 
-    if (showSectorBlocks && dbPartitions?.length > 0) {
-      // 활성 그룹만 렌더링 (activeGroupKeys가 결정되기 전이면 가장 가까운 그룹 하나만)
+    if (showSectorBlocks && dbGroups?.length > 0 && activeGroupKeys.size > 0) {
+      // ── 그룹 boundary 단위 렌더링 (unioned polygon 사용) ──────────────
+      for (const g of dbGroups) {
+        if (!activeGroupKeys.has(g.group_key)) continue;
+        if (!g.boundary_geojson || g.partition_count === 0) continue;
+
+        const geoList = buildGroupBoundaryGeometries(g.boundary_geojson);
+        if (!geoList.length) continue;
+
+        const seed = hashString([g.group_key, g.theme_code, g.group_seq].join('|'));
+        const texIdx = seed % (poolCount || texCount);
+
+        for (const geo of geoList) {
+          result.push({ geo, texIdx, order: 5, transparent: false });
+        }
+      }
+    } else if (showSectorBlocks && dbPartitions?.length > 0) {
+      // ── fallback: micro 파티션 단위 렌더링 (그룹 boundary 없을 때) ────
       const keysToRender = activeGroupKeys.size > 0
         ? activeGroupKeys
         : null;
@@ -369,12 +412,10 @@ const CityBlockContent = ({
       const targetGroupKeys = keysToRender
         ? new Set([...keysToRender])
         : (() => {
-            // fallback: 전체 파티션 중 첫 group_key만
             const firstKey = dbPartitions.find(p => p.group_key)?.group_key;
             return firstKey ? new Set([firstKey]) : new Set();
           })();
 
-      // group_key 단위 캐시 활용
       for (const groupKey of targetGroupKeys) {
         const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexIndexMap, poolCount);
         result.push(...geos);
@@ -392,7 +433,7 @@ const CityBlockContent = ({
     }
 
     return result;
-  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, texCount, activeGroupKeys, partitionTexIndexMap, poolCount]);
+  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexIndexMap, poolCount]);
 
   return (
     <group>
@@ -433,6 +474,7 @@ const CityBlockOverlay = ({
 }) => {
   const [texturePaths, setTexturePaths] = useState([]);
   const [dbPartitions, setDbPartitions] = useState([]);
+  const [dbGroups, setDbGroups] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -474,6 +516,27 @@ const CityBlockOverlay = ({
       }
     };
     fetchPartitions();
+    return () => { cancelled = true; };
+  }, [showSectorBlocks, currentDong?.id]);
+
+  // 그룹 boundary 데이터 (바닥 렌더링용 unioned polygon)
+  useEffect(() => {
+    let cancelled = false;
+    if (!showSectorBlocks || !currentDong?.id) { setDbGroups([]); return; }
+    if (groupBoundaryCache.has(currentDong.id)) {
+      setDbGroups(groupBoundaryCache.get(currentDong.id));
+      return;
+    }
+    worldApi.getCodexDongGroups(currentDong.id)
+      .then((res) => {
+        if (cancelled) return;
+        const data = Array.isArray(res.data) ? res.data : [];
+        // partition_count > 0 인 그룹만 (도로 corridor 제외)
+        const flooring = data.filter((g) => g.partition_count > 0 && g.boundary_geojson);
+        groupBoundaryCache.set(currentDong.id, flooring);
+        setDbGroups(flooring);
+      })
+      .catch(() => { if (!cancelled) setDbGroups([]); });
     return () => { cancelled = true; };
   }, [showSectorBlocks, currentDong?.id]);
 

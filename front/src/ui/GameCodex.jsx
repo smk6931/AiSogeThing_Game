@@ -264,17 +264,109 @@ function WorldMiniMap({ groups, partitions, selectedGroupId, selectedPartitionId
   );
 }
 
-/* ─── Leaflet 레이어 컨트롤러 ─── */
+/* ─── 그룹 DivIcon 생성 헬퍼 ─── */
+function makeGroupIcon(g, state) {
+  // state: 'default' | 'active' | 'dim'
+  const col = themeColor(g.theme_code);
+  const name = (g.display_name || '').slice(0, 5);
+  const count = g.partition_count || 0;
+
+  const cfg = {
+    default: { size: 38, borderW: 1.5, fillAlpha: '22', textAlpha: 1, glow: false, scale: 1 },
+    active:  { size: 48, borderW: 2.5, fillAlpha: '33', textAlpha: 1, glow: true,  scale: 1 },
+    dim:     { size: 28, borderW: 1,   fillAlpha: '0d', textAlpha: 0.3, glow: false, scale: 1 },
+  }[state] || {};
+
+  const { size, borderW, fillAlpha, textAlpha, glow } = cfg;
+  const glowCss = glow ? `box-shadow:0 0 12px ${col}99,0 0 4px ${col}66;` : '';
+  const dimCss = state === 'dim' ? 'filter:saturate(0.3);' : '';
+
+  const badgeHtml = count > 0 ? `
+    <div style="
+      position:absolute;top:-5px;right:-5px;
+      background:${col};color:#050b12;
+      font-size:7px;font-weight:800;border-radius:999px;
+      padding:1px 4px;min-width:14px;text-align:center;
+      line-height:14px;height:14px;
+      font-family:sans-serif;
+      opacity:${state === 'dim' ? 0.3 : 1};
+    ">${count}</div>` : '';
+
+  const html = `
+    <div style="position:relative;width:${size}px;height:${size}px;">
+      <div style="
+        width:${size}px;height:${size}px;border-radius:50%;
+        background:${col}${fillAlpha};
+        border:${borderW}px solid ${col};
+        display:flex;align-items:center;justify-content:center;
+        font-size:${state === 'active' ? 9 : 8}px;
+        color:${col};font-weight:${state === 'active' ? 700 : 600};
+        font-family:sans-serif;text-align:center;line-height:1.2;
+        cursor:pointer;opacity:${textAlpha};
+        ${glowCss}${dimCss}
+      ">${name}</div>
+      ${badgeHtml}
+    </div>`;
+
+  return L.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+}
+
+/* ─── Leaflet 레이어 컨트롤러 (고도화) ─── */
 function MapLayersController({ groups, partitions, selectedGroupId, selectedPartitionId, onSelectGroup, onSelectPartition }) {
   const map = useMap();
-  const layersRef = useRef({});
+  const gBoundaryRef = useRef({}); // group boundary GeoJSON layers
+  const gMarkerRef   = useRef({}); // group centroid DivIcon markers
+  const pLayerRef    = useRef({}); // partition GeoJSON layers
+  const allGroupBoundsRef = useRef(null);
 
-  /* groups/partitions 변경 시 레이어 전체 재구성 */
+  /* 그룹 레이어 재구성 (groups 변경 시) */
   useEffect(() => {
-    Object.values(layersRef.current).forEach((l) => { try { map.removeLayer(l); } catch (_) {} });
-    layersRef.current = {};
+    Object.values(gBoundaryRef.current).forEach((l) => { try { map.removeLayer(l); } catch (_) {} });
+    Object.values(gMarkerRef.current).forEach((l) => { try { map.removeLayer(l); } catch (_) {} });
+    gBoundaryRef.current = {};
+    gMarkerRef.current = {};
 
     const bounds = [];
+
+    groups.forEach((g) => {
+      const col = themeColor(g.theme_code);
+
+      /* 경계 폴리곤 */
+      if (g.boundary_geojson) {
+        try {
+          const geo = typeof g.boundary_geojson === 'string' ? JSON.parse(g.boundary_geojson) : g.boundary_geojson;
+          const layer = L.geoJSON(geo, {
+            style: { color: col, weight: 1.5, fillColor: col, fillOpacity: 0.08, opacity: 0.55, dashArray: '5 3' },
+          }).on('click', (e) => { L.DomEvent.stopPropagation(e); onSelectGroup(g); });
+          layer.addTo(map);
+          gBoundaryRef.current[g.id] = layer;
+          bounds.push(layer.getBounds());
+        } catch (_) {}
+      }
+
+      /* centroid 마커 */
+      if (g.centroid_lat && g.centroid_lng) {
+        const marker = L.marker([g.centroid_lat, g.centroid_lng], { icon: makeGroupIcon(g, 'default'), zIndexOffset: 100 })
+          .on('click', () => onSelectGroup(g));
+        marker.addTo(map);
+        gMarkerRef.current[g.id] = marker;
+      }
+    });
+
+    if (bounds.length) {
+      try {
+        const combined = bounds.reduce((a, b) => a.extend(b));
+        allGroupBoundsRef.current = combined;
+        map.fitBounds(combined, { padding: [28, 28], maxZoom: 16, animate: false });
+      } catch (_) {}
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups]);
+
+  /* 파티션 레이어 재구성 (partitions 변경 시) */
+  useEffect(() => {
+    Object.values(pLayerRef.current).forEach((l) => { try { map.removeLayer(l); } catch (_) {} });
+    pLayerRef.current = {};
 
     partitions.forEach((p) => {
       if (!p.boundary_geojson) return;
@@ -282,62 +374,69 @@ function MapLayersController({ groups, partitions, selectedGroupId, selectedPart
         const geo = typeof p.boundary_geojson === 'string' ? JSON.parse(p.boundary_geojson) : p.boundary_geojson;
         const col = themeColor(p.theme_code);
         const layer = L.geoJSON(geo, {
-          style: { color: col, weight: 1, fillColor: col, fillOpacity: 0.22, opacity: 0.7 },
+          style: { color: col, weight: 0.8, fillColor: col, fillOpacity: 0.28, opacity: 0.75 },
         }).on('click', (e) => { L.DomEvent.stopPropagation(e); onSelectPartition(p); });
         layer.addTo(map);
-        layersRef.current[`p_${p.id}`] = layer;
-        bounds.push(layer.getBounds());
+        pLayerRef.current[p.id] = layer;
       } catch (_) {}
     });
-
-    groups.forEach((g) => {
-      if (!g.boundary_geojson) return;
-      try {
-        const geo = typeof g.boundary_geojson === 'string' ? JSON.parse(g.boundary_geojson) : g.boundary_geojson;
-        const col = themeColor(g.theme_code);
-        const layer = L.geoJSON(geo, {
-          style: { color: col, weight: 2, fill: false, opacity: 0.75, dashArray: '5 3' },
-        }).on('click', (e) => { L.DomEvent.stopPropagation(e); onSelectGroup(g); });
-        layer.addTo(map);
-        layersRef.current[`g_${g.id}`] = layer;
-        if (!partitions.length) bounds.push(layer.getBounds());
-      } catch (_) {}
-    });
-
-    if (bounds.length) {
-      try {
-        map.fitBounds(bounds.reduce((a, b) => a.extend(b)), { padding: [24, 24], maxZoom: 17, animate: false });
-      } catch (_) {}
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups, partitions]);
+  }, [partitions]);
 
-  /* 선택 상태 변경 시 스타일만 업데이트 */
+  /* 선택 상태 변경 → 스타일 + 마커 업데이트 + 카메라 */
   useEffect(() => {
-    Object.entries(layersRef.current).forEach(([key, layer]) => {
-      if (key.startsWith('p_')) {
-        const id = parseInt(key.slice(2), 10);
-        const p = partitions.find((x) => x.id === id);
-        if (!p) return;
-        const col = themeColor(p.theme_code);
-        const active = selectedPartitionId === id;
-        layer.setStyle({ fillOpacity: active ? 0.55 : 0.22, weight: active ? 2 : 1, color: active ? '#fff' : col });
+    const hasGroup = !!selectedGroupId;
+
+    /* 그룹 경계 스타일 */
+    Object.entries(gBoundaryRef.current).forEach(([id, layer]) => {
+      const gid = Number(id);
+      const g = groups.find((x) => x.id === gid);
+      if (!g) return;
+      const col = themeColor(g.theme_code);
+      const active = selectedGroupId === gid;
+
+      if (!hasGroup) {
+        layer.setStyle({ color: col, weight: 1.5, fillOpacity: 0.08, opacity: 0.55, dashArray: '5 3' });
+      } else if (active) {
+        layer.setStyle({ color: col, weight: 2.5, fillColor: col, fillOpacity: 0.14, opacity: 1, dashArray: null });
+        /* 선택된 그룹으로 카메라 이동 */
+        try { map.fitBounds(layer.getBounds(), { padding: [32, 32], maxZoom: 17, animate: true }); } catch (_) {}
       } else {
-        const id = parseInt(key.slice(2), 10);
-        const g = groups.find((x) => x.id === id);
-        if (!g) return;
-        const col = themeColor(g.theme_code);
-        const active = selectedGroupId === id;
-        layer.setStyle({ weight: active ? 2.5 : 2, opacity: active ? 1 : 0.75, dashArray: active ? null : '5 3', color: active ? '#fff' : col });
+        layer.setStyle({ color: col, weight: 0.8, fillOpacity: 0.03, opacity: 0.18, dashArray: '5 3' });
       }
     });
+
+    /* 그룹 마커 아이콘 업데이트 */
+    Object.entries(gMarkerRef.current).forEach(([id, marker]) => {
+      const gid = Number(id);
+      const g = groups.find((x) => x.id === gid);
+      if (!g) return;
+      const state = !hasGroup ? 'default' : selectedGroupId === gid ? 'active' : 'dim';
+      marker.setIcon(makeGroupIcon(g, state));
+    });
+
+    /* 선택 해제 시 전체 뷰로 복귀 */
+    if (!hasGroup && allGroupBoundsRef.current) {
+      try { map.fitBounds(allGroupBoundsRef.current, { padding: [28, 28], maxZoom: 16, animate: true }); } catch (_) {}
+    }
+
+    /* 파티션 스타일 */
+    Object.entries(pLayerRef.current).forEach(([id, layer]) => {
+      const pid = Number(id);
+      const p = partitions.find((x) => x.id === pid);
+      if (!p) return;
+      const col = themeColor(p.theme_code);
+      const active = selectedPartitionId === pid;
+      layer.setStyle({ color: active ? '#ffffff' : col, weight: active ? 2 : 0.8, fillOpacity: active ? 0.55 : 0.28, opacity: active ? 1 : 0.75 });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGroupId, selectedPartitionId, groups, partitions]);
 
   return null;
 }
 
-/* ─── WorldMapLeaflet: 실제 서울 타일 + GeoJSON 경계 ─── */
-function WorldMapLeaflet({ groups, partitions, selectedGroupId, selectedPartitionId, onSelectGroup, onSelectPartition, height = 240 }) {
+/* ─── WorldMapLeaflet: 서울 타일 + GeoJSON + 그룹 마커 ─── */
+function WorldMapLeaflet({ groups, partitions, selectedGroupId, selectedPartitionId, onSelectGroup, onSelectPartition, loading = false, height = 240 }) {
   return (
     <div style={{ height, borderRadius: 10, overflow: 'hidden', border: `1px solid ${BORDER}`, flexShrink: 0, position: 'relative' }}>
       <MapContainer
@@ -347,12 +446,11 @@ function WorldMapLeaflet({ groups, partitions, selectedGroupId, selectedPartitio
         zoomControl={false}
         attributionControl={false}
       >
-        {/* CartoDB Dark Matter: 게임 UI 분위기에 맞는 어두운 지도 */}
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           subdomains="abcd"
           maxZoom={19}
-          opacity={0.75}
+          opacity={0.72}
         />
         <MapLayersController
           groups={groups}
@@ -363,6 +461,25 @@ function WorldMapLeaflet({ groups, partitions, selectedGroupId, selectedPartitio
           onSelectPartition={onSelectPartition}
         />
       </MapContainer>
+
+      {/* 파티션 로딩 오버레이 */}
+      {loading && (
+        <div style={{ position: 'absolute', bottom: 8, right: 10, fontSize: 9, color: ACCENT, background: 'rgba(5,11,18,0.8)', padding: '3px 8px', borderRadius: 999, border: `1px solid ${BORDER}`, pointerEvents: 'none' }}>
+          파티션 로딩 중…
+        </div>
+      )}
+
+      {/* 테마 범례 */}
+      {groups.length > 0 && (
+        <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 3, background: 'rgba(5,11,18,0.82)', borderRadius: 7, padding: '5px 7px', border: `1px solid ${BORDER}`, pointerEvents: 'none', maxWidth: 110 }}>
+          {[...new Set(groups.map((g) => g.theme_code).filter(Boolean))].slice(0, 5).map((code) => (
+            <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: themeColor(code), flexShrink: 0 }} />
+              <span style={{ fontSize: 8, color: '#8ca6a0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{code}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -608,7 +725,7 @@ const WorldCodex = () => {
                   <span style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 700 }}>{selectedDong.name}</span>
                   {loadingPartitions && <span style={{ fontSize: 9, color: '#4a6a66' }}>파티션 로딩중...</span>}
                 </div>
-                {/* 서울 지도 타일 + GeoJSON 경계 */}
+                {/* 서울 지도 타일 + GeoJSON 경계 + 그룹 마커 */}
                 <WorldMapLeaflet
                   groups={groups}
                   partitions={partitions}
@@ -616,7 +733,8 @@ const WorldCodex = () => {
                   selectedPartitionId={selectedPartition?.id}
                   onSelectGroup={(g) => { selectGroup(g); setSelectedPartition(null); }}
                   onSelectPartition={selectPartition}
-                  height={selectedGroup ? 200 : 260}
+                  loading={loadingPartitions}
+                  height={selectedGroup ? 195 : 255}
                 />
                 {/* 선택 상태 정보 패널 */}
                 {(selectedPartition || selectedGroup) && (
