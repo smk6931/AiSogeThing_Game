@@ -10,6 +10,7 @@ from world.services.district_service import (
     get_current_district as _get_current_district,
     get_current_dong as _get_current_dong,
 )
+from world.repositories import partition_repository
 from world.services.partition_service import get_current_region_info, get_partitions_by_dong_osm_id
 from world.services.terrain_service import terrain_service
 from world.services.world_design_service import get_yongsan_world_profile
@@ -182,3 +183,18 @@ async def get_road_texture_folders():
 @router.get("/design/yongsan")
 async def get_yongsan_design_profile():
     return get_yongsan_world_profile()
+
+
+@router.get("/codex/areas")
+async def get_codex_areas():
+    return await partition_repository.get_codex_area_tree()
+
+
+@router.get("/codex/dong/{dong_id}/groups")
+async def get_codex_dong_groups(dong_id: int):
+    return await partition_repository.get_codex_dong_groups(dong_id)
+
+
+@router.get("/codex/group/{group_id}/partitions")
+async def get_codex_group_partitions(group_id: int):
+    return await partition_repository.get_codex_group_partitions(group_id)

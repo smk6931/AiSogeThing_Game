@@ -89,6 +89,7 @@ const PartitionBoundaryOverlay = ({
   currentPartitionKey = null,
   currentGroupKey = null,
   elevation = 0.42,
+  microOpacity = 0.24,
 }) => {
   const [partitions, setPartitions] = useState([]);
 
@@ -156,7 +157,7 @@ const PartitionBoundaryOverlay = ({
       {visibleMicro &&
         microMeshes.map((entry) => (
           <mesh key={`partition-boundary-${entry.id}`} geometry={entry.geometry} renderOrder={13}>
-            <meshBasicMaterial color="#f7d56b" transparent opacity={0.24} depthWrite={false} depthTest={false} />
+            <meshBasicMaterial color="#f7d56b" transparent opacity={microOpacity} depthWrite={false} depthTest={false} />
           </mesh>
         ))}
 

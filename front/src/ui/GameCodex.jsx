@@ -1,9 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { BookOpen, ChevronLeft, Sparkles, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BookOpen, ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-react';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 import { useAuth } from '@contexts/AuthContext';
 import itemApi from '@api/item';
 import monsterApi from '@api/monster';
+import worldApi from '@api/world';
 
 const GAME_FONT = "'Cinzel', 'Noto Sans KR', serif";
 const PANEL_BG = 'linear-gradient(180deg, rgba(5,11,18,0.99), rgba(8,14,22,0.98))';
@@ -100,6 +104,561 @@ const ComingSoon = ({ label }) => (
     <div style={{ fontSize: '14px' }}>{label} 준비 중</div>
   </div>
 );
+
+/* ─── 월드 도감 ─────────────────────────────────────────── */
+
+const THEME_COLOR = {
+  sanctuary_green:  '#4ade80',
+  urban_district:   '#60a5fa',
+  commercial_hub:   '#fbbf24',
+  residential:      '#a78bfa',
+  industrial:       '#f97316',
+  park_nature:      '#22c55e',
+  mixed_use:        '#fb7185',
+  cultural:         '#e879f9',
+  waterfront:       '#38bdf8',
+};
+const themeColor = (code) => THEME_COLOR[code] || ACCENT;
+
+const LEVEL_EMOJI = { city: '🏙️', district: '🏛️', dong: '🏘️', group: '🗂️', partition: '📍' };
+
+/* 트리 구조 빌더 (flat → nested) */
+function buildAreaTree(areas) {
+  const byId = {};
+  areas.forEach((a) => { byId[a.id] = { ...a, children: [] }; });
+  const roots = [];
+  areas.forEach((a) => {
+    if (a.parent_id && byId[a.parent_id]) {
+      byId[a.parent_id].children.push(byId[a.id]);
+    } else if (!a.parent_id || !byId[a.parent_id]) {
+      roots.push(byId[a.id]);
+    }
+  });
+  // sort children by name
+  const sort = (nodes) => nodes.sort((x, y) => x.name.localeCompare(y.name, 'ko'));
+  Object.values(byId).forEach((n) => sort(n.children));
+  return sort(roots);
+}
+
+/* GeoJSON → SVG path 변환 헬퍼 */
+function extractGeoCoords(geojson) {
+  if (!geojson) return [];
+  const geo = typeof geojson === 'string' ? JSON.parse(geojson) : geojson;
+  const rings =
+    geo.type === 'Polygon' ? geo.coordinates :
+    geo.type === 'MultiPolygon' ? geo.coordinates.flat() : [];
+  return rings.flat().map(([lng, lat]) => ({ lat, lng }));
+}
+
+function geoToSvgPath(geojson, toXY) {
+  if (!geojson) return null;
+  const geo = typeof geojson === 'string' ? JSON.parse(geojson) : geojson;
+  const rings =
+    geo.type === 'Polygon' ? geo.coordinates :
+    geo.type === 'MultiPolygon' ? geo.coordinates.flat() : null;
+  if (!rings) return null;
+  return rings
+    .map((ring) =>
+      'M ' +
+      ring.map(([lng, lat]) => {
+        const { x, y } = toXY(lat, lng);
+        return `${x.toFixed(1)} ${y.toFixed(1)}`;
+      }).join(' L ') +
+      ' Z'
+    )
+    .join(' ');
+}
+
+/* 실제 GeoJSON 경계 기반 SVG 지도 */
+function WorldMiniMap({ groups, partitions, selectedGroupId, selectedPartitionId, onSelectGroup, onSelectPartition, width = 480, height = 260 }) {
+  const PAD = 16;
+
+  /* 바운딩 박스: 파티션/그룹 boundary_geojson의 모든 좌표 사용 */
+  const { minLat, maxLat, minLng, maxLng } = useMemo(() => {
+    const pts = [];
+    [...partitions, ...groups].forEach((item) => {
+      extractGeoCoords(item.boundary_geojson).forEach((c) => pts.push(c));
+      if (item.centroid_lat) pts.push({ lat: item.centroid_lat, lng: item.centroid_lng });
+    });
+    if (!pts.length) return { minLat: 0, maxLat: 1, minLng: 0, maxLng: 1 };
+    const lats = pts.map((p) => p.lat);
+    const lngs = pts.map((p) => p.lng);
+    const padV = (Math.max(...lats) - Math.min(...lats)) * 0.05 || 0.001;
+    const padH = (Math.max(...lngs) - Math.min(...lngs)) * 0.05 || 0.001;
+    return { minLat: Math.min(...lats) - padV, maxLat: Math.max(...lats) + padV, minLng: Math.min(...lngs) - padH, maxLng: Math.max(...lngs) + padH };
+  }, [groups, partitions]);
+
+  const toXY = useCallback((lat, lng) => ({
+    x: PAD + ((lng - minLng) / (maxLng - minLng || 1)) * (width - PAD * 2),
+    y: PAD + ((maxLat - lat) / (maxLat - minLat || 1)) * (height - PAD * 2),
+  }), [minLat, maxLat, minLng, maxLng, width, height]);
+
+  const hasData = partitions.length > 0 || groups.length > 0;
+  if (!hasData) {
+    return (
+      <div style={{ width, height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4a6a66', fontSize: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: 10, border: `1px solid ${BORDER}` }}>
+        경계 데이터 없음
+      </div>
+    );
+  }
+
+  return (
+    <svg
+      width={width} height={height}
+      style={{ background: 'rgba(2,8,16,0.85)', borderRadius: 10, border: `1px solid ${BORDER}`, cursor: 'default', flexShrink: 0 }}
+    >
+      {/* 파티션 폴리곤 */}
+      {partitions.map((p) => {
+        const d = geoToSvgPath(p.boundary_geojson, toXY);
+        if (!d) return null;
+        const col = themeColor(p.theme_code);
+        const active = selectedPartitionId === p.id;
+        const inActiveGroup = selectedGroupId && true; // 그룹 선택 시 해당 그룹 파티션
+        return (
+          <path
+            key={p.id} d={d}
+            fill={col} fillOpacity={active ? 0.55 : 0.2}
+            stroke={active ? col : `${col}88`} strokeWidth={active ? 1.5 : 0.6}
+            style={{ cursor: 'pointer' }}
+            onClick={(e) => { e.stopPropagation(); onSelectPartition(p); }}
+          >
+            <title>{p.display_name}</title>
+          </path>
+        );
+      })}
+
+      {/* 그룹 경계 윤곽 */}
+      {groups.map((g) => {
+        const d = geoToSvgPath(g.boundary_geojson, toXY);
+        const col = themeColor(g.theme_code);
+        const active = selectedGroupId === g.id;
+        return (
+          <g key={g.id}>
+            {d && (
+              <path
+                d={d}
+                fill="none"
+                stroke={col} strokeWidth={active ? 2.5 : 1.2}
+                strokeOpacity={active ? 1 : 0.6}
+                strokeDasharray={active ? 'none' : '4 2'}
+                style={{ cursor: 'pointer' }}
+                onClick={() => onSelectGroup(g)}
+              />
+            )}
+            {/* 그룹 레이블 (centroid) */}
+            {g.centroid_lat && g.centroid_lng && (() => {
+              const { x, y } = toXY(g.centroid_lat, g.centroid_lng);
+              return (
+                <g style={{ cursor: 'pointer' }} onClick={() => onSelectGroup(g)}>
+                  <circle cx={x} cy={y} r={active ? 13 : 9} fill={col} fillOpacity={active ? 0.3 : 0.15} stroke={col} strokeWidth={active ? 1.8 : 1} />
+                  <text x={x} y={y + 1} textAnchor="middle" dominantBaseline="middle" fontSize={active ? 8 : 7} fill={active ? '#fff' : col} style={{ pointerEvents: 'none', fontFamily: 'sans-serif', fontWeight: active ? 700 : 400 }}>
+                    {(g.display_name || '').slice(0, 4)}
+                  </text>
+                </g>
+              );
+            })()}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ─── Leaflet 레이어 컨트롤러 ─── */
+function MapLayersController({ groups, partitions, selectedGroupId, selectedPartitionId, onSelectGroup, onSelectPartition }) {
+  const map = useMap();
+  const layersRef = useRef({});
+
+  /* groups/partitions 변경 시 레이어 전체 재구성 */
+  useEffect(() => {
+    Object.values(layersRef.current).forEach((l) => { try { map.removeLayer(l); } catch (_) {} });
+    layersRef.current = {};
+
+    const bounds = [];
+
+    partitions.forEach((p) => {
+      if (!p.boundary_geojson) return;
+      try {
+        const geo = typeof p.boundary_geojson === 'string' ? JSON.parse(p.boundary_geojson) : p.boundary_geojson;
+        const col = themeColor(p.theme_code);
+        const layer = L.geoJSON(geo, {
+          style: { color: col, weight: 1, fillColor: col, fillOpacity: 0.22, opacity: 0.7 },
+        }).on('click', (e) => { L.DomEvent.stopPropagation(e); onSelectPartition(p); });
+        layer.addTo(map);
+        layersRef.current[`p_${p.id}`] = layer;
+        bounds.push(layer.getBounds());
+      } catch (_) {}
+    });
+
+    groups.forEach((g) => {
+      if (!g.boundary_geojson) return;
+      try {
+        const geo = typeof g.boundary_geojson === 'string' ? JSON.parse(g.boundary_geojson) : g.boundary_geojson;
+        const col = themeColor(g.theme_code);
+        const layer = L.geoJSON(geo, {
+          style: { color: col, weight: 2, fill: false, opacity: 0.75, dashArray: '5 3' },
+        }).on('click', (e) => { L.DomEvent.stopPropagation(e); onSelectGroup(g); });
+        layer.addTo(map);
+        layersRef.current[`g_${g.id}`] = layer;
+        if (!partitions.length) bounds.push(layer.getBounds());
+      } catch (_) {}
+    });
+
+    if (bounds.length) {
+      try {
+        map.fitBounds(bounds.reduce((a, b) => a.extend(b)), { padding: [24, 24], maxZoom: 17, animate: false });
+      } catch (_) {}
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, partitions]);
+
+  /* 선택 상태 변경 시 스타일만 업데이트 */
+  useEffect(() => {
+    Object.entries(layersRef.current).forEach(([key, layer]) => {
+      if (key.startsWith('p_')) {
+        const id = parseInt(key.slice(2), 10);
+        const p = partitions.find((x) => x.id === id);
+        if (!p) return;
+        const col = themeColor(p.theme_code);
+        const active = selectedPartitionId === id;
+        layer.setStyle({ fillOpacity: active ? 0.55 : 0.22, weight: active ? 2 : 1, color: active ? '#fff' : col });
+      } else {
+        const id = parseInt(key.slice(2), 10);
+        const g = groups.find((x) => x.id === id);
+        if (!g) return;
+        const col = themeColor(g.theme_code);
+        const active = selectedGroupId === id;
+        layer.setStyle({ weight: active ? 2.5 : 2, opacity: active ? 1 : 0.75, dashArray: active ? null : '5 3', color: active ? '#fff' : col });
+      }
+    });
+  }, [selectedGroupId, selectedPartitionId, groups, partitions]);
+
+  return null;
+}
+
+/* ─── WorldMapLeaflet: 실제 서울 타일 + GeoJSON 경계 ─── */
+function WorldMapLeaflet({ groups, partitions, selectedGroupId, selectedPartitionId, onSelectGroup, onSelectPartition, height = 240 }) {
+  return (
+    <div style={{ height, borderRadius: 10, overflow: 'hidden', border: `1px solid ${BORDER}`, flexShrink: 0, position: 'relative' }}>
+      <MapContainer
+        center={[37.55, 126.98]}
+        zoom={14}
+        style={{ width: '100%', height: '100%' }}
+        zoomControl={false}
+        attributionControl={false}
+      >
+        {/* CartoDB Dark Matter: 게임 UI 분위기에 맞는 어두운 지도 */}
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
+          maxZoom={19}
+          opacity={0.75}
+        />
+        <MapLayersController
+          groups={groups}
+          partitions={partitions}
+          selectedGroupId={selectedGroupId}
+          selectedPartitionId={selectedPartitionId}
+          onSelectGroup={onSelectGroup}
+          onSelectPartition={onSelectPartition}
+        />
+      </MapContainer>
+    </div>
+  );
+}
+
+/* 그룹 상세 패널 */
+function GroupDetail({ group, partitions, loading, onBack }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: ACCENT, cursor: 'pointer', fontSize: '12px', marginBottom: '12px', padding: 0, fontFamily: GAME_FONT }}>
+        <ChevronLeft size={14} /> 목록으로
+      </button>
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px' }}>
+        <div style={{ width: 48, height: 48, borderRadius: 10, background: `${themeColor(group.theme_code)}22`, border: `2px solid ${themeColor(group.theme_code)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+          🗂️
+        </div>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>{group.display_name || group.group_key}</div>
+          <div style={{ fontSize: 10, color: '#6a9a94', marginTop: 2 }}>
+            <span style={{ padding: '1px 6px', borderRadius: 999, border: `1px solid ${themeColor(group.theme_code)}55`, color: themeColor(group.theme_code), marginRight: 6 }}>{group.theme_code || '?'}</span>
+            파티션 {group.partition_count}개
+          </div>
+        </div>
+      </div>
+      {group.summary && (
+        <div style={{ fontSize: 11, color: '#b6c5c2', lineHeight: 1.7, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${BORDER}`, marginBottom: 12 }}>
+          {group.summary}
+        </div>
+      )}
+      <div style={{ fontSize: 10, color: GOLD, letterSpacing: '1.5px', marginBottom: 8 }}>PARTITIONS</div>
+      {loading ? (
+        <div style={{ color: '#4a6a66', fontSize: 12 }}>불러오는 중...</div>
+      ) : (
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {partitions.map((p) => {
+            const col = themeColor(p.theme_code);
+            return (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${BORDER}` }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: '#e2e8f0' }}>{p.display_name}</div>
+                  {p.dominant_landuse && <div style={{ fontSize: 9, color: '#5a7a74', marginTop: 2 }}>{p.dominant_landuse}</div>}
+                </div>
+                {p.area_m2 && <div style={{ fontSize: 9, color: '#6a9a94', flexShrink: 0 }}>{(p.area_m2 / 10000).toFixed(2)}ha</div>}
+              </div>
+            );
+          })}
+          {!partitions.length && <div style={{ color: '#4a6a66', fontSize: 12 }}>파티션 없음</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* 월드 도감 메인 */
+const WorldCodex = () => {
+  const [viewMode, setViewMode] = useState('tree'); // 'tree' | 'map'
+  const [areas, setAreas] = useState([]);
+  const [tree, setTree] = useState([]);
+  const [loadingAreas, setLoadingAreas] = useState(true);
+
+  // 선택 경로: district → dong
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [selectedDong, setSelectedDong] = useState(null);
+
+  // 그룹 목록 (동 선택 시 로드)
+  const [groups, setGroups] = useState([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+
+  // 파티션 목록 (그룹 선택 시 로드)
+  const [partitions, setPartitions] = useState([]);
+  const [loadingPartitions, setLoadingPartitions] = useState(false);
+  const [selectedPartition, setSelectedPartition] = useState(null);
+
+  useEffect(() => {
+    worldApi.getCodexAreas()
+      .then((res) => {
+        const data = Array.isArray(res.data) ? res.data : [];
+        setAreas(data);
+        setTree(buildAreaTree(data));
+      })
+      .catch(() => setAreas([]))
+      .finally(() => setLoadingAreas(false));
+  }, []);
+
+  const selectDong = useCallback((dong) => {
+    setSelectedDong(dong);
+    setSelectedGroup(null);
+    setSelectedPartition(null);
+    setPartitions([]);
+    setGroups([]);
+    setLoadingGroups(true);
+    worldApi.getCodexDongGroups(dong.id)
+      .then((res) => setGroups(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setGroups([]))
+      .finally(() => setLoadingGroups(false));
+  }, []);
+
+  const selectGroup = useCallback((group) => {
+    setSelectedGroup(group);
+    setSelectedPartition(null);
+    setPartitions([]);
+    setLoadingPartitions(true);
+    worldApi.getCodexGroupPartitions(group.id)
+      .then((res) => setPartitions(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setPartitions([]))
+      .finally(() => setLoadingPartitions(false));
+  }, []);
+
+  const selectPartition = useCallback((partition) => {
+    setSelectedPartition((prev) => prev?.id === partition.id ? null : partition);
+  }, []);
+
+  // 브레드크럼
+  const breadcrumb = [];
+  if (selectedDistrict) breadcrumb.push({ label: selectedDistrict.name, onClick: () => { setSelectedDistrict(null); setSelectedDong(null); setSelectedGroup(null); setSelectedPartition(null); setGroups([]); setPartitions([]); } });
+  if (selectedDong) breadcrumb.push({ label: selectedDong.name, onClick: () => { setSelectedDong(null); setSelectedGroup(null); setSelectedPartition(null); setGroups([]); setPartitions([]); } });
+  if (selectedGroup) breadcrumb.push({ label: selectedGroup.display_name || selectedGroup.group_key, onClick: () => { setSelectedGroup(null); setSelectedPartition(null); setPartitions([]); } });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* 상단 뷰 토글 + 브레드크럼 + 1차 초안 배지 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        {/* 뷰 토글 */}
+        <div style={{ display: 'flex', border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+          {[{ id: 'tree', label: '트리' }, { id: 'map', label: '지도' }].map((v) => (
+            <button key={v.id} onClick={() => setViewMode(v.id)} style={{ padding: '4px 12px', fontSize: 11, cursor: 'pointer', background: viewMode === v.id ? 'rgba(103,232,214,0.15)' : 'transparent', color: viewMode === v.id ? ACCENT : '#6a9a94', border: 'none', fontFamily: GAME_FONT }}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+        {/* 브레드크럼 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6a9a94', flex: 1, flexWrap: 'wrap' }}>
+          <span style={{ color: GOLD }}>서울시</span>
+          {breadcrumb.map((bc, i) => (
+            <React.Fragment key={i}>
+              <ChevronRight size={10} color="#4a6a66" />
+              <button onClick={bc.onClick} style={{ background: 'none', border: 'none', color: i === breadcrumb.length - 1 ? '#e2e8f0' : ACCENT, cursor: 'pointer', fontSize: 11, padding: 0, fontFamily: GAME_FONT }}>
+                {bc.label}
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+        {/* 1차 초안 배지 */}
+        <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(208,177,107,0.4)', color: '#9a7e45', background: 'rgba(208,177,107,0.07)', letterSpacing: '0.5px', flexShrink: 0 }}>
+          1차 초안
+        </span>
+      </div>
+
+      {/* 콘텐츠 */}
+      {loadingAreas ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4a6a66', fontSize: 13 }}>불러오는 중...</div>
+      ) : viewMode === 'tree' ? (
+        /* ── 트리 뷰 ── */
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {selectedGroup ? (
+            <GroupDetail group={selectedGroup} partitions={partitions} loading={loadingPartitions} onBack={() => { setSelectedGroup(null); setSelectedPartition(null); setPartitions([]); }} />
+          ) : selectedDong ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, color: GOLD, letterSpacing: '1.5px', marginBottom: 4 }}>GROUPS — {selectedDong.name}</div>
+              {loadingGroups ? (
+                <div style={{ color: '#4a6a66', fontSize: 12 }}>불러오는 중...</div>
+              ) : groups.length === 0 ? (
+                <div style={{ color: '#4a6a66', fontSize: 12 }}>등록된 그룹 없음</div>
+              ) : groups.map((g) => {
+                const col = themeColor(g.theme_code);
+                return (
+                  <button key={g.id} onClick={() => selectGroup(g)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: `linear-gradient(135deg, rgba(8,14,22,0.9), ${col}0d)`, border: `1px solid ${col}33`, borderRadius: 10, cursor: 'pointer', textAlign: 'left' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: `${col}22`, border: `1px solid ${col}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🗂️</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>{g.display_name || g.group_key}</div>
+                      <div style={{ fontSize: 9, color: '#6a9a94', marginTop: 2 }}>
+                        <span style={{ color: col }}>{g.theme_code || '?'}</span>{' · '}파티션 {g.partition_count}개
+                      </div>
+                    </div>
+                    <ChevronRight size={14} color="#4a6a66" />
+                  </button>
+                );
+              })}
+            </div>
+          ) : selectedDistrict ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, color: GOLD, letterSpacing: '1.5px', marginBottom: 4 }}>DONGS — {selectedDistrict.name}</div>
+              {selectedDistrict.children.map((dong) => (
+                <button key={dong.id} onClick={() => selectDong(dong)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 10, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ fontSize: 18 }}>🏘️</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: '#e2e8f0' }}>{dong.name}</div>
+                    <div style={{ fontSize: 9, color: '#6a9a94', marginTop: 2 }}>그룹 {dong.group_count}개 · 파티션 {dong.partition_count}개</div>
+                  </div>
+                  <ChevronRight size={14} color="#4a6a66" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, color: GOLD, letterSpacing: '1.5px', marginBottom: 4 }}>DISTRICTS — 서울특별시</div>
+              {tree.flatMap((city) => city.children).map((district) => {
+                const partCount = district.children.reduce((s, d) => s + (d.partition_count || 0), 0);
+                return (
+                  <button key={district.id} onClick={() => setSelectedDistrict(district)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 10, cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ fontSize: 18 }}>🏛️</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: '#e2e8f0' }}>{district.name}</div>
+                      <div style={{ fontSize: 9, color: '#6a9a94', marginTop: 2 }}>동 {district.children.length}개 · 파티션 {partCount}개</div>
+                    </div>
+                    <ChevronRight size={14} color="#4a6a66" />
+                  </button>
+                );
+              })}
+              {tree.flatMap((c) => c.children).length === 0 && (
+                <div style={{ color: '#4a6a66', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>구 데이터 없음</div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ── 지도 뷰 ── */
+        <div style={{ flex: 1, display: 'flex', gap: 10, overflow: 'hidden' }}>
+          {/* 동 선택 사이드 */}
+          <div style={{ width: 110, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ fontSize: 9, color: GOLD, letterSpacing: '1.5px', marginBottom: 4 }}>동 선택</div>
+            {areas.filter((a) => a.area_level === 'dong' && a.partition_count > 0).map((dong) => (
+              <button key={dong.id} onClick={() => { setSelectedDistrict(null); selectDong(dong); }} style={{ padding: '5px 7px', fontSize: 10, borderRadius: 6, cursor: 'pointer', background: selectedDong?.id === dong.id ? 'rgba(103,232,214,0.14)' : 'transparent', border: `1px solid ${selectedDong?.id === dong.id ? ACCENT : BORDER}`, color: selectedDong?.id === dong.id ? ACCENT : '#8ca6a0', textAlign: 'left', fontFamily: GAME_FONT }}>
+                {dong.name}
+                <span style={{ display: 'block', fontSize: 8, color: '#4a6a66', marginTop: 1 }}>파티션 {dong.partition_count}</span>
+              </button>
+            ))}
+            {areas.filter((a) => a.area_level === 'dong' && a.partition_count > 0).length === 0 && (
+              <div style={{ fontSize: 10, color: '#4a6a66' }}>데이터 없음</div>
+            )}
+          </div>
+
+          {/* 지도 영역 */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', minWidth: 0 }}>
+            {!selectedDong ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4a6a66', fontSize: 12 }}>← 동을 선택하세요</div>
+            ) : loadingGroups ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4a6a66', fontSize: 12 }}>경계 불러오는 중...</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 700 }}>{selectedDong.name}</span>
+                  {loadingPartitions && <span style={{ fontSize: 9, color: '#4a6a66' }}>파티션 로딩중...</span>}
+                </div>
+                {/* 서울 지도 타일 + GeoJSON 경계 */}
+                <WorldMapLeaflet
+                  groups={groups}
+                  partitions={partitions}
+                  selectedGroupId={selectedGroup?.id}
+                  selectedPartitionId={selectedPartition?.id}
+                  onSelectGroup={(g) => { selectGroup(g); setSelectedPartition(null); }}
+                  onSelectPartition={selectPartition}
+                  height={selectedGroup ? 200 : 260}
+                />
+                {/* 선택 상태 정보 패널 */}
+                {(selectedPartition || selectedGroup) && (
+                  <div style={{ padding: '8px 10px', background: selectedPartition ? `${themeColor(selectedPartition.theme_code)}10` : `${themeColor(selectedGroup.theme_code)}10`, border: `1px solid ${selectedPartition ? themeColor(selectedPartition.theme_code) : themeColor(selectedGroup.theme_code)}44`, borderRadius: 8, flexShrink: 0 }}>
+                    {selectedPartition ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>📍 {selectedPartition.display_name}</span>
+                          <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 999, border: `1px solid ${themeColor(selectedPartition.theme_code)}55`, color: themeColor(selectedPartition.theme_code) }}>{selectedPartition.theme_code}</span>
+                          {selectedPartition.area_m2 && <span style={{ fontSize: 8, color: '#4a6a66', marginLeft: 'auto' }}>{(selectedPartition.area_m2 / 10000).toFixed(2)}ha</span>}
+                        </div>
+                        {selectedPartition.dominant_landuse && <div style={{ fontSize: 9, color: '#6a9a94' }}>{selectedPartition.dominant_landuse}</div>}
+                        {selectedPartition.summary && <div style={{ fontSize: 10, color: '#b6c5c2', lineHeight: 1.6, marginTop: 4 }}>{selectedPartition.summary}</div>}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                          <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>🗂️ {selectedGroup.display_name}</span>
+                          <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 999, border: `1px solid ${themeColor(selectedGroup.theme_code)}55`, color: themeColor(selectedGroup.theme_code) }}>{selectedGroup.theme_code}</span>
+                          <span style={{ fontSize: 8, color: '#4a6a66', marginLeft: 'auto' }}>파티션 {selectedGroup.partition_count}개</span>
+                        </div>
+                        {selectedGroup.summary && <div style={{ fontSize: 10, color: '#b6c5c2', lineHeight: 1.6 }}>{selectedGroup.summary}</div>}
+                        {!loadingPartitions && partitions.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 5 }}>
+                            {partitions.slice(0, 6).map((p) => (
+                              <span key={p.id} onClick={() => selectPartition(p)} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 999, background: `${themeColor(p.theme_code)}18`, border: `1px solid ${themeColor(p.theme_code)}44`, color: themeColor(p.theme_code), cursor: 'pointer' }}>{p.display_name}</span>
+                            ))}
+                            {partitions.length > 6 && <span style={{ fontSize: 8, color: '#4a6a66' }}>+{partitions.length - 6}</span>}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const MonsterDetail = ({ monster, onBack }) => {
   const tier = monster.tier || 'normal';
@@ -621,7 +1180,7 @@ const GameCodex = ({ onClose }) => {
                 : <ItemList userId={user?.id} onSelect={setSelectedItem} />
             )}
             {activeTab === 'skill' && <ComingSoon label="스킬 도감" />}
-            {activeTab === 'world' && <ComingSoon label="월드 정보" />}
+            {activeTab === 'world' && <WorldCodex />}
           </div>
         </div>
       </div>

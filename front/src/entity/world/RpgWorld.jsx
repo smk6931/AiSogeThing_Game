@@ -601,12 +601,13 @@ const RpgWorld = ({
         <Suspense fallback={null}>
           <PartitionBoundaryOverlay
             currentDong={currentDong}
-            visibleMicro={showMicroBoundaries}
-            visibleGroup={showGroupBoundaries}
+            visibleMicro={showMicroBoundaries || showGroupArea || showGroupColors}
+            visibleGroup={showGroupBoundaries || showGroupArea || showGroupColors}
             highlightCurrentGroup={highlightCurrentGroup}
             currentPartitionKey={currentRegionInfo?.currentPartition?.partition_key || null}
             currentGroupKey={currentRegionInfo?.currentPartition?.group_key || null}
             elevation={debugConfig.mapElevation + 0.34}
+            microOpacity={(showGroupArea || showGroupColors) ? 0.55 : 0.24}
           />
         </Suspense>
       )}

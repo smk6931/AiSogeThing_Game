@@ -95,7 +95,16 @@ const worldApi = {
   // 용산구 월드 디자인 메타데이터 초안 조회
   getYongsanDesignProfile: async () => {
     return await client.get('/api/world/design/yongsan');
-  }
+  },
+
+  // 도감: 서울시→구→동 계층 트리 (그룹/파티션 카운트 포함)
+  getCodexAreas: async () => client.get('/api/world/codex/areas'),
+
+  // 도감: 특정 동의 그룹파티션 목록
+  getCodexDongGroups: async (dongId) => client.get(`/api/world/codex/dong/${dongId}/groups`),
+
+  // 도감: 특정 그룹의 파티션 목록
+  getCodexGroupPartitions: async (groupId) => client.get(`/api/world/codex/group/${groupId}/partitions`),
 };
 
 export default worldApi;
