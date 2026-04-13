@@ -486,6 +486,15 @@ const RpgWorld = ({
         <Environment files={debugConfig.hdriUrl} background />
       )}
 
+      {/* 등고선 ON: 카메라가 대각선으로 볼 때 파티션 외곽 시야에 검정 void 노출 방지용
+          renderOrder=0 (최하단), 스텐실 없음, 30km 광역 커버 */}
+      {showElevation && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.8, 0]} renderOrder={0}>
+          <planeGeometry args={[30000, 30000]} />
+          <meshBasicMaterial color="#3a3020" toneMapped={false} depthWrite={false} />
+        </mesh>
+      )}
+
       {debugConfig.showBaseFloor && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, debugConfig.baseFloorElevation, 0]} receiveShadow>
           <planeGeometry args={[20000, 20000]} />
@@ -544,6 +553,7 @@ const RpgWorld = ({
             elevation={debugConfig.mapElevation + LAYER_Y.road}
             shiftZ={0}
             partitions={sharedPartitions}
+            showElevation={showElevation}
           />
         </Suspense>
       )}

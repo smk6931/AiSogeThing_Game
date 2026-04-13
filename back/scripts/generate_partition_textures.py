@@ -179,6 +179,9 @@ STYLE_PRESETS: dict[str, dict] = {
 _ACTIVE_STYLE: str | None = None
 # --override-prompt 로 직접 지정된 프롬프트 (None = DB/그룹 프롬프트 사용)
 _OVERRIDE_PROMPT: str | None = None
+# --tile 모드: 정사각형 타일 생성 (polygon 클리핑 없음, seamless 타일 텍스처용)
+_TILE_MODE: bool = False
+_TILE_PX: int = 512   # Pass 1 픽셀 크기 (출력은 x2 → 기본 1024px)
 
 # theme_code → Positive 추가 프롬프트 (DreamShaper XL Lightning 스타일 기준)
 # 규칙: 건물·소품·실내 표현 금지, "바닥 지형이 프레임을 꽉 채운다" 중심 묘사
@@ -578,11 +581,16 @@ async def generate_one(
     span_lat = bbox[3] - bbox[1]
     width_m  = span_lng * LNG_TO_M
     height_m = span_lat * LAT_TO_M
-    img_w, img_h, tile_w_m, tile_h_m = compute_image_size(span_lng, span_lat)
 
-    repeat_x = width_m  / tile_w_m
-    repeat_y = height_m / tile_h_m
-    is_tiled = repeat_x > 1.05 or repeat_y > 1.05
+    if _TILE_MODE:
+        # 정사각형 타일 모드: 고정 크기, polygon 클리핑 없음 (world-space UV 타일링용)
+        img_w = img_h = _TILE_PX
+        is_tiled = True   # 클리핑 스킵
+    else:
+        img_w, img_h, tile_w_m, tile_h_m = compute_image_size(span_lng, span_lat)
+        repeat_x = width_m  / tile_w_m
+        repeat_y = height_m / tile_h_m
+        is_tiled = repeat_x > 1.05 or repeat_y > 1.05
 
     # 파티션 실제 면적 → scale hint (작을수록 세밀한 석재/이끼, 클수록 넓은 자연 지형)
     area_m2 = width_m * height_m
@@ -603,7 +611,7 @@ async def generate_one(
         )
     pos_full = positive + f", {scale_hint}"
 
-    tile_info = f" (tile {tile_w_m:.0f}m×{tile_h_m:.0f}m, repeat {repeat_x:.1f}×{repeat_y:.1f})" if is_tiled else ""
+    tile_info = f" (tile {tile_w_m:.0f}m×{tile_h_m:.0f}m, repeat {repeat_x:.1f}×{repeat_y:.1f})" if (is_tiled and not _TILE_MODE) else (" (square tile, no clip)" if _TILE_MODE else "")
     print(f"  [{label}] 면적: {width_m:.0f}m×{height_m:.0f}m → {img_w}×{img_h}px{tile_info}")
 
     if dry_run:
@@ -728,8 +736,14 @@ async def run_partition_mode(partition_keys: list[str], dry_run: bool, outline: 
 
             p_short  = short_name(pk)
             g_short  = short_name(part["group_key"])
-            out_path = FRONT_PUBLIC / "world_partition" / g_short / f"{p_short}.png"
-            db_url   = f"/world_partition/{g_short}/{p_short}.png"
+
+            if _TILE_MODE:
+                # 타일 모드: 출력 경로 = {FRONT_PUBLIC}/{p_short}.png, DB 업데이트 없음
+                out_path = FRONT_PUBLIC / f"{p_short}.png"
+                db_url   = None
+            else:
+                out_path = FRONT_PUBLIC / "world_partition" / g_short / f"{p_short}.png"
+                db_url   = f"/world_partition/{g_short}/{p_short}.png"
 
             print(f"\n[PARTITION] {part['dong_name']} / {part['display_name']} ({pk})")
 
@@ -743,13 +757,15 @@ async def run_partition_mode(partition_keys: list[str], dry_run: bool, outline: 
                 out_path, p_short, dry_run,
                 outline=outline,
             )
-            if ok and not dry_run:
+            if ok and not dry_run and db_url:
                 await session.execute(
                     text("UPDATE world_partition SET texture_image_url = :url WHERE id = :id"),
                     {"url": db_url, "id": part["id"]},
                 )
                 await session.commit()
                 print(f"[OK] DB: {pk} → {db_url}")
+            elif ok and not dry_run:
+                print(f"[OK] tile: {out_path} (DB 업데이트 없음)")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -862,12 +878,22 @@ if __name__ == "__main__":
                         help="레퍼런스 스타일 프리셋. dreamshaper=Lightning 8스텝, juggernaut=JuggernautXL 30스텝, village=아이소메트릭 마을, nature=overhead 자연씬")
     parser.add_argument("--output-dir", default=None,
                         help="출력 루트 디렉토리 오버라이드 (기본: front/public). 예: /tmp/test")
+    parser.add_argument("--tile", action="store_true",
+                        help="정사각형 타일 생성 모드: polygon 클리핑 없음, seamless world-space UV 타일링용")
+    parser.add_argument("--tile-px", type=int, default=512,
+                        help="--tile 모드 Pass1 픽셀 크기 (기본 512 → 출력 1024px)")
     args = parser.parse_args()
 
     # --output-dir 오버라이드
     if args.output_dir:
         FRONT_PUBLIC = Path(args.output_dir)
         print(f"[OUTPUT] 출력 경로 오버라이드: {FRONT_PUBLIC}")
+
+    # --tile 모드
+    if args.tile:
+        _TILE_MODE = True
+        _TILE_PX   = args.tile_px
+        print(f"[TILE] 정사각형 타일 모드: {_TILE_PX}px → 출력 {min(_TILE_PX*2,2048)}px, polygon 클리핑 없음")
 
     # --override-prompt 적용
     if args.override_prompt:

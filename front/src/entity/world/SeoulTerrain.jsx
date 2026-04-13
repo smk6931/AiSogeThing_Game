@@ -311,7 +311,7 @@ function buildRoadAtlasGeometry(features, roadType = 'alley', roadWidthMajor = 2
   try { return mergeGeometries(geos, false); } catch (_) { return null; }
 }
 
-const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, isRoad = false, roadType = 'alley', texture = null, useStencil = false }) => {
+const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0], isWater = false, isRoad = false, roadType = 'alley', texture = null, useStencil = false, showElevation = false }) => {
   if (!geometry) return null;
   const roadStyle = ROAD_STYLE[roadType] || ROAD_STYLE.alley;
   const materialProps = isWater ? {
@@ -347,7 +347,10 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
     materialProps.stencilFunc = THREE.EqualStencilFunc;
   }
 
-  const finalRenderOrder = isRoad ? roadStyle.renderOrder : (isWater ? 5 : 1);
+  // showElevation ON: 도로(원래 104~112)가 elevated 파티션 floor(5) 위에 겹치지 않도록 아래로 내림
+  const finalRenderOrder = isRoad
+    ? (showElevation ? 2 : roadStyle.renderOrder)
+    : (isWater ? 5 : 1);
 
   return (
     <mesh rotation={rotation} position={position} renderOrder={finalRenderOrder}>
@@ -464,6 +467,7 @@ const SeoulTerrain = ({
   elevation = 0, shiftX = -450, shiftZ = 320,
   roadWidthMajor = 18, roadWidthMid = 10, roadWidthMinor = 6,
   partitions = null,  // RpgWorld에서 주입 — null이면 자체 fetch
+  showElevation = false,
 }) => {
   const [data, setData] = useState(null);
   const [geos, setGeos] = useState(null);
@@ -675,11 +679,11 @@ const SeoulTerrain = ({
       )}
       {showRoads && (
         <group name="roads-layer" position={[0, 0.1, 0]}>
-          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTextures.service} useStencil={stencilEnabled} isRoad={true} roadType="service" />}
-          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTextures.pedestrian} useStencil={stencilEnabled} isRoad={true} roadType="pedestrian" />}
-          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTextures.alley} useStencil={stencilEnabled} isRoad={true} roadType="alley" />}
-          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTextures.mid} useStencil={stencilEnabled} isRoad={true} roadType="mid" />}
-          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTextures.major} useStencil={stencilEnabled} isRoad={true} roadType="major" />}
+          {activeRoadTypes.service && <MergedMesh geometry={geos.roadService} color={COLORS.road_service} texture={roadTextures.service} useStencil={stencilEnabled} isRoad={true} roadType="service" showElevation={showElevation} />}
+          {activeRoadTypes.pedestrian && <MergedMesh geometry={geos.roadPedestrian} color={COLORS.road_pedestrian} texture={roadTextures.pedestrian} useStencil={stencilEnabled} isRoad={true} roadType="pedestrian" showElevation={showElevation} />}
+          {activeRoadTypes.alley && <MergedMesh geometry={geos.roadAlley} color={COLORS.road_alley} texture={roadTextures.alley} useStencil={stencilEnabled} isRoad={true} roadType="alley" showElevation={showElevation} />}
+          {activeRoadTypes.mid && <MergedMesh geometry={geos.roadMid} color={COLORS.road_mid} texture={roadTextures.mid} useStencil={stencilEnabled} isRoad={true} roadType="mid" showElevation={showElevation} />}
+          {activeRoadTypes.major && <MergedMesh geometry={geos.roadMajor} color={COLORS.road_major} texture={roadTextures.major} useStencil={stencilEnabled} isRoad={true} roadType="major" showElevation={showElevation} />}
         </group>
       )}
     </group>
