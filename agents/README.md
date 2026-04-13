@@ -47,6 +47,7 @@ Priority: high | medium | low
   월드 구조, 파티션, 도로, 감성 규칙
   - `local_image_generation.md` — 로컬 ComfyUI 이미지 생성 설정 (모델, 파라미터, 스크립트 사용법, 출력 경로 규칙)
   - `world_texture_terrain_direction.md` — 파티션 바닥 텍스처 방향 정리 (폴리곤별 이미지 방식 주의사항, 연속 지형 방향 결정)
+  - `world_elevation_cliff_rules.md` — 등고선 렌더링(extruded polygon, push/pull 방식), 절벽 메시 생성, 카메라 회전 대응 규칙
 - `auth/`
   로그인, 회원가입, 계정 생성 흐름 규칙
 - `planning/`

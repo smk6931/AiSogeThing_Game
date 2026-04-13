@@ -97,6 +97,11 @@ export function useMapSettings() {
     () => localStorage.getItem('road_texture_folder') || ''
   );
 
+  // 바닥 렌더 모드: 'partition' (랜덤 해시) | 'terrain' (고도 버킷 + 노이즈)
+  const [groundMode, setGroundMode] = useState(
+    () => localStorage.getItem('ground_tex_mode') || 'partition'
+  );
+
   const { availableFolders: availableGroundTextureFolders } = useTextureFolders(
     worldApi.getBlockTextureFolders, groundTextureFolder, setGroundTextureFolder
   );
@@ -159,6 +164,10 @@ export function useMapSettings() {
     }
   }, [roadTextureFolder]);
 
+  useEffect(() => {
+    localStorage.setItem('ground_tex_mode', groundMode);
+  }, [groundMode]);
+
   // ── 레이어 setter 팩토리 ─────────────────────────────────────────────────
   const makeLayerSetter = useCallback(
     (key) => (value) => setLayers(prev => ({ ...prev, [key]: value })),
@@ -194,6 +203,9 @@ export function useMapSettings() {
     // 텍스처 폴더
     groundTextureFolder, setGroundTextureFolder, availableGroundTextureFolders,
     roadTextureFolder,   setRoadTextureFolder,   availableRoadTextureFolders,
+
+    // 바닥 렌더 모드
+    groundMode, setGroundMode,
 
     // 편의 액션
     onPlayView: () => { setZoomLevel(18.5); setCameraMode('isometric'); },

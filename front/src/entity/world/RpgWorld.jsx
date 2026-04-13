@@ -119,6 +119,7 @@ const RpgWorld = ({
     groundTextureFolder = '',
     roadTextureFolder = '',
     worldEditorOpen = false,
+    groundMode = 'partition',
   } = mapSettings;
   const [debugConfig, setDebugConfig] = useState(() => {
     const defaults = {
@@ -613,6 +614,7 @@ const RpgWorld = ({
             dongId={currentDongId}
             currentDong={currentDong}
             elevation={debugConfig.mapElevation + LAYER_Y.landuse}
+            groundMode={groundMode}
           />
         </Suspense>
       )}
@@ -633,6 +635,7 @@ const RpgWorld = ({
             playerPositionRef={playerRef}
             partitions={sharedPartitions}
             showElevation={showElevation}
+            groundMode={groundMode}
           />
         </Suspense>
       )}
@@ -653,6 +656,7 @@ const RpgWorld = ({
             playerPositionRef={playerRef}
             partitions={sharedPartitions}
             showElevation={showElevation}
+            groundMode={groundMode}
           />
         </Suspense>
       )}

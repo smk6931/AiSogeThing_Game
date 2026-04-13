@@ -2,7 +2,7 @@ import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text, useGLTF, useAnimations } from '@react-three/drei';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { getTerrainHeight } from '@entity/world/terrainHandler';
+import { getTerrainHeight, getPartitionElevY } from '@entity/world/terrainHandler';
 
 const BASE_MODEL_URL = '/models/';
 
@@ -142,7 +142,8 @@ const TargetRing = () => (
 /** 몬스터 컴포넌트 — GLB 전용 (modelPath 없으면 렌더링 안 함) */
 const Monster = ({ id, position, hp, maxHp, state, modelPath, tier = 'normal', scale = 1, isTargeted = false, onInfoClick }) => {
   if (hp <= 0 || state === 'dead' || !modelPath) return null;
-  const groundY = getTerrainHeight(position.x, position.z);
+  // showElevation ON 시 파티션 고도 우선, 없으면 heightmap 폴백 (플레이어와 동일 로직)
+  const groundY = getPartitionElevY(position.x, position.z) ?? getTerrainHeight(position.x, position.z);
   const pos = [position.x, groundY, position.z];
   const name = modelPath.split('_').pop()?.replace('.glb', '') || `#${id}`;
   const cfg = MODEL_CONFIG[modelPath] || DEFAULT_CONFIG;

@@ -92,14 +92,62 @@ const TILE_SIZE = 100.0;
 // theme_code → 텍스처 파일 매핑 (Phase 1 단순화: 5~6종 타일링)
 const THEME_TEXTURE_MAP = {
   sanctuary_green:     '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
-  ancient_stone_route: '/ground/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
+  ancient_stone_route: '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_1.jpg',
   water:               '/ground/ice/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__0.jpg',
-  urban_road:          '/ground/grounds/lucid-origin_top-down_view_not_rotated_not_45_degree_slight_isometric_feel_2.5D_fantasy_RPG_e-0.jpg',
-  residential:         '/ground/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_1.jpg',
-  special:             '/ground/p024_scene_a_test/ds_dungeon_hall_00001_.png',
-  default:             '/ground/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
+  urban_road:          '/ground/forest/lucid-origin_isometric_2.5D_fantasy_RPG_background_top-down_diagonal_camera_angle_beautiful_e-0.jpg',
+  residential:         '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_2.jpg',
+  special:             '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_3.jpg',
+  default:             '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
 };
 const THEME_TEXTURE_PATHS = [...new Set(Object.values(THEME_TEXTURE_MAP))];
+
+// ── terrain 모드: 고도 버킷 기반 텍스처 ────────────────────────────────────
+const ELEV_LOW_MAX  = 10;   // elevation_m < 10  → low  (저지대/수변)
+const ELEV_HIGH_MIN = 35;   // elevation_m >= 35 → high (고지대/산악)
+
+const ELEV_TEXTURE_MAP = {
+  elev_low:  '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_2.jpg',
+  elev_mid:  '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
+  elev_high: '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_3.jpg',
+};
+// low/mid/high 버킷별 색 tint (고도감 강조)
+const ELEV_TINT = {
+  elev_low:  '#7aaa88',   // 푸른빛 저지대
+  elev_mid:  '#a09060',   // 중간 흙빛
+  elev_high: '#888070',   // 회갈색 고지대
+};
+const ELEV_TEXTURE_PATHS = [...new Set(Object.values(ELEV_TEXTURE_MAP))];
+
+// 노이즈 텍스처 (terrain 모드 오버레이용, 1회 생성 후 재사용)
+let _noiseTexture = null;
+const getNoiseTexture = () => {
+  if (_noiseTexture) return _noiseTexture;
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, size, size);
+  // 4 옥타브 노이즈: 큰 패치 → 세밀한 그레인 순서로 쌓기
+  const octaves = [
+    { count: 300,   size: 32, alpha: 0.25 },
+    { count: 1200,  size: 12, alpha: 0.20 },
+    { count: 5000,  size: 4,  alpha: 0.15 },
+    { count: 15000, size: 2,  alpha: 0.10 },
+  ];
+  for (const { count, size: dotSize, alpha } of octaves) {
+    for (let i = 0; i < count; i++) {
+      const v = Math.floor(Math.random() * 255);
+      ctx.fillStyle = `rgba(${v},${v},${v},${alpha})`;
+      ctx.fillRect(Math.random() * size, Math.random() * size, dotSize, dotSize);
+    }
+  }
+  _noiseTexture = new THREE.CanvasTexture(canvas);
+  _noiseTexture.wrapS = _noiseTexture.wrapT = THREE.RepeatWrapping;
+  _noiseTexture.minFilter = THREE.LinearMipmapLinearFilter;
+  _noiseTexture.generateMipmaps = true;
+  return _noiseTexture;
+};
 
 /**
  * per-partition 이미지의 UV repeat 계산
@@ -474,13 +522,13 @@ const buildGroupBoundaryCliffs = (dbGroups, groupElevMap, activeGroupKeys, effec
 // group_key 단위 geometry 빌드 (캐시 우선)
 // partitionTexIndexMap: Map<partition_key, texIndex> — ComfyUI 생성 이미지가 있는 파티션의 텍스처 인덱스
 // poolCount: 풀 텍스처 개수 (fallback hash 계산에 사용)
-const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndexMap, poolCount, effectiveScale = ELEV_SCALE) => {
+const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndexMap, poolCount, effectiveScale = ELEV_SCALE, groundMode = 'partition') => {
   const mapSize = partitionTexIndexMap ? partitionTexIndexMap.size : 0;
-  // elevation 합산 + scale을 캐시 키에 포함 — 고도 on/off 전환 시 geometry 재빌드
+  // elevation 합산 + scale + groundMode를 캐시 키에 포함
   const elevSum = allPartitions
     .filter(p => p.group_key === groupKey)
     .reduce((s, p) => s + (p.elevation_m ?? 0), 0);
-  const cacheKey = `${groupKey}:${texCount}:${mapSize}:${elevSum.toFixed(1)}:${effectiveScale}`;
+  const cacheKey = `${groupKey}:${texCount}:${mapSize}:${elevSum.toFixed(1)}:${effectiveScale}:${groundMode}`;
   if (groupGeometryCache.has(cacheKey)) return groupGeometryCache.get(cacheKey);
 
   const fallbackCount = poolCount || texCount;
@@ -517,6 +565,21 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
   for (const partition of allPartitions) {
     if (partition.group_key !== groupKey) continue;
 
+    const elevY = BASE_Y + (partition.elevation_m ?? 0) * effectiveScale;
+
+    // ── terrain 모드: 고도 버킷 기반 텍스처, world-space UV (fitUV=false) ──
+    if (groundMode === 'terrain') {
+      const elev = partition.elevation_m ?? 0;
+      const elevBucket = elev < ELEV_LOW_MAX ? 'elev_low'
+        : elev < ELEV_HIGH_MIN ? 'elev_mid'
+        : 'elev_high';
+      const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, false, null, null, elevY);
+      if (!geo) continue;
+      result.push({ geo, themeCode: elevBucket, elevBucket, order: 5, transparent: false });
+      continue;
+    }
+
+    // ── partition 모드 (기존 로직) ─────────────────────────────────────────
     const hasOwnImage = partitionTexIndexMap && partitionTexIndexMap.has(partition.partition_key);
     // group 이미지(공유 URL) → group bbox UV, per-partition 이미지(고유 URL) → 개별 bbox UV
     const isSharedGroupImage = hasOwnImage && (urlCount.get(partition.texture_image_url) || 0) > 1;
@@ -525,7 +588,6 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
     const uvRepeat = (hasOwnImage && !isSharedGroupImage)
       ? computePartitionRepeat(partition)
       : null;
-    const elevY = BASE_Y + (partition.elevation_m ?? 0) * effectiveScale;
     const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds, uvRepeat, elevY);
     if (!geo) continue;
 
@@ -635,6 +697,7 @@ const CityBlockContent = ({
   playerPositionRef,
   currentGroupOnly = false,
   showElevation = false,
+  groundMode = 'partition',
 }) => {
   const textures = useTexture(texturePaths);  // pool 텍스처 — 항상 존재하므로 안전
   const texCount = Array.isArray(textures) ? textures.length : 1;
@@ -651,6 +714,26 @@ const CityBlockContent = ({
     }
     return map;
   }, [themeTextures]);
+
+  // terrain 모드: 고도 버킷 텍스처 (useTexture로 일괄 로드)
+  const rawElevTextures = useTexture(ELEV_TEXTURE_PATHS);
+  const elevTextures = Array.isArray(rawElevTextures) ? rawElevTextures : [rawElevTextures];
+  const elevTexMap = useMemo(() => {
+    const map = {};
+    for (const [code, path] of Object.entries(ELEV_TEXTURE_MAP)) {
+      const idx = ELEV_TEXTURE_PATHS.indexOf(path);
+      map[code] = elevTextures[idx] ?? elevTextures[0];
+    }
+    return map;
+  }, [elevTextures]);
+
+  // terrain 모드 노이즈 오버레이 텍스처 (1회 생성)
+  const noiseTex = useMemo(() => {
+    const t = getNoiseTexture();
+    t.repeat.set(15, 15);  // 100m 기준으로 촘촘히
+    t.needsUpdate = true;
+    return t;
+  }, []);
 
   // 지형 텍스처 로더 (404 크래시 없음)
   const loadTex = (url, setter) => {
@@ -793,7 +876,7 @@ const CityBlockContent = ({
           })();
 
       for (const groupKey of targetGroupKeys) {
-        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexUrlMap, poolCount, effectiveScale);
+        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexUrlMap, poolCount, effectiveScale, groundMode);
         result.push(...geos);
       }
 
@@ -815,14 +898,14 @@ const CityBlockContent = ({
     }
 
     return result;
-  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation]);
+  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation, groundMode]);
 
-  // 동 경계 전체를 덮는 베이스 플레이트 — 파티션 폴리곤 좌표 불일치로 생기는
-  // 흰 틈을 모두 메운다. renderOrder=3 (파티션 바닥=5 아래)
+  // 동 경계 전체를 덮는 베이스 플레이트 — flat 모드에서 파티션 좌표 불일치 틈 메움
+  // showElevation ON: extruded 메시가 자체 벽을 가지므로 불필요
   const dongBasePlate = useMemo(() => {
-    if (!currentDong?.coords?.length) return null;
+    if (showElevation || !currentDong?.coords?.length) return null;
     return buildTerrainBlock(currentDong.coords, currentDong.holes ?? [], false, null, null, BASE_Y - 0.05);
-  }, [currentDong]);
+  }, [currentDong, showElevation]);
 
   return (
     <group>
@@ -831,7 +914,9 @@ const CityBlockContent = ({
         {blocks.map((block, index) => {
           // ── [A] Extruded 3D 메시 (showElevation ON, push/pull 방식) ────────────
           // geometry.groups[0]=상단면(partition tex), groups[1]=측면벽(cliff tex)
-          // depthWrite=true → GPU depth sorting, 스텐실 불필요, 카메라 회전 안전
+          // depthWrite=false: depth buffer 기록 안 함 → 세계 기저평면과 depth 충돌 없음
+          // DoubleSide 상단면: 카메라가 박스 내부를 향할 때도 텍스처 렌더
+          // renderOrder=5 painter's algorithm으로 카메라 회전 대응
           if (block.isExtruded) {
             const topTex  = block.themeCode
               ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
@@ -840,8 +925,8 @@ const CityBlockContent = ({
             const wallColor = wallTex ? '#ffffff' : '#7a6850';
             return (
               <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
-                <meshBasicMaterial attach="material-0" map={topTex}          side={THREE.FrontSide}   toneMapped={false} depthWrite={true} />
-                <meshBasicMaterial attach="material-1" map={wallTex ?? undefined} color={wallColor} side={THREE.DoubleSide} toneMapped={false} depthWrite={true} />
+                <meshBasicMaterial attach="material-0" map={topTex}                       side={THREE.DoubleSide} toneMapped={false} depthWrite={false} />
+                <meshBasicMaterial attach="material-1" map={wallTex ?? undefined} color={wallColor} side={THREE.DoubleSide} toneMapped={false} depthWrite={false} />
               </mesh>
             );
           }
@@ -865,17 +950,24 @@ const CityBlockContent = ({
             );
           }
 
-          // ── [C] 기존 flat 파티션/존 블록 ──────────────────────────────────────
+          // ── [C] flat 파티션/존 블록 ───────────────────────────────────────────
+          // terrain 모드: elevTexMap 우선 사용, color tint 적용
+          // partition 모드: 기존 partTex → themeTexMap → pool 순서
+          const isTerrainBlock = groundMode === 'terrain' && block.elevBucket;
           const partTex = block.partitionUrl ? partitionTextureMap.get(block.partitionUrl) : null;
-          const tex = partTex
-            ?? (block.themeCode ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
-              : (Array.isArray(textures) ? textures[block.texIdx] : textures));
-          const isTransparent = block.transparent && !!partTex;
+          const tex = isTerrainBlock
+            ? (elevTexMap[block.elevBucket] ?? elevTexMap.elev_mid)
+            : (partTex
+                ?? (block.themeCode ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
+                  : (Array.isArray(textures) ? textures[block.texIdx] : textures)));
+          const tint = isTerrainBlock ? (ELEV_TINT[block.elevBucket] ?? '#ffffff') : '#ffffff';
+          const isTransparent = !isTerrainBlock && block.transparent && !!partTex;
           const useStencil = !showElevation;
           return (
           <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
             <meshBasicMaterial
               map={tex}
+              color={tint}
               transparent={isTransparent}
               alphaTest={isTransparent ? 0.1 : 0}
               opacity={1}
@@ -889,6 +981,21 @@ const CityBlockContent = ({
           </mesh>
           );
         })}
+
+        {/* terrain 모드 노이즈 오버레이: 동 전체를 덮는 반투명 노이즈 그레인 */}
+        {groundMode === 'terrain' && dongBasePlate && (
+          <mesh geometry={dongBasePlate} renderOrder={6}>
+            <meshBasicMaterial
+              map={noiseTex}
+              transparent
+              opacity={0.18}
+              blending={THREE.MultiplyBlending}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+              toneMapped={false}
+            />
+          </mesh>
+        )}
       </group>
     </group>
   );
@@ -907,6 +1014,7 @@ const CityBlockOverlay = ({
   textureFolder = '',
   partitions = null,  // RpgWorld에서 주입 — null이면 자체 fetch
   showElevation = false,
+  groundMode = 'partition',
 }) => {
   const [texturePaths, setTexturePaths] = useState([]);
   const [dbPartitions, setDbPartitions] = useState([]);
@@ -1023,6 +1131,7 @@ const CityBlockOverlay = ({
       playerPositionRef={playerPositionRef}
       currentGroupOnly={currentGroupOnly}
       showElevation={showElevation}
+      groundMode={groundMode}
     />
   );
 };

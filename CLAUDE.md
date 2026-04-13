@@ -33,6 +33,7 @@
 - [`agents/game_design/local_image_generation.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/local_image_generation.md) — 파티션 텍스처 생성 스크립트, 모델, 출력 경로 규칙 (파티션 이미지 생성 작업 시 필독)
 - [`agents/frontend/asset_cache_rules.md`](C:/GitHub/AiSogeThing_Game/agents/frontend/asset_cache_rules.md) — Service Worker 에셋 영구 캐시, manifest 해시 갱신 절차 (GLB/텍스처 추가·변경 시 필독)
 - [`agents/game_design/world_texture_terrain_direction.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_texture_terrain_direction.md) — 바닥/파티션 텍스처 방향, 폴리곤별 이미지 방식 주의사항 (텍스처 구조 변경 시 필독)
+- [`agents/game_design/world_elevation_cliff_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_elevation_cliff_rules.md) — 등고선 extruded 렌더링, 절벽 메시, showElevation 토글 규칙 (등고선/절벽 수정 시 필독)
 - [`agents/process/workflow_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/workflow_rules.md)
 - [`agents/process/tool_split_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/tool_split_rules.md)
 - [`agents/process/global_tooling_scope_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/global_tooling_scope_rules.md)

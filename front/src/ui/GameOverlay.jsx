@@ -242,6 +242,8 @@ const GameOverlay = ({
   const setGroundTextureFolder = mapSettings.setGroundTextureFolder ?? (() => {});
   const roadTextureFolder = mapSettings.roadTextureFolder ?? '';
   const setRoadTextureFolder = mapSettings.setRoadTextureFolder ?? (() => {});
+  const groundMode = mapSettings.groundMode ?? 'partition';
+  const setGroundMode = mapSettings.setGroundMode ?? (() => {});
   const setWorldZoomLevel = mapSettings.setZoomLevel ?? (() => {});
   const availableGroundTextureFolders = mapSettings.availableGroundTextureFolders ?? [];
   const availableRoadTextureFolders = mapSettings.availableRoadTextureFolders ?? [];
@@ -1423,6 +1425,40 @@ const GameOverlay = ({
               <div style={{ fontSize: '10px', color: '#6a8a84', marginTop: '6px', lineHeight: 1.5 }}>
                 use `front/public/ground/{groundTextureFolder || 'root'}` as the active floor texture directory
               </div>
+              <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', margin: '10px 0 6px' }}>GROUND MODE</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+                <button
+                  onClick={() => setGroundMode('partition')}
+                  style={{
+                    padding: '8px 6px',
+                    background: groundMode === 'partition' ? 'rgba(103,232,214,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${groundMode === 'partition' ? ACCENT : BORDER_COLOR}`,
+                    borderRadius: '7px',
+                    color: groundMode === 'partition' ? ACCENT : '#8ca6a0',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    fontFamily: GAME_FONT,
+                    fontWeight: '600',
+                  }}
+                >파티션</button>
+                <button
+                  onClick={() => setGroundMode('terrain')}
+                  style={{
+                    padding: '8px 6px',
+                    background: groundMode === 'terrain' ? 'rgba(200,168,75,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${groundMode === 'terrain' ? GOLD : BORDER_COLOR}`,
+                    borderRadius: '7px',
+                    color: groundMode === 'terrain' ? GOLD : '#8ca6a0',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    fontFamily: GAME_FONT,
+                    fontWeight: '600',
+                  }}
+                >지형</button>
+              </div>
+              <div style={{ fontSize: '10px', color: '#6a8a84', marginTop: '6px', lineHeight: 1.5 }}>
+                {groundMode === 'terrain' ? '고도 버킷 + 노이즈 블렌딩' : '파티션 해시 랜덤'}
+              </div>
             </div>
           )}
 
@@ -1642,6 +1678,40 @@ const GameOverlay = ({
           </select>
           <div style={{ fontSize: '10px', color: '#6a8a84', marginTop: '6px', lineHeight: 1.5 }}>
             current road: {roadTextureFolder || 'root'}
+          </div>
+          <div style={{ fontSize: '9px', color: GOLD, letterSpacing: '1.5px', margin: '10px 0 6px' }}>GROUND MODE</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+            <button
+              onClick={() => setGroundMode('partition')}
+              style={{
+                padding: '8px 6px',
+                background: groundMode === 'partition' ? 'rgba(103,232,214,0.15)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${groundMode === 'partition' ? ACCENT : BORDER_COLOR}`,
+                borderRadius: '7px',
+                color: groundMode === 'partition' ? ACCENT : '#8ca6a0',
+                fontSize: '10px',
+                cursor: 'pointer',
+                fontFamily: GAME_FONT,
+                fontWeight: '600',
+              }}
+            >파티션</button>
+            <button
+              onClick={() => setGroundMode('terrain')}
+              style={{
+                padding: '8px 6px',
+                background: groundMode === 'terrain' ? 'rgba(200,168,75,0.15)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${groundMode === 'terrain' ? GOLD : BORDER_COLOR}`,
+                borderRadius: '7px',
+                color: groundMode === 'terrain' ? GOLD : '#8ca6a0',
+                fontSize: '10px',
+                cursor: 'pointer',
+                fontFamily: GAME_FONT,
+                fontWeight: '600',
+              }}
+            >지형</button>
+          </div>
+          <div style={{ fontSize: '10px', color: '#6a8a84', marginTop: '6px', lineHeight: 1.5 }}>
+            {groundMode === 'terrain' ? '고도 버킷 + 노이즈 블렌딩' : '파티션 해시 랜덤'}
           </div>
         </div>
       )}
