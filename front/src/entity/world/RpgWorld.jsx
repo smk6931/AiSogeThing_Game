@@ -21,6 +21,7 @@ import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M, LAYER_Y } from '@entity/world/mapConfig
 import CameraRig from '@entity/world/CameraRig';
 import CullRadiusIndicator from '@entity/world/CullRadiusIndicator';
 import worldApi from '@api/world';
+import { updatePartitionElevations } from '@entity/world/terrainHandler';
 
 // 개별 몬스터 — 자기 자신의 hp/state/position/targeting만 변경될 때 리렌더
 const MonsterItem = React.memo(
@@ -221,6 +222,12 @@ const RpgWorld = ({
 
   // monstersRef 최신값 유지
   useEffect(() => { monstersRef.current = monsters; }, [monsters]);
+
+  // 파티션 고도 데이터를 terrainHandler에 주입 (showElevation 토글/파티션 로드 시 갱신)
+  const ELEV_SCALE = 1.0; // CityBlockOverlay.ELEV_SCALE 과 동일값 유지
+  useEffect(() => {
+    updatePartitionElevations(sharedPartitions, showElevation ? ELEV_SCALE : 0);
+  }, [sharedPartitions, showElevation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 몬스터 HP 감소 감지 → 데미지 숫자 생성
   useEffect(() => {

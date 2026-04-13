@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getTerrainHeight } from '@entity/world/terrainHandler';
+import { getTerrainHeight, getPartitionElevY } from '@entity/world/terrainHandler';
 import { useGameConfig } from '@contexts/GameConfigContext';
 
 export const usePlayerMovement = (ref, input, onMove, zoomLevel = 16) => {
@@ -45,8 +45,9 @@ export const usePlayerMovement = (ref, input, onMove, zoomLevel = 16) => {
         ref.current.rotation.y = Math.atan2(moveX, moveZ);
       }
 
-      // [NEW] 지형 고도 동기화 (지형타기) - 이동 중일 때 실시간 반영
-      const terrainHeight = getTerrainHeight(ref.current.position.x, ref.current.position.z);
+      // 파티션 고도(showElevation ON) 우선, 없으면 heightmap 폴백
+      const terrainHeight = getPartitionElevY(ref.current.position.x, ref.current.position.z)
+        ?? getTerrainHeight(ref.current.position.x, ref.current.position.z);
       ref.current.position.y = terrainHeight;
 
       if (onMove) {
@@ -74,8 +75,9 @@ export const usePlayerMovement = (ref, input, onMove, zoomLevel = 16) => {
         lastSendTime.current = now;
       }
     } else {
-      // [NEW] 정지 상태일 때도 지형 높이 유지 (혹은 텔레포트 대비)
-      const terrainHeight = getTerrainHeight(ref.current.position.x, ref.current.position.z);
+      // 정지 상태일 때도 파티션 고도 유지
+      const terrainHeight = getPartitionElevY(ref.current.position.x, ref.current.position.z)
+        ?? getTerrainHeight(ref.current.position.x, ref.current.position.z);
       if (Math.abs(ref.current.position.y - terrainHeight) > 0.01) {
         ref.current.position.y = terrainHeight;
       }

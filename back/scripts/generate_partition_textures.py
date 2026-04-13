@@ -59,6 +59,7 @@ SCHEDULER         = "karras"
 HIRESFIX_DENOISE  = 0.5           # hi-res fix 2nd pass denoise
 UPSCALE_MODEL     = "4xUltrasharp_4xUltrasharpV10.pt"
 POLY_MASK_FEATHER = 6             # PIL post-process polygon clip 경계 feather
+SOFTEN_RADIUS     = 0.8           # 저장 전 GaussianBlur 반경 (0 = 비활성, 0.5~1.5 권장)
 
 # 지리 좌표 → 미터 (서울 기준, mapConfig.js 동일)
 LAT_TO_M = 110940
@@ -586,8 +587,11 @@ async def generate_one(
         poly_mask = create_mask(boundaries, bbox, gen_w, gen_h, feather=POLY_MASK_FEATHER)
         black = Image.new("RGB", gen_img.size, (0, 0, 0))
         clipped = Image.composite(gen_img, black, poly_mask.convert("L"))
+        if SOFTEN_RADIUS > 0:
+            softened = clipped.filter(ImageFilter.GaussianBlur(radius=SOFTEN_RADIUS))
+            clipped = Image.composite(softened, black, poly_mask.convert("L"))
         clipped.save(out_path, format="PNG")
-        print(f"  polygon clip: {gen_w}×{gen_h}px (feather={POLY_MASK_FEATHER})")
+        print(f"  polygon clip: {gen_w}×{gen_h}px (feather={POLY_MASK_FEATHER}, soften={SOFTEN_RADIUS})")
 
     if outline:
         draw_polygon_outline(out_path, boundaries, bbox)
@@ -804,6 +808,9 @@ if __name__ == "__main__":
                         help="--outline-only와 함께: 기존 이미지 삭제 후 빈 배경에 outline만 그림")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--steps", type=int, default=None, help="KSampler steps 오버라이드")
+    parser.add_argument("--cfg", type=float, default=None, help="KSampler CFG 오버라이드")
+    parser.add_argument("--sampler", default=None, help="KSampler sampler 오버라이드")
     parser.add_argument("--override-prompt", default=None,
                         help="그룹/DB 프롬프트 무시하고 이 프롬프트를 직접 사용 (테스트용)")
     parser.add_argument("--style", choices=["village", "nature"], default=None,
@@ -826,6 +833,11 @@ if __name__ == "__main__":
         print(f"[STYLE] '{args.style}' 프리셋 적용: {CHECKPOINT_NAME}, steps={STEPS}, cfg={CFG}")
     elif args.checkpoint:
         CHECKPOINT_NAME = args.checkpoint
+
+    # --steps / --cfg / --sampler 개별 오버라이드
+    if args.steps:   STEPS   = args.steps
+    if args.cfg:     CFG     = args.cfg
+    if args.sampler: SAMPLER = args.sampler
 
     if not args.outline_only and not check_comfyui():
         print(f"[ERROR] ComfyUI가 {COMFYUI_HOST}에서 응답하지 않습니다.")

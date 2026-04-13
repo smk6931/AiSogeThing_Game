@@ -86,6 +86,21 @@ const MAX_PARTITION_ASPECT = 3.0;
 const ELEV_SCALE = 1.0;
 const BASE_Y = 0.55;
 
+// world-space UV tile size (meters) — 인접 파티션이 같은 theme이면 텍스처가 끊김 없이 이어짐
+const TILE_SIZE = 100.0;
+
+// theme_code → 텍스처 파일 매핑 (Phase 1 단순화: 5~6종 타일링)
+const THEME_TEXTURE_MAP = {
+  sanctuary_green:     '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
+  ancient_stone_route: '/ground/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
+  water:               '/ground/ice/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__0.jpg',
+  urban_road:          '/ground/grounds/lucid-origin_top-down_view_not_rotated_not_45_degree_slight_isometric_feel_2.5D_fantasy_RPG_e-0.jpg',
+  residential:         '/ground/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_1.jpg',
+  special:             '/ground/p024_scene_a_test/ds_dungeon_hall_00001_.png',
+  default:             '/ground/grounds/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
+};
+const THEME_TEXTURE_PATHS = [...new Set(Object.values(THEME_TEXTURE_MAP))];
+
 /**
  * per-partition 이미지의 UV repeat 계산
  * Python compute_image_size 와 동일한 로직: MAX_ASPECT:1 초과 → 타일링
@@ -164,7 +179,6 @@ const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null, u
   const positions = new Float32Array(faces.length * 9);
   const uvs = new Float32Array(faces.length * 6);
   let vi = 0, ui = 0;
-  const tileSize = 100.0;
 
   for (const [a, b, c] of faces) {
     for (const idx of [a, b, c]) {
@@ -178,8 +192,9 @@ const buildTerrainBlock = (coords, holes = [], fitUV = false, uvBounds = null, u
         uvs[ui++] = ((p.x - minX) / spanX) * rx;
         uvs[ui++] = ((p.z - minZ) / spanZ) * rz;
       } else {
-        uvs[ui++] = (p.x - minX) / tileSize;
-        uvs[ui++] = (p.z - minZ) / tileSize;
+        // world-space UV: 인접 파티션이 같은 theme이면 경계 없이 이어짐
+        uvs[ui++] = p.x / TILE_SIZE;
+        uvs[ui++] = p.z / TILE_SIZE;
       }
     }
   }
@@ -218,6 +233,87 @@ const buildGroupBoundaryGeometries = (boundaryGeoJson, elevY = BASE_Y) => {
     const holeCoords = holes.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
     const geo = buildTerrainBlock(outerCoords, holeCoords, false, null, null, elevY);
     if (geo) result.push(geo);
+  }
+  return result;
+};
+
+// 두 파티션 간 고도차 기준: 초과 → cliff, 이하 → slope
+const CLIFF_DIFF_THRESHOLD = 8;
+// 엣지 매칭 정밀도: 0.5m 단위 (float 변환 오차 흡수)
+const EDGE_RF = 2;
+
+/**
+ * 인접 파티션 쌍 기반 절벽 생성 (구 buildPartitionSkirts 대체)
+ * - 공유 엣지: 두 파티션 고도 차이만큼만 수직 면 생성
+ * - 외곽 엣지: 파티션 상단 → -1.0 (동 경계, 다른 레이어 floor 의존 없음)
+ */
+const buildAdjacentCliffs = (partitions, effectiveScale) => {
+  if (effectiveScale === 0 || !partitions?.length) return [];
+
+  // ── 엣지 맵 구축 ──────────────────────────────────────────────────────────
+  const edgeMap = new Map();
+  for (const partition of partitions) {
+    const b = partition.boundary_geojson;
+    if (!b?.coordinates?.[0]) continue;
+    const elevY = BASE_Y + (partition.elevation_m ?? 0) * effectiveScale;
+    const outer = b.coordinates[0];
+    for (let i = 0; i < outer.length - 1; i++) {
+      const p0 = gpsToGame(outer[i][1],     outer[i][0]);
+      const p1 = gpsToGame(outer[i + 1][1], outer[i + 1][0]);
+      const r0x = Math.round(p0.x * EDGE_RF), r0z = Math.round(p0.z * EDGE_RF);
+      const r1x = Math.round(p1.x * EDGE_RF), r1z = Math.round(p1.z * EDGE_RF);
+      if (r0x === r1x && r0z === r1z) continue;
+      const key = (r0x < r1x || (r0x === r1x && r0z < r1z))
+        ? `${r0x},${r0z}|${r1x},${r1z}` : `${r1x},${r1z}|${r0x},${r0z}`;
+      if (!edgeMap.has(key)) edgeMap.set(key, { p0, p1, elevYs: [] });
+      edgeMap.get(key).elevYs.push(elevY);
+    }
+  }
+
+  const cliffPos = [], cliffUv = [];
+  const slopePos = [], slopeUv = [];
+
+  for (const [, { p0, p1, elevYs }] of edgeMap) {
+    let yLow, yHigh;
+    if (elevYs.length >= 2) {
+      // 공유 엣지: 두 파티션 고도 차이만
+      yLow  = Math.min(...elevYs);
+      yHigh = Math.max(...elevYs);
+      if (yHigh - yLow < 0.05) continue;
+    } else {
+      // 외곽 엣지(동 경계): 파티션 상단 → 지표 아래
+      yHigh = elevYs[0];
+      yLow  = -1.0;
+      if (yHigh - BASE_Y < 0.05) continue;
+    }
+
+    const heightDiff = yHigh - yLow;
+    const isCliff    = heightDiff > CLIFF_DIFF_THRESHOLD;
+    const edgeLen    = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
+    const uScale     = edgeLen / 5;
+    const vScale     = heightDiff / 5;
+
+    const pos = isCliff ? cliffPos : slopePos;
+    const uv  = isCliff ? cliffUv  : slopeUv;
+
+    pos.push(p0.x, yLow,  p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
+    uv.push(0, 0,  0, vScale,  uScale, vScale);
+    pos.push(p0.x, yLow,  p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
+    uv.push(0, 0,  uScale, vScale,  uScale, 0);
+  }
+
+  const result = [];
+  if (cliffPos.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cliffPos), 3));
+    geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(cliffUv),  2));
+    result.push({ geo, isWall: true, isCliff: true, order: 4 });
+  }
+  if (slopePos.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(slopePos), 3));
+    geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(slopeUv),  2));
+    result.push({ geo, isWall: true, isCliff: false, order: 4 });
   }
   return result;
 };
@@ -290,7 +386,7 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
       partition.partition_seq || 0,
     ].join('|'));
     const texIdx = seed % fallbackCount;  // fallback (partitionUrl 로드 실패 시 사용)
-    result.push({ geo, texIdx, partitionUrl, order: 5, transparent: !!partitionUrl });
+    result.push({ geo, texIdx, themeCode: partition.group_theme_code || 'default', partitionUrl, order: 5, transparent: !!partitionUrl });
   }
 
   groupGeometryCache.set(cacheKey, result);
@@ -391,6 +487,34 @@ const CityBlockContent = ({
   const texCount = Array.isArray(textures) ? textures.length : 1;
   const partitionTextureMap = usePartitionTextures(partitionUrls);  // 개별 로드, 404 무시
 
+  // theme_code 기반 텍스처 (world-space UV 타일링)
+  const rawThemeTextures = useTexture(THEME_TEXTURE_PATHS);
+  const themeTextures = Array.isArray(rawThemeTextures) ? rawThemeTextures : [rawThemeTextures];
+  const themeTexMap = useMemo(() => {
+    const map = {};
+    for (const [code, path] of Object.entries(THEME_TEXTURE_MAP)) {
+      const idx = THEME_TEXTURE_PATHS.indexOf(path);
+      map[code] = themeTextures[idx] ?? themeTextures[0];
+    }
+    return map;
+  }, [themeTextures]);
+
+  // 지형 텍스처 로더 (404 크래시 없음)
+  const loadTex = (url, setter) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(url,
+      (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; t.needsUpdate = true; setter(t); },
+      undefined,
+      () => setter(null),
+    );
+  };
+
+  const [cliffTex, setCliffTex] = useState(null);
+  const [slopeTex, setSlopeTex] = useState(null);
+
+  useEffect(() => { loadTex('/ground/cliff/image.png', setCliffTex); }, []);
+  useEffect(() => { loadTex('/ground/slope/image.png', setSlopeTex); }, []);
+
   // 현재 그룹 + 인접 그룹 key 집합 (500ms 간격 갱신)
   const [activeGroupKeys, setActiveGroupKeys] = useState(() => new Set());
   const activeGroupKeysRef = useRef(new Set());
@@ -429,6 +553,15 @@ const CityBlockContent = ({
       // partitionTextureMap 텍스처는 usePartitionTextures 내부에서 이미 설정됨
     });
   }, [textures]);
+
+  useEffect(() => {
+    themeTextures.forEach((t) => {
+      if (!t) return;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 16;
+      t.needsUpdate = true;
+    });
+  }, [themeTextures]);
 
   const blocks = useMemo(() => {
     const result = [];
@@ -476,12 +609,21 @@ const CityBlockContent = ({
         const geoList = buildGroupBoundaryGeometries(g.boundary_geojson, groupElevY);
         if (!geoList.length) continue;
 
-        const seed = hashString([g.group_key, g.theme_code, g.group_seq].join('|'));
-        const texIdx = seed % (poolCount || texCount);
-
         for (const geo of geoList) {
-          result.push({ geo, texIdx, order: 5, transparent: false });
+          result.push({ geo, themeCode: g.theme_code || 'default', order: 5, transparent: false });
         }
+      }
+
+      // ── 그룹 경계 단차 옹벽: 그룹 평균 고도 기준 ────────────────────────
+      if (effectiveScale > 0) {
+        const avgElevPartitions = dbPartitions
+          .filter(p => activeGroupKeys.has(p.group_key))
+          .map(p => {
+            const ge = groupElevMap.get(p.group_key);
+            const avgElev = ge && ge.count > 0 ? ge.sum / ge.count : 0;
+            return { ...p, elevation_m: avgElev };
+          });
+        result.push(...buildPartitionSkirts(avgElevPartitions, effectiveScale));
       }
     } else if (showSectorBlocks && dbPartitions?.length > 0) {
       // ── fallback: micro 파티션 단위 렌더링 (그룹 boundary 없을 때) ────
@@ -499,6 +641,12 @@ const CityBlockContent = ({
       for (const groupKey of targetGroupKeys) {
         const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexUrlMap, poolCount, effectiveScale);
         result.push(...geos);
+      }
+
+      // ── 파티션 단위 단차 옹벽 ─────────────────────────────────────────────
+      if (effectiveScale > 0) {
+        const partitionsToWall = dbPartitions.filter(p => targetGroupKeys.has(p.group_key));
+        result.push(...buildPartitionSkirts(partitionsToWall, effectiveScale));
       }
     } else if (showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
       // dbPartitions 없을 때 fallback (currentGroupOnly는 그룹 단독 렌더 — 전체 sectors 대체 불가)
@@ -520,9 +668,31 @@ const CityBlockContent = ({
       <DongMask currentDong={currentDong} currentDistrict={currentDistrict} elevation={elevation + 0.01} />
       <group position={[0, elevation, 0]}>
         {blocks.map((block, index) => {
-          // partitionUrl이 있으면 개별 로드 맵에서 찾고, 없거나 로드 실패면 pool 텍스처 fallback
+          // 절벽(cliff) or 경사로(slope) 텍스처
+          // 스텐실 미사용: 수직 벽은 파티션 경계에서만 생성되므로 마스크 불필요
+          // (DongMask 수평면이 수직 면의 스크린 영역을 커버하지 못해 EqualStencil 실패)
+          if (block.isWall) {
+            const wallTex  = block.isCliff
+              ? (cliffTex ?? null)
+              : (slopeTex ?? cliffTex ?? null);
+            const wallColor = wallTex ? '#ffffff' : (block.isCliff ? '#7a6850' : '#8a9a6a');
+            return (
+              <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
+                <meshBasicMaterial
+                  map={wallTex ?? undefined}
+                  color={wallColor}
+                  side={THREE.DoubleSide}
+                  toneMapped={false}
+                  depthWrite={false}
+                />
+              </mesh>
+            );
+          }
+          // partitionUrl이 있으면 개별 로드 맵에서 찾고, 없거나 로드 실패면 theme → pool 순으로 fallback
           const partTex = block.partitionUrl ? partitionTextureMap.get(block.partitionUrl) : null;
-          const tex = partTex ?? (Array.isArray(textures) ? textures[block.texIdx] : textures);
+          const tex = partTex
+            ?? (block.themeCode ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
+              : (Array.isArray(textures) ? textures[block.texIdx] : textures));
           const isTransparent = block.transparent && !!partTex;
           return (
           <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>

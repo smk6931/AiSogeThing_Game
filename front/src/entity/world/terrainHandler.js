@@ -1,4 +1,4 @@
-import { LAYER_Y } from './mapConfig';
+import { LAYER_Y, GIS_ORIGIN, LNG_TO_M, LAT_TO_M } from './mapConfig';
 
 /**
  * 서울 지형(HeightMap) 데이터 기반 고도 계산 핸들러
@@ -17,6 +17,91 @@ export const loadHeightMap = async () => {
     console.error('[TerrainHandler] 지형 데이터 로드 실패:', err);
     return null;
   }
+};
+
+// ─── 파티션 고도 데이터 (showElevation 활성화 시 사용) ──────────────────────
+let partitionElevStore = null; // { items: [{elevY, bbox, pts}], baseCharY: number }
+
+// ray-casting point-in-polygon (2D, XZ 평면)
+const pointInPolygon2D = (wx, wz, pts) => {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i][0], zi = pts[i][1];
+    const xj = pts[j][0], zj = pts[j][1];
+    if ((zi > wz) !== (zj > wz) && wx < (xj - xi) * (wz - zi) / (zj - zi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+};
+
+/**
+ * RpgWorld에서 sharedPartitions + effectiveScale이 변경될 때마다 호출.
+ * effectiveScale=0 이면 파티션 고도 비활성화.
+ */
+export const updatePartitionElevations = (partitions, effectiveScale) => {
+  if (!partitions?.length || effectiveScale === 0) {
+    partitionElevStore = null;
+    return;
+  }
+
+  const BASE_Y = 0.55; // CityBlockOverlay BASE_Y 와 동일
+  const items = [];
+
+  for (const p of partitions) {
+    const elev = (p.elevation_m ?? 0) * effectiveScale;
+    const b = p.boundary_geojson;
+    if (!b?.coordinates?.[0]) continue;
+
+    const outer = b.coordinates[0];
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    const pts = [];
+    for (const [lng, lat] of outer) {
+      const x = (lng - GIS_ORIGIN.lng) * LNG_TO_M;
+      const z = (GIS_ORIGIN.lat - lat) * LAT_TO_M;
+      pts.push([x, z]);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+
+    // 플레이어 목표 Y = 지면 Y + 캐릭터 오프셋
+    // 지면 실제 Y = elevation_prop(0.05) + BASE_Y(0.55) + elev
+    // 캐릭터는 지면 위에 서 있어야 하므로 LAYER_Y.character + elev
+    items.push({ elevY: LAYER_Y.character + elev, bbox: { minX, maxX, minZ, maxZ }, pts });
+  }
+
+  partitionElevStore = items.length ? items : null;
+};
+
+// 마지막 탐색 결과 캐시 (매 프레임 full scan 방지)
+let _lastPos = null;
+let _lastElevY = null;
+const CACHE_DIST_SQ = 5 * 5; // 5m 이상 이동 시에만 재탐색
+
+/**
+ * 현재 플레이어 위치(wx, wz)에 해당하는 파티션 Y 반환.
+ * 파티션 고도 비활성화 상태면 null 반환 → 호출측에서 getTerrainHeight 로 폴백.
+ */
+export const getPartitionElevY = (wx, wz) => {
+  if (!partitionElevStore) return null;
+
+  // 캐시 히트
+  if (_lastPos) {
+    const dx = wx - _lastPos[0], dz = wz - _lastPos[1];
+    if (dx * dx + dz * dz < CACHE_DIST_SQ) return _lastElevY;
+  }
+
+  let result = LAYER_Y.character; // 파티션 미탐색 시 기본값
+  for (const { elevY, bbox, pts } of partitionElevStore) {
+    if (wx < bbox.minX || wx > bbox.maxX || wz < bbox.minZ || wz > bbox.maxZ) continue;
+    if (pointInPolygon2D(wx, wz, pts)) { result = elevY; break; }
+  }
+
+  _lastPos = [wx, wz];
+  _lastElevY = result;
+  return result;
 };
 
 export const getTerrainHeight = (wx, wz) => {
