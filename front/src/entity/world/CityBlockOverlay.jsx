@@ -282,9 +282,9 @@ const buildAdjacentCliffs = (partitions, effectiveScale) => {
       if (yHigh - yLow < 0.05) continue;
     } else {
       // 외곽 엣지(동 경계): 파티션 상단 → 지표 아래
+      // elevation=0이어도 바닥(BASE_Y=0.55)과 배경(Y=0) 사이 갭이 존재하므로 항상 생성
       yHigh = elevYs[0];
       yLow  = -1.0;
-      if (yHigh - BASE_Y < 0.05) continue;
     }
 
     const heightDiff = yHigh - yLow;
@@ -300,6 +300,76 @@ const buildAdjacentCliffs = (partitions, effectiveScale) => {
     uv.push(0, 0,  0, vScale,  uScale, vScale);
     pos.push(p0.x, yLow,  p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
     uv.push(0, 0,  uScale, vScale,  uScale, 0);
+  }
+
+  const result = [];
+  if (cliffPos.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cliffPos), 3));
+    geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(cliffUv),  2));
+    result.push({ geo, isWall: true, isCliff: true, order: 4 });
+  }
+  if (slopePos.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(slopePos), 3));
+    geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(slopeUv),  2));
+    result.push({ geo, isWall: true, isCliff: false, order: 4 });
+  }
+  return result;
+};
+
+/**
+ * 그룹 union boundary polygon 외곽 링 → 수직 옹벽 압출
+ * per-partition 엣지 매칭 불필요 — union polygon이 내부 갭 없는 깨끗한 경계 제공
+ * 각 그룹의 평균 고도에서 yBot=-1.0까지 전 외곽을 덮음 (sparse gap 원천 제거)
+ */
+const buildGroupBoundaryCliffs = (dbGroups, groupElevMap, activeGroupKeys, effectiveScale) => {
+  if (effectiveScale === 0 || !dbGroups?.length) return [];
+
+  const cliffPos = [], cliffUv = [];
+  const slopePos = [], slopeUv = [];
+  const yBot = -1.0;
+
+  for (const g of dbGroups) {
+    if (!activeGroupKeys.has(g.group_key)) continue;
+    if (!g.boundary_geojson) continue;
+
+    const ge = groupElevMap.get(g.group_key);
+    const avgElev = ge && ge.count > 0 ? ge.sum / ge.count : 0;
+    const yHigh = BASE_Y + avgElev * effectiveScale;
+    const heightDiff = yHigh - yBot;
+
+    // Polygon / MultiPolygon 외곽 링만 추출
+    const { type, coordinates } = g.boundary_geojson;
+    const outerRings = [];
+    if (type === 'Polygon') {
+      if (coordinates[0]) outerRings.push(coordinates[0]);
+    } else if (type === 'MultiPolygon') {
+      for (const poly of coordinates) {
+        if (poly[0]) outerRings.push(poly[0]);
+      }
+    }
+
+    for (const ring of outerRings) {
+      if (!ring || ring.length < 2) continue;
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p0 = gpsToGame(ring[i][1],     ring[i][0]);
+        const p1 = gpsToGame(ring[i + 1][1], ring[i + 1][0]);
+        const edgeLen = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
+        if (edgeLen < 0.01) continue;
+
+        const isCliff = heightDiff > CLIFF_DIFF_THRESHOLD;
+        const uScale  = edgeLen / 5;
+        const vScale  = heightDiff / 5;
+        const pos = isCliff ? cliffPos : slopePos;
+        const uv  = isCliff ? cliffUv  : slopeUv;
+
+        pos.push(p0.x, yBot,  p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
+        uv.push(0, 0,  0, vScale,  uScale, vScale);
+        pos.push(p0.x, yBot,  p0.z,  p1.x, yHigh, p1.z,  p1.x, yBot,  p1.z);
+        uv.push(0, 0,  uScale, vScale,  uScale, 0);
+      }
+    }
   }
 
   const result = [];
@@ -614,16 +684,9 @@ const CityBlockContent = ({
         }
       }
 
-      // ── 그룹 경계 단차 옹벽: 그룹 평균 고도 기준 ────────────────────────
+      // ── 그룹 경계 단차 옹벽: union boundary 직접 압출 (엣지 매칭 불필요) ──
       if (effectiveScale > 0) {
-        const avgElevPartitions = dbPartitions
-          .filter(p => activeGroupKeys.has(p.group_key))
-          .map(p => {
-            const ge = groupElevMap.get(p.group_key);
-            const avgElev = ge && ge.count > 0 ? ge.sum / ge.count : 0;
-            return { ...p, elevation_m: avgElev };
-          });
-        result.push(...buildPartitionSkirts(avgElevPartitions, effectiveScale));
+        result.push(...buildGroupBoundaryCliffs(dbGroups, groupElevMap, activeGroupKeys, effectiveScale));
       }
     } else if (showSectorBlocks && dbPartitions?.length > 0) {
       // ── fallback: micro 파티션 단위 렌더링 (그룹 boundary 없을 때) ────
@@ -646,7 +709,7 @@ const CityBlockContent = ({
       // ── 파티션 단위 단차 옹벽 ─────────────────────────────────────────────
       if (effectiveScale > 0) {
         const partitionsToWall = dbPartitions.filter(p => targetGroupKeys.has(p.group_key));
-        result.push(...buildPartitionSkirts(partitionsToWall, effectiveScale));
+        result.push(...buildAdjacentCliffs(partitionsToWall, effectiveScale));
       }
     } else if (showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
       // dbPartitions 없을 때 fallback (currentGroupOnly는 그룹 단독 렌더 — 전체 sectors 대체 불가)
@@ -662,6 +725,13 @@ const CityBlockContent = ({
 
     return result;
   }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation]);
+
+  // 동 경계 전체를 덮는 베이스 플레이트 — 파티션 폴리곤 좌표 불일치로 생기는
+  // 흰 틈을 모두 메운다. renderOrder=3 (파티션 바닥=5 아래)
+  const dongBasePlate = useMemo(() => {
+    if (!currentDong?.coords?.length) return null;
+    return buildTerrainBlock(currentDong.coords, currentDong.holes ?? [], false, null, null, BASE_Y - 0.05);
+  }, [currentDong]);
 
   return (
     <group>

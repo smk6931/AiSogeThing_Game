@@ -87,6 +87,51 @@ STYLE_NEGATIVE = ""
 # --style nature  : 이미지2 기준 — sdxl overhead 자연 씬 (바위+돌길+나무)
 
 STYLE_PRESETS: dict[str, dict] = {
+    # ── 모델 비교 프리셋 ─────────────────────────────────────────────────────────
+    # --style dreamshaper : DreamShaper XL Lightning 고퀄 (12스텝, ruins 타겟)
+    "dreamshaper": {
+        "checkpoint": "dreamshaperXL_lightningDPMSDE.safetensors",
+        "steps": 12, "cfg": 2.5, "sampler": "dpmpp_sde", "scheduler": "karras",
+        "positive": (
+            "bird's eye top-down overhead view 75 degrees, ancient stone ruins courtyard, "
+            "moss-covered dark granite flagstones filling entire frame, "
+            "circular stone pattern inlaid in weathered ground, "
+            "overgrown with lush dense moss and fern, gnarled tree roots spreading across stones, "
+            "atmospheric dappled forest light through canopy from above, "
+            "deep shadows in stone crevices, rich dark earth between cracks, "
+            "highly detailed fantasy RPG map art, painterly game environment, "
+            "masterpiece quality, intricate ground texture, aerial view fills frame"
+        ),
+        "negative": (
+            "blurry, low quality, watermark, text, ui, signature, "
+            "humans, characters, animals, vehicles, "
+            "side view, horizon, empty space, solid black border, "
+            "modern, sci-fi, flat, cartoon, cel-shaded"
+        ),
+    },
+    # --style juggernaut : JuggernautXL v10 고퀄 (40스텝, ruins 타겟)
+    "juggernaut": {
+        "checkpoint": "juggernautXL_v10.safetensors",
+        "steps": 40, "cfg": 6.5, "sampler": "dpmpp_2m_sde", "scheduler": "karras",
+        "positive": (
+            "bird's eye top-down overhead view 75 degrees, ancient mossy stone ruins courtyard, "
+            "dark weathered granite flagstone ground fills entire frame edge to edge, "
+            "circular stone tile pattern worn into ground, dense moss and ivy covering stones, "
+            "large gnarled tree canopy visible from above with thick roots on stone, "
+            "dramatic shadows cast by ancient walls and trees, "
+            "rich dark atmospheric lighting, deep greens and dark grays, "
+            "ultra detailed fantasy RPG environment art, photorealistic painting style, "
+            "game map overhead aerial view, masterpiece, best quality, 8k detail, "
+            "intricate stone texture, organic overgrowth, depth and atmosphere"
+        ),
+        "negative": (
+            "blurry, low quality, jpeg artifacts, watermark, text, ui elements, signature, "
+            "people, characters, animals, vehicles, modern objects, "
+            "side view, horizon line, sky, interior ceiling, "
+            "flat lighting, overexposed, washed out, desaturated, "
+            "3d render plastic, modern architecture, sci-fi, neon"
+        ),
+    },
     # 이미지1 기준: rpg_v5 아이소메트릭 45° 한국 판타지 마을
     "village": {
         "checkpoint": "rpg_v5.safetensors",
@@ -813,9 +858,16 @@ if __name__ == "__main__":
     parser.add_argument("--sampler", default=None, help="KSampler sampler 오버라이드")
     parser.add_argument("--override-prompt", default=None,
                         help="그룹/DB 프롬프트 무시하고 이 프롬프트를 직접 사용 (테스트용)")
-    parser.add_argument("--style", choices=["village", "nature"], default=None,
-                        help="레퍼런스 스타일 프리셋 (DB 페르소나 무시). village=아이소메트릭 마을, nature=overhead 자연씬")
+    parser.add_argument("--style", choices=["dreamshaper", "juggernaut", "village", "nature"], default=None,
+                        help="레퍼런스 스타일 프리셋. dreamshaper=Lightning 8스텝, juggernaut=JuggernautXL 30스텝, village=아이소메트릭 마을, nature=overhead 자연씬")
+    parser.add_argument("--output-dir", default=None,
+                        help="출력 루트 디렉토리 오버라이드 (기본: front/public). 예: /tmp/test")
     args = parser.parse_args()
+
+    # --output-dir 오버라이드
+    if args.output_dir:
+        FRONT_PUBLIC = Path(args.output_dir)
+        print(f"[OUTPUT] 출력 경로 오버라이드: {FRONT_PUBLIC}")
 
     # --override-prompt 적용
     if args.override_prompt:
