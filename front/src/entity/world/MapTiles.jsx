@@ -77,6 +77,7 @@ const MapTiles = ({
   showOsmMap = true,
   cameraMode = 'isometric',
   elevation = -0.05,
+  showElevation = false,
 }) => {
   const zoom = Math.max(13, Math.floor(zoomLevel || 16));
 
@@ -127,6 +128,9 @@ const MapTiles = ({
     }
     return nextTiles;
   }, [cameraMode, centerTile.x, centerTile.y, zoom]);
+
+  // showElevation ON: extruded 파티션 메시가 지형을 완전 덮으므로 지도 타일 숨김 (depth 충돌 방지)
+  if (showElevation) return null;
 
   return (
     <group>

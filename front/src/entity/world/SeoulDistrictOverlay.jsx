@@ -154,6 +154,7 @@ const SeoulDistrictOverlay = ({
               emissiveIntensity={1.2}
               side={THREE.DoubleSide}
               depthWrite={false}
+              depthTest={false}
             />
           </mesh>
           <line geometry={districtLineGeo} position={[0, 0.5, 0]}>
@@ -180,6 +181,7 @@ const SeoulDistrictOverlay = ({
               emissiveIntensity={1.8}
               side={THREE.DoubleSide}
               depthWrite={false}
+              depthTest={false}
             />
           </mesh>
           <line geometry={dongLineGeo} position={[0, 0.6, 0]}>

@@ -215,7 +215,7 @@ const GroupColorOverlay = ({
       {/* ── 그룹색: Fill ───────────────────────────────────────────────── */}
       {showGroupColors && groupData.map((g) => g.geometry && (
         <mesh key={`gc-${g.key}`} geometry={g.geometry} rotation={[-Math.PI / 2, 0, 0]} renderOrder={20}>
-          <meshBasicMaterial color={g.color} transparent opacity={0.28} depthWrite={false} side={THREE.DoubleSide} />
+          <meshBasicMaterial color={g.color} transparent opacity={0.28} depthWrite={false} depthTest={false} side={THREE.DoubleSide} />
         </mesh>
       ))}
 
@@ -233,7 +233,7 @@ const GroupColorOverlay = ({
       {showGroupArea && groupData.map((g) => g.geometry && (
         <React.Fragment key={`ga-${g.key}`}>
           <mesh geometry={g.geometry} rotation={[-Math.PI / 2, 0, 0]} renderOrder={21}>
-            <meshBasicMaterial color={g.color} transparent opacity={0.20} depthWrite={false} side={THREE.DoubleSide} />
+            <meshBasicMaterial color={g.color} transparent opacity={0.20} depthWrite={false} depthTest={false} side={THREE.DoubleSide} />
           </mesh>
           <Html position={[g.centroid.x, 2, g.centroid.z]} center zIndexRange={[21, 31]}>
             <div style={labelBox(g.color)}>
@@ -250,12 +250,12 @@ const GroupColorOverlay = ({
         <React.Fragment key={`pf-${p.id}`}>
           {/* 색상 fill */}
           <mesh geometry={p.fillGeo} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}>
-            <meshBasicMaterial color={p.color} transparent opacity={0.36} depthWrite={false} side={THREE.DoubleSide} />
+            <meshBasicMaterial color={p.color} transparent opacity={0.36} depthWrite={false} depthTest={false} side={THREE.DoubleSide} />
           </mesh>
           {/* 경계선 */}
           {p.lineGeo && (
             <line geometry={p.lineGeo} renderOrder={23}>
-              <lineBasicMaterial color={p.color} transparent opacity={0.85} depthWrite={false} />
+              <lineBasicMaterial color={p.color} transparent opacity={0.85} depthWrite={false} depthTest={false} />
             </line>
           )}
         </React.Fragment>

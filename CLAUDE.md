@@ -39,6 +39,8 @@
 - [`agents/process/global_tooling_scope_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/global_tooling_scope_rules.md)
 - [`agents/process/advisory_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/advisory_rules.md)
 - [`agents/process/communication_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/communication_rules.md)
+- [`agents/planning/world_layer_design.md`](C:/GitHub/AiSogeThing_Game/agents/planning/world_layer_design.md) — Layer 0/1 분리 원칙, placed_objects 스키마, InstancedMesh 렌더 규칙 (오브젝트 배치 구현 시 필독)
+- [`agents/planning/game_identity_hypothesis.md`](C:/GitHub/AiSogeThing_Game/agents/planning/game_identity_hypothesis.md) — 게임 정체성 가설, 검증 조건, AI 연동 로드맵 (방향 논의 시 참고)
 
 ## Claude Scope
 

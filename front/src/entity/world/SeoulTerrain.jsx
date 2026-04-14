@@ -325,10 +325,12 @@ const MergedMesh = ({ geometry, color, rotation = [0, 0, 0], position = [0, 0, 0
   } : isRoad ? {
     color: roadStyle.color,
     map: texture ?? null,
-    transparent: true,   // Transparent 패스로 이동 → renderOrder가 파티션 텍스처보다 높아서 위에 그려짐
+    // showElevation ON: 3D 씬 참여 → depthWrite/depthTest=true (GPU depth sorting)
+    // showElevation OFF: 2D 오버레이 방식 유지 → Transparent 패스 + 높은 renderOrder
+    transparent: !showElevation,
     opacity: roadStyle.opacity,
-    depthWrite: false,
-    depthTest: false,
+    depthWrite: showElevation,
+    depthTest: showElevation,
     toneMapped: false,
     polygonOffset: true,
     polygonOffsetFactor: -2,

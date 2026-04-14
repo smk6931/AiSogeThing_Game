@@ -135,7 +135,7 @@ const DongGroundMesh = ({
         roughness={1.0}
         metalness={0.0}
         side={THREE.DoubleSide}
-        depthWrite={false}
+        depthWrite={true}
       />
     </mesh>
   );

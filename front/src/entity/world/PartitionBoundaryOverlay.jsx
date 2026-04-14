@@ -144,6 +144,7 @@ const PartitionBoundaryOverlay = ({
               transparent
               opacity={entry.groupKey === currentGroupKey ? 0.7 : 0.35}
               depthWrite={false}
+              depthTest={false}
             />
           </mesh>
         ))}
@@ -151,14 +152,14 @@ const PartitionBoundaryOverlay = ({
       {highlightCurrentGroup &&
         currentGroupMicroMeshes.map((entry) => (
           <mesh key={`partition-current-group-${entry.id}`} geometry={entry.geometry} renderOrder={15}>
-            <meshBasicMaterial color="#67e8d6" transparent opacity={0.4} depthWrite={false} />
+            <meshBasicMaterial color="#67e8d6" transparent opacity={0.4} depthWrite={false} depthTest={false} />
           </mesh>
         ))}
 
       {highlightCurrentGroup &&
         currentMicroMeshes.map((entry) => (
           <mesh key={`partition-current-micro-${entry.id}`} geometry={entry.geometry} renderOrder={16}>
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.55} depthWrite={false} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.55} depthWrite={false} depthTest={false} />
           </mesh>
         ))}
     </group>

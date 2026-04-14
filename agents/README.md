@@ -52,6 +52,8 @@ Priority: high | medium | low
   로그인, 회원가입, 계정 생성 흐름 규칙
 - `planning/`
   게임 방향성, 기획서, 콘텐츠 설계 결정 문서
+  - `world_layer_design.md` — Layer 0(정적 지형)과 Layer 1(플레이어 건설) 분리 원칙, placed_objects 스키마, 렌더 규칙 (오브젝트 배치 기능 구현 시 필독)
+  - `game_identity_hypothesis.md` — "서울 지형이 캔버스, 유저가 붓" 게임 정체성 가설, 검증 조건, AI 연동 중장기 계획 (방향 논의 시 참고)
 - `process/`
   Claude와 Codex가 공통으로 따를 작업 절차, 역할 분리, 검증 흐름 문서
   공통 조언 방식, 공통 소통 규칙도 포함

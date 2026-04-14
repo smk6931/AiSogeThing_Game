@@ -492,7 +492,7 @@ const RpgWorld = ({
       {showElevation && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.8, 0]} renderOrder={0}>
           <planeGeometry args={[30000, 30000]} />
-          <meshBasicMaterial color="#3a3020" toneMapped={false} depthWrite={false} />
+          <meshBasicMaterial color="#3a3020" toneMapped={false} depthWrite={true} />
         </mesh>
       )}
 
@@ -520,6 +520,7 @@ const RpgWorld = ({
           cameraMode={cameraMode}
           elevation={debugConfig.mapElevation}
           districts={districts}
+          showElevation={showElevation}
         />
       </Suspense>
 
@@ -597,6 +598,7 @@ const RpgWorld = ({
               port: showLanduseZones && landuseFilters.port,
               unexplored: false,
             }}
+            showElevation={showElevation}
           />
         </Suspense>
       )}

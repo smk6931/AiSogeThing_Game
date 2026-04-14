@@ -61,6 +61,12 @@ UPSCALE_MODEL     = "4xUltrasharp_4xUltrasharpV10.pt"
 POLY_MASK_FEATHER = 6             # PIL post-process polygon clip 경계 feather
 SOFTEN_RADIUS     = 0.8           # 저장 전 GaussianBlur 반경 (0 = 비활성, 0.5~1.5 권장)
 
+# LoRA 설정 (--lora / --lora2 로 설정)
+LORA_NAME       = ""     # 비어있으면 비활성
+LORA_STRENGTH   = 0.75
+LORA_NAME_2     = ""
+LORA_STRENGTH_2 = 0.75
+
 # 지리 좌표 → 미터 (서울 기준, mapConfig.js 동일)
 LAT_TO_M = 110940
 LNG_TO_M = 88200
@@ -107,6 +113,46 @@ STYLE_PRESETS: dict[str, dict] = {
             "humans, characters, animals, vehicles, "
             "side view, horizon, empty space, solid black border, "
             "modern, sci-fi, flat, cartoon, cel-shaded"
+        ),
+    },
+    # --style lora_dreamshaper : DreamShaper + DetailTweaker XL + Isometric LoRA 테스트
+    "lora_dreamshaper": {
+        "checkpoint": "dreamshaperXL_lightningDPMSDE.safetensors",
+        "steps": 8, "cfg": 2.0, "sampler": "dpmpp_sde", "scheduler": "karras",
+        "lora": "add-detail-xl.safetensors", "lora_strength": 0.7,
+        "lora2": "zavy-ctsmtrc-sdxl.safetensors", "lora2_strength": 0.8,
+        "positive": (
+            "top-down view, slight isometric feel, 2.5D fantasy RPG environment, "
+            "orthographic camera, game map style, hand-painted stylized, "
+            "soft lighting, ambient occlusion, high quality, "
+            "lush green forest clearing, dirt path winding through trees, "
+            "mossy rocks, dense canopy viewed from above, rich natural colors"
+        ),
+        "negative": (
+            "blurry, low quality, watermark, text, ui, signature, "
+            "humans, characters, animals, vehicles, "
+            "modern, sci-fi, flat, cartoon, cel-shaded, "
+            "side view, horizon, sky"
+        ),
+    },
+    # --style lora_rpg : rpg_v5 + DetailTweaker XL + Isometric LoRA 테스트
+    "lora_rpg": {
+        "checkpoint": "rpg_v5.safetensors",
+        "steps": 20, "cfg": 7.0, "sampler": "dpm_2_ancestral", "scheduler": "karras",
+        "lora": "add-detail-xl.safetensors", "lora_strength": 0.6,
+        "lora2": "zavy-ctsmtrc-sdxl.safetensors", "lora2_strength": 0.8,
+        "positive": (
+            "top-down view, slight isometric feel, 2.5D fantasy RPG environment, "
+            "orthographic camera, game map style, hand-painted stylized, "
+            "soft lighting, ambient occlusion, high quality, "
+            "lush green forest clearing, dirt path winding through trees, "
+            "mossy rocks, dense canopy viewed from above, rich natural colors"
+        ),
+        "negative": (
+            "blurry, low quality, watermark, text, ui, signature, "
+            "humans, characters, animals, vehicles, "
+            "modern, sci-fi, flat, cartoon, cel-shaded, "
+            "side view, horizon, sky"
         ),
     },
     # --style juggernaut : JuggernautXL v10 고퀄 (40스텝, ruins 타겟)
@@ -378,10 +424,47 @@ def build_workflow(positive: str, negative: str, seed: int,
     """
     out_w = min(img_w * 2, 2048)
     out_h = min(img_h * 2, 2048)
-    return {
-        "1":  {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT_NAME}},
-        "2":  {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["1", 1]}},
-        "3":  {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["1", 1]}},
+
+    wf: dict = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT_NAME}},
+    }
+
+    # LoRA 체인: LORA_NAME 있으면 LoraLoader 노드 삽입
+    model_ref: list = ["1", 0]
+    clip_ref:  list = ["1", 1]
+    next_id = 14
+
+    if LORA_NAME:
+        next_id += 1
+        nid = str(next_id)
+        wf[nid] = {
+            "class_type": "LoraLoader",
+            "inputs": {
+                "model": model_ref, "clip": clip_ref,
+                "lora_name": LORA_NAME,
+                "strength_model": LORA_STRENGTH,
+                "strength_clip": LORA_STRENGTH,
+            },
+        }
+        model_ref, clip_ref = [nid, 0], [nid, 1]
+
+    if LORA_NAME_2:
+        next_id += 1
+        nid = str(next_id)
+        wf[nid] = {
+            "class_type": "LoraLoader",
+            "inputs": {
+                "model": model_ref, "clip": clip_ref,
+                "lora_name": LORA_NAME_2,
+                "strength_model": LORA_STRENGTH_2,
+                "strength_clip": LORA_STRENGTH_2,
+            },
+        }
+        model_ref, clip_ref = [nid, 0], [nid, 1]
+
+    wf.update({
+        "2":  {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": clip_ref}},
+        "3":  {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": clip_ref}},
         "4":  {"class_type": "EmptyLatentImage", "inputs": {"width": img_w, "height": img_h, "batch_size": 1}},
         # Pass 1: txt2img
         "5": {
@@ -389,7 +472,7 @@ def build_workflow(positive: str, negative: str, seed: int,
             "inputs": {
                 "seed": seed, "steps": STEPS, "cfg": CFG,
                 "sampler_name": SAMPLER, "scheduler": SCHEDULER, "denoise": 1.0,
-                "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0],
+                "model": model_ref, "positive": ["2", 0], "negative": ["3", 0],
                 "latent_image": ["4", 0],
             },
         },
@@ -402,7 +485,7 @@ def build_workflow(positive: str, negative: str, seed: int,
             "inputs": {
                 "seed": seed, "steps": STEPS, "cfg": CFG,
                 "sampler_name": SAMPLER, "scheduler": SCHEDULER, "denoise": HIRESFIX_DENOISE,
-                "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0],
+                "model": model_ref, "positive": ["2", 0], "negative": ["3", 0],
                 "latent_image": ["8", 0],
             },
         },
@@ -415,7 +498,8 @@ def build_workflow(positive: str, negative: str, seed: int,
             "width": out_w, "height": out_h, "crop": "disabled",
         }},
         "14": {"class_type": "SaveImage", "inputs": {"images": ["13", 0], "filename_prefix": "partition_tex"}},
-    }
+    })
+    return wf
 
 
 def wait_for_job(prompt_id: str, timeout: int = 300) -> list[dict]:
@@ -874,8 +958,12 @@ if __name__ == "__main__":
     parser.add_argument("--sampler", default=None, help="KSampler sampler 오버라이드")
     parser.add_argument("--override-prompt", default=None,
                         help="그룹/DB 프롬프트 무시하고 이 프롬프트를 직접 사용 (테스트용)")
-    parser.add_argument("--style", choices=["dreamshaper", "juggernaut", "village", "nature"], default=None,
-                        help="레퍼런스 스타일 프리셋. dreamshaper=Lightning 8스텝, juggernaut=JuggernautXL 30스텝, village=아이소메트릭 마을, nature=overhead 자연씬")
+    parser.add_argument("--style", choices=list(STYLE_PRESETS.keys()), default=None,
+                        help="레퍼런스 스타일 프리셋")
+    parser.add_argument("--lora", default=None, help="LoRA 파일명 (models/loras/ 기준)")
+    parser.add_argument("--lora-strength", type=float, default=0.75)
+    parser.add_argument("--lora2", default=None, help="두 번째 LoRA 파일명")
+    parser.add_argument("--lora2-strength", type=float, default=0.75)
     parser.add_argument("--output-dir", default=None,
                         help="출력 루트 디렉토리 오버라이드 (기본: front/public). 예: /tmp/test")
     parser.add_argument("--tile", action="store_true",
@@ -908,14 +996,28 @@ if __name__ == "__main__":
         CFG        = p["cfg"]
         SAMPLER    = p["sampler"]
         SCHEDULER  = p["scheduler"]
-        print(f"[STYLE] '{args.style}' 프리셋 적용: {CHECKPOINT_NAME}, steps={STEPS}, cfg={CFG}")
+        if p.get("lora"):
+            LORA_NAME     = p["lora"]
+            LORA_STRENGTH = p.get("lora_strength", 0.75)
+        if p.get("lora2"):
+            LORA_NAME_2     = p["lora2"]
+            LORA_STRENGTH_2 = p.get("lora2_strength", 0.75)
+        lora_info = f", lora={LORA_NAME}({LORA_STRENGTH})" if LORA_NAME else ""
+        lora_info += f" + {LORA_NAME_2}({LORA_STRENGTH_2})" if LORA_NAME_2 else ""
+        print(f"[STYLE] '{args.style}' 프리셋 적용: {CHECKPOINT_NAME}, steps={STEPS}, cfg={CFG}{lora_info}")
     elif args.checkpoint:
         CHECKPOINT_NAME = args.checkpoint
 
-    # --steps / --cfg / --sampler 개별 오버라이드
+    # --steps / --cfg / --sampler / --lora 개별 오버라이드
     if args.steps:   STEPS   = args.steps
     if args.cfg:     CFG     = args.cfg
     if args.sampler: SAMPLER = args.sampler
+    if args.lora:
+        LORA_NAME     = args.lora
+        LORA_STRENGTH = args.lora_strength
+    if args.lora2:
+        LORA_NAME_2     = args.lora2
+        LORA_STRENGTH_2 = args.lora2_strength
 
     if not args.outline_only and not check_comfyui():
         print(f"[ERROR] ComfyUI가 {COMFYUI_HOST}에서 응답하지 않습니다.")

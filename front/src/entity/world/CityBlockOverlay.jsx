@@ -290,7 +290,11 @@ const buildGroupBoundaryGeometries = (boundaryGeoJson, elevY = BASE_Y) => {
  * geometry.groups[1] = 측면벽 (cliff texture)
  * depthWrite=true 사용 → 카메라 회전에도 GPU depth sorting 정상 동작
  */
-const buildExtrudedPolygon = (outerRing, holes = [], yTop, yBot = -1.0) => {
+/**
+ * includeWalls=false: 상단면만 생성 (벽면은 buildGroupCliffsDeduplicated가 별도 처리)
+ * includeWalls=true : 기존처럼 상단면+벽면 포함 (단독 그룹 렌더링 시 사용)
+ */
+const buildExtrudedPolygon = (outerRing, holes = [], yTop, yBot = -1.0, includeWalls = true) => {
   if (!outerRing || outerRing.length < 3) return null;
 
   // ── 좌표 변환 ──────────────────────────────────────────────────────────
@@ -315,8 +319,9 @@ const buildExtrudedPolygon = (outerRing, holes = [], yTop, yBot = -1.0) => {
   const spanX = maxX - minX || 1, spanZ = maxZ - minZ || 1;
 
   const topCount  = faces.length * 3;
-  // 외곽 링 + 홀 링 모두 벽 생성
-  const allRings  = [pts, ...holePts];
+
+  // includeWalls=false: 상단면만 (인접 그룹 공유 엣지 Z-fighting 방지)
+  const allRings  = includeWalls ? [pts, ...holePts] : [];
   let wallCount = 0;
   for (const ring of allRings) wallCount += (ring.length - 1) * 6;
 
@@ -334,38 +339,127 @@ const buildExtrudedPolygon = (outerRing, holes = [], yTop, yBot = -1.0) => {
     }
   }
 
-  // ── 측면벽 버텍스 (외곽 + 홀 링) ──────────────────────────────────────
-  const heightDiff = yTop - yBot;
-  for (const ring of allRings) {
-    for (let i = 0; i < ring.length - 1; i++) {
-      const p0 = ring[i], p1 = ring[i + 1];
-      const edgeLen = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
-      if (edgeLen < 0.01) continue;
-      const uS = edgeLen / 5, vS = heightDiff / 5;
-      // tri 1
-      positions[vi++] = p0.x; positions[vi++] = yBot;  positions[vi++] = p0.z;
-      positions[vi++] = p0.x; positions[vi++] = yTop;  positions[vi++] = p0.z;
-      positions[vi++] = p1.x; positions[vi++] = yTop;  positions[vi++] = p1.z;
-      uvs[ui++] = 0; uvs[ui++] = 0;
-      uvs[ui++] = 0; uvs[ui++] = vS;
-      uvs[ui++] = uS; uvs[ui++] = vS;
-      // tri 2
-      positions[vi++] = p0.x; positions[vi++] = yBot;  positions[vi++] = p0.z;
-      positions[vi++] = p1.x; positions[vi++] = yTop;  positions[vi++] = p1.z;
-      positions[vi++] = p1.x; positions[vi++] = yBot;  positions[vi++] = p1.z;
-      uvs[ui++] = 0; uvs[ui++] = 0;
-      uvs[ui++] = uS; uvs[ui++] = vS;
-      uvs[ui++] = uS; uvs[ui++] = 0;
+  // ── 측면벽 버텍스 (includeWalls=true 시에만) ────────────────────────────
+  if (includeWalls) {
+    const heightDiff = yTop - yBot;
+    for (const ring of allRings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p0 = ring[i], p1 = ring[i + 1];
+        const edgeLen = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
+        if (edgeLen < 0.01) continue;
+        const uS = edgeLen / 5, vS = heightDiff / 5;
+        // tri 1
+        positions[vi++] = p0.x; positions[vi++] = yBot;  positions[vi++] = p0.z;
+        positions[vi++] = p0.x; positions[vi++] = yTop;  positions[vi++] = p0.z;
+        positions[vi++] = p1.x; positions[vi++] = yTop;  positions[vi++] = p1.z;
+        uvs[ui++] = 0; uvs[ui++] = 0;
+        uvs[ui++] = 0; uvs[ui++] = vS;
+        uvs[ui++] = uS; uvs[ui++] = vS;
+        // tri 2
+        positions[vi++] = p0.x; positions[vi++] = yBot;  positions[vi++] = p0.z;
+        positions[vi++] = p1.x; positions[vi++] = yTop;  positions[vi++] = p1.z;
+        positions[vi++] = p1.x; positions[vi++] = yBot;  positions[vi++] = p1.z;
+        uvs[ui++] = 0; uvs[ui++] = 0;
+        uvs[ui++] = uS; uvs[ui++] = vS;
+        uvs[ui++] = uS; uvs[ui++] = 0;
+      }
     }
   }
 
   const geo = new THREE.BufferGeometry();
-  // 실제 쓴 버텍스 수로 잘라냄 (edgeLen<0.01 skip으로 vi < totalCount 가능)
   geo.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, vi), 3));
   geo.setAttribute('uv',       new THREE.BufferAttribute(uvs.subarray(0, ui),       2));
-  geo.addGroup(0, topCount, 0);           // 상단면
-  geo.addGroup(topCount, vi / 3 - topCount, 1); // 측면벽
+  geo.addGroup(0, topCount, 0);                    // 상단면 (material-0)
+  geo.addGroup(topCount, vi / 3 - topCount, 1);    // 측면벽 (material-1, includeWalls=false면 count=0)
   return geo;
+};
+
+/**
+ * 그룹 레벨 엣지 중복제거 벽면 생성
+ * buildAdjacentCliffs의 그룹 버전:
+ * - 엣지가 1개 그룹에만 속함 → 외곽 엣지 → yBot까지 전체 벽
+ * - 엣지가 2개 그룹에 속함 → 공유 경계 → 두 그룹 고도 차이만큼만 벽
+ * → 인접 그룹 공유 경계 중복 생성 없음 → Z-fighting 해결
+ */
+const buildGroupCliffsDeduplicated = (dbGroups, groupElevMap, activeGroupKeys, effectiveScale) => {
+  if (effectiveScale === 0 || !dbGroups?.length) return [];
+  const yBot = -1.0;
+
+  // 모든 활성 그룹의 외곽 링 엣지를 수집 (0.5m 정밀도로 해시)
+  const edgeMap = new Map();
+  for (const g of dbGroups) {
+    if (!activeGroupKeys.has(g.group_key)) continue;
+    if (!g.boundary_geojson) continue;
+
+    const ge = groupElevMap.get(g.group_key);
+    const avgElev = ge && ge.count > 0 ? ge.sum / ge.count : 0;
+    const elevY = BASE_Y + avgElev * effectiveScale;
+
+    const { type, coordinates } = g.boundary_geojson;
+    const outerRings = [];
+    if (type === 'Polygon') { if (coordinates[0]) outerRings.push(coordinates[0]); }
+    else if (type === 'MultiPolygon') { for (const poly of coordinates) if (poly[0]) outerRings.push(poly[0]); }
+
+    for (const ring of outerRings) {
+      if (!ring || ring.length < 2) continue;
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p0 = gpsToGame(ring[i][1],     ring[i][0]);
+        const p1 = gpsToGame(ring[i + 1][1], ring[i + 1][0]);
+        const r0x = Math.round(p0.x * EDGE_RF), r0z = Math.round(p0.z * EDGE_RF);
+        const r1x = Math.round(p1.x * EDGE_RF), r1z = Math.round(p1.z * EDGE_RF);
+        if (r0x === r1x && r0z === r1z) continue;
+        const key = (r0x < r1x || (r0x === r1x && r0z < r1z))
+          ? `${r0x},${r0z}|${r1x},${r1z}` : `${r1x},${r1z}|${r0x},${r0z}`;
+        if (!edgeMap.has(key)) edgeMap.set(key, { p0, p1, elevYs: [] });
+        edgeMap.get(key).elevYs.push(elevY);
+      }
+    }
+  }
+
+  const cliffPos = [], cliffUv = [];
+  const slopePos = [], slopeUv = [];
+
+  for (const [, { p0, p1, elevYs }] of edgeMap) {
+    let yLow, yHigh;
+    if (elevYs.length >= 2) {
+      // 공유 경계: 두 그룹 고도 차이만큼만 벽
+      yLow  = Math.min(...elevYs);
+      yHigh = Math.max(...elevYs);
+      if (yHigh - yLow < 0.05) continue; // 거의 같은 고도 → 벽 불필요
+    } else {
+      // 외곽 엣지: 그룹 상단 → yBot
+      yHigh = elevYs[0];
+      yLow  = yBot;
+    }
+
+    const heightDiff = yHigh - yLow;
+    const isCliff    = heightDiff > CLIFF_DIFF_THRESHOLD;
+    const edgeLen    = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
+    if (edgeLen < 0.01) continue;
+    const uS = edgeLen / 5, vS = heightDiff / 5;
+    const pos = isCliff ? cliffPos : slopePos;
+    const uv  = isCliff ? cliffUv  : slopeUv;
+
+    pos.push(p0.x, yLow,  p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
+    uv.push(0, 0,  0, vS,  uS, vS);
+    pos.push(p0.x, yLow,  p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
+    uv.push(0, 0,  uS, vS,  uS, 0);
+  }
+
+  const result = [];
+  if (cliffPos.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cliffPos), 3));
+    geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(cliffUv),  2));
+    result.push({ geo, isWall: true, isCliff: true, order: 4 });
+  }
+  if (slopePos.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(slopePos), 3));
+    geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(slopeUv),  2));
+    result.push({ geo, isWall: true, isCliff: false, order: 4 });
+  }
+  return result;
 };
 
 // 두 파티션 간 고도차 기준: 초과 → cliff, 이하 → slope
@@ -843,12 +937,13 @@ const CityBlockContent = ({
         const groupElevY = BASE_Y + avgElev * effectiveScale;
 
         if (effectiveScale > 0) {
-          // ── 등고선 ON: push/pull extruded 3D 메시 (상단면 + 측면벽 하나로) ──
+          // ── 등고선 ON: 상단면만 (벽면은 buildGroupCliffsDeduplicated가 일괄 처리)
+          // includeWalls=false → 인접 그룹 공유 엣지 중복 Z-fighting 방지
           const { type, coordinates } = g.boundary_geojson;
           const polys = type === 'Polygon' ? [coordinates] : (type === 'MultiPolygon' ? coordinates : []);
           for (const [outer, ...holes] of polys) {
             if (!outer || outer.length < 3) continue;
-            const geo = buildExtrudedPolygon(outer, holes, groupElevY);
+            const geo = buildExtrudedPolygon(outer, holes, groupElevY, -1.0, false);
             if (!geo) continue;
             result.push({ geo, themeCode: g.theme_code || 'default', order: 5, isExtruded: true });
           }
@@ -861,7 +956,10 @@ const CityBlockContent = ({
         }
       }
 
-      // effectiveScale > 0 시 buildGroupBoundaryCliffs 불필요 — extruded 메시에 벽 포함됨
+      // effectiveScale > 0: 벽면은 엣지 중복제거 방식으로 별도 생성 (Z-fighting 없음)
+      if (effectiveScale > 0) {
+        result.push(...buildGroupCliffsDeduplicated(dbGroups, groupElevMap, activeGroupKeys, effectiveScale));
+      }
     } else if (showSectorBlocks && dbPartitions?.length > 0) {
       // ── fallback: micro 파티션 단위 렌더링 (그룹 boundary 없을 때) ────
       const keysToRender = activeGroupKeys.size > 0
@@ -914,9 +1012,8 @@ const CityBlockContent = ({
         {blocks.map((block, index) => {
           // ── [A] Extruded 3D 메시 (showElevation ON, push/pull 방식) ────────────
           // geometry.groups[0]=상단면(partition tex), groups[1]=측면벽(cliff tex)
-          // depthWrite=false: depth buffer 기록 안 함 → 세계 기저평면과 depth 충돌 없음
-          // DoubleSide 상단면: 카메라가 박스 내부를 향할 때도 텍스처 렌더
-          // renderOrder=5 painter's algorithm으로 카메라 회전 대응
+          // depthWrite=true: GPU depth sorting → 카메라 회전 시 절벽 깜박임 없음
+          // DoubleSide 상단면: 카메라가 박스 내부를 향해도 top face가 텍스처를 렌더 → black hole 없음
           if (block.isExtruded) {
             const topTex  = block.themeCode
               ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
@@ -925,8 +1022,8 @@ const CityBlockContent = ({
             const wallColor = wallTex ? '#ffffff' : '#7a6850';
             return (
               <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
-                <meshBasicMaterial attach="material-0" map={topTex}                       side={THREE.DoubleSide} toneMapped={false} depthWrite={false} />
-                <meshBasicMaterial attach="material-1" map={wallTex ?? undefined} color={wallColor} side={THREE.DoubleSide} toneMapped={false} depthWrite={false} />
+                <meshBasicMaterial attach="material-0" map={topTex}                       side={THREE.DoubleSide} toneMapped={false} depthWrite={true} />
+                <meshBasicMaterial attach="material-1" map={wallTex ?? undefined} color={wallColor} side={THREE.DoubleSide} toneMapped={false} depthWrite={true} />
               </mesh>
             );
           }
@@ -944,7 +1041,7 @@ const CityBlockContent = ({
                   color={wallColor}
                   side={THREE.DoubleSide}
                   toneMapped={false}
-                  depthWrite={false}
+                  depthWrite={true}
                 />
               </mesh>
             );
@@ -976,7 +1073,7 @@ const CityBlockContent = ({
               stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
               side={THREE.DoubleSide}
               toneMapped={false}
-              depthWrite={false}
+              depthWrite={!isTransparent}
             />
           </mesh>
           );
