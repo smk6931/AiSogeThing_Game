@@ -91,13 +91,13 @@ const TILE_SIZE = 100.0;
 
 // theme_code → 텍스처 파일 매핑 (Phase 1 단순화: 5~6종 타일링)
 const THEME_TEXTURE_MAP = {
-  sanctuary_green:     '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
-  ancient_stone_route: '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_1.jpg',
+  sanctuary_green:     '/ground/generated/forest_ground_v2.png',
+  ancient_stone_route: '/ground/generated/rocky_terrain_v2.png',
   water:               '/ground/ice/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__0.jpg',
-  urban_road:          '/ground/forest/lucid-origin_isometric_2.5D_fantasy_RPG_background_top-down_diagonal_camera_angle_beautiful_e-0.jpg',
-  residential:         '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_2.jpg',
-  special:             '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_3.jpg',
-  default:             '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
+  urban_road:          '/ground/generated/rocky_terrain_v2.png',
+  residential:         '/ground/generated/dirt_mountain_path_v2.png',
+  special:             '/ground/generated/rocky_terrain_v2.png',
+  default:             '/ground/generated/forest_ground_v2.png',
 };
 const THEME_TEXTURE_PATHS = [...new Set(Object.values(THEME_TEXTURE_MAP))];
 
@@ -106,9 +106,9 @@ const ELEV_LOW_MAX  = 10;   // elevation_m < 10  → low  (저지대/수변)
 const ELEV_HIGH_MIN = 35;   // elevation_m >= 35 → high (고지대/산악)
 
 const ELEV_TEXTURE_MAP = {
-  elev_low:  '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_2.jpg',
-  elev_mid:  '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_0.jpg',
-  elev_high: '/ground/forest/Lucid_Origin_isometric_25D_fantasy_RPG_background_topdown_diag_3.jpg',
+  elev_low:  '/ground/generated/forest_ground_v2.png',
+  elev_mid:  '/ground/generated/dirt_mountain_path_v2.png',
+  elev_high: '/ground/generated/rocky_terrain_v2.png',
 };
 // low/mid/high 버킷별 색 tint (고도감 강조)
 const ELEV_TINT = {
@@ -385,7 +385,7 @@ const buildGroupCliffsDeduplicated = (dbGroups, groupElevMap, activeGroupKeys, e
   if (effectiveScale === 0 || !dbGroups?.length) return [];
   const yBot = -1.0;
 
-  // 모든 활성 그룹의 외곽 링 엣지를 수집 (0.5m 정밀도로 해시)
+  // 엣지별로 어떤 그룹(theme)에 속하는지 추적 (높은 쪽 그룹의 theme 사용)
   const edgeMap = new Map();
   for (const g of dbGroups) {
     if (!activeGroupKeys.has(g.group_key)) continue;
@@ -394,6 +394,7 @@ const buildGroupCliffsDeduplicated = (dbGroups, groupElevMap, activeGroupKeys, e
     const ge = groupElevMap.get(g.group_key);
     const avgElev = ge && ge.count > 0 ? ge.sum / ge.count : 0;
     const elevY = BASE_Y + avgElev * effectiveScale;
+    const themeCode = g.theme_code || 'default';
 
     const { type, coordinates } = g.boundary_geojson;
     const outerRings = [];
@@ -410,26 +411,33 @@ const buildGroupCliffsDeduplicated = (dbGroups, groupElevMap, activeGroupKeys, e
         if (r0x === r1x && r0z === r1z) continue;
         const key = (r0x < r1x || (r0x === r1x && r0z < r1z))
           ? `${r0x},${r0z}|${r1x},${r1z}` : `${r1x},${r1z}|${r0x},${r0z}`;
-        if (!edgeMap.has(key)) edgeMap.set(key, { p0, p1, elevYs: [] });
-        edgeMap.get(key).elevYs.push(elevY);
+        if (!edgeMap.has(key)) edgeMap.set(key, { p0, p1, elevYs: [], themeCodes: [] });
+        const entry = edgeMap.get(key);
+        entry.elevYs.push(elevY);
+        entry.themeCodes.push({ elevY, themeCode });
       }
     }
   }
 
-  const cliffPos = [], cliffUv = [];
-  const slopePos = [], slopeUv = [];
+  // theme별로 cliff/slope 버퍼 분리
+  const themeBuffers = new Map(); // themeCode → { cliffPos, cliffUv, slopePos, slopeUv }
+  const getThemeBuf = (tc) => {
+    if (!themeBuffers.has(tc)) themeBuffers.set(tc, { cliffPos: [], cliffUv: [], slopePos: [], slopeUv: [] });
+    return themeBuffers.get(tc);
+  };
 
-  for (const [, { p0, p1, elevYs }] of edgeMap) {
-    let yLow, yHigh;
+  for (const [, { p0, p1, elevYs, themeCodes }] of edgeMap) {
+    let yLow, yHigh, themeCode;
     if (elevYs.length >= 2) {
-      // 공유 경계: 두 그룹 고도 차이만큼만 벽
       yLow  = Math.min(...elevYs);
       yHigh = Math.max(...elevYs);
-      if (yHigh - yLow < 0.05) continue; // 거의 같은 고도 → 벽 불필요
+      if (yHigh - yLow < 0.05) continue;
+      // 높은 쪽 그룹의 theme 사용
+      themeCode = themeCodes.find(t => t.elevY === yHigh)?.themeCode ?? 'default';
     } else {
-      // 외곽 엣지: 그룹 상단 → yBot
       yHigh = elevYs[0];
       yLow  = yBot;
+      themeCode = themeCodes[0]?.themeCode ?? 'default';
     }
 
     const heightDiff = yHigh - yLow;
@@ -437,8 +445,9 @@ const buildGroupCliffsDeduplicated = (dbGroups, groupElevMap, activeGroupKeys, e
     const edgeLen    = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
     if (edgeLen < 0.01) continue;
     const uS = edgeLen / 5, vS = heightDiff / 5;
-    const pos = isCliff ? cliffPos : slopePos;
-    const uv  = isCliff ? cliffUv  : slopeUv;
+    const buf = getThemeBuf(themeCode);
+    const pos = isCliff ? buf.cliffPos : buf.slopePos;
+    const uv  = isCliff ? buf.cliffUv  : buf.slopeUv;
 
     pos.push(p0.x, yLow,  p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
     uv.push(0, 0,  0, vS,  uS, vS);
@@ -447,17 +456,19 @@ const buildGroupCliffsDeduplicated = (dbGroups, groupElevMap, activeGroupKeys, e
   }
 
   const result = [];
-  if (cliffPos.length) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cliffPos), 3));
-    geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(cliffUv),  2));
-    result.push({ geo, isWall: true, isCliff: true, order: 4 });
-  }
-  if (slopePos.length) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(slopePos), 3));
-    geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(slopeUv),  2));
-    result.push({ geo, isWall: true, isCliff: false, order: 4 });
+  for (const [themeCode, buf] of themeBuffers) {
+    if (buf.cliffPos.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(buf.cliffPos), 3));
+      geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(buf.cliffUv),  2));
+      result.push({ geo, isWall: true, isCliff: true, themeCode, order: 4 });
+    }
+    if (buf.slopePos.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(buf.slopePos), 3));
+      geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(buf.slopeUv),  2));
+      result.push({ geo, isWall: true, isCliff: false, themeCode, order: 4 });
+    }
   }
   return result;
 };
@@ -1018,7 +1029,7 @@ const CityBlockContent = ({
             const topTex  = block.themeCode
               ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
               : (Array.isArray(textures) ? textures[block.texIdx ?? 0] : textures);
-            const wallTex = cliffTex ?? null;
+            const wallTex = topTex ?? cliffTex ?? null;
             const wallColor = wallTex ? '#ffffff' : '#7a6850';
             return (
               <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
@@ -1030,9 +1041,9 @@ const CityBlockContent = ({
 
           // ── [B] 별도 cliff/slope 쿼드 (fallback: partition-level 또는 flat 모드) ──
           if (block.isWall) {
-            const wallTex  = block.isCliff
-              ? (cliffTex ?? null)
-              : (slopeTex ?? cliffTex ?? null);
+            const wallTex  = block.themeCode
+              ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
+              : (block.isCliff ? (cliffTex ?? null) : (slopeTex ?? cliffTex ?? null));
             const wallColor = wallTex ? '#ffffff' : (block.isCliff ? '#7a6850' : '#8a9a6a');
             return (
               <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>

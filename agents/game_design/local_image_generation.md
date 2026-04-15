@@ -141,6 +141,40 @@ front/public/world_partition/{g_short}/{p_short}.png
 예: front/public/world_partition/noryangjin2_g04/0040.png
 ```
 
+## 출력 해상도 옵션
+
+| 방법 | 출력 | VRAM | 품질 | 상태 |
+|------|------|------|------|------|
+| 512 → 4xUltrasharp | **2048** | 안전 | ★★★★ | 현재 기본 |
+| 512 → 4xUltrasharp → lanczos ×2 | **4096** | 안전 | ★★★ (보간) | 스크립트 옵션 |
+| 512 → 4xUltrasharp → UltimateSDUpscale | **4096** | 안전 | ★★★★★ | custom node 미설치 |
+
+- **UltimateSDUpscale**: 2048 이미지를 타일 분할 → 타일별 img2img (denoise ~0.3) → 스티칭. AI가 4096 해상도로 디테일 재렌더.
+- 설치: `tools/ComfyUI/custom_nodes/` 에 ComfyUI_UltimateSDUpscale 클론 후 ComfyUI 재시작
+- RTX 4060 8GB 기준 4096 img2img 타일링은 VRAM 안전 (타일당 512 처리)
+
+## 생성 테스트 결과 (2026-04-15)
+
+### 마을길 (village_road) — DreamShaper XL Lightning + add-detail-xl LoRA
+
+| 항목 | 값 |
+|------|-----|
+| 모델 | dreamshaperXL_lightningDPMSDE |
+| LoRA | add-detail-xl (strength 0.7) |
+| Steps/CFG | 8 / 2.0 |
+| 출력 | 1024px (2048 생성 후 다운스케일 — 이후 수정) |
+| 결과 이미지 | `front/public/ground/generated/village_road.png` |
+
+**평가:**
+- 코블스톤 + 이끼 디테일 良 (add-detail-xl LoRA 효과 확인)
+- **문제**: 길이 S자 구도, 양옆 석벽 포함 → 바닥 텍스처 부적합
+- **원인**: 프롬프트에 `cobblestone village road` → 길 전체 구도를 생성, floor texture 개념 아님
+- **개선 방향**: `full ground coverage, no walls, no path edges, flat overhead texture` 추가
+- **zavy-ctsmtrc-sdxl LoRA 추가** 고려 (top-down 구도 강제 효과)
+
+**스크립트 수정 이력:**
+- `gen_seamless_tiles.py` 출력 해상도 1024→2048 수정 (4xUltrasharp 결과 다운스케일 제거)
+
 ## 새 모델 추가
 
 1. CivitAI에서 `.safetensors` 다운로드
