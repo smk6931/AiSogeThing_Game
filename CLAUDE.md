@@ -37,6 +37,7 @@
 - [`agents/process/workflow_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/workflow_rules.md)
 - [`agents/process/tool_split_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/tool_split_rules.md)
 - [`agents/process/global_tooling_scope_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/global_tooling_scope_rules.md)
+- [`agents/process/documentation_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/documentation_rules.md)
 - [`agents/process/advisory_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/advisory_rules.md)
 - [`agents/process/communication_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/communication_rules.md)
 - [`agents/planning/world_layer_design.md`](C:/GitHub/AiSogeThing_Game/agents/planning/world_layer_design.md) — Layer 0/1 분리 원칙, placed_objects 스키마, InstancedMesh 렌더 규칙 (오브젝트 배치 구현 시 필독)

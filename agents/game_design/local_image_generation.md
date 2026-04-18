@@ -1,7 +1,7 @@
 # Title: Local Image Generation (ComfyUI)
-Description: 로컬 ComfyUI로 파티션 바닥 텍스처 생성 시 사용하는 모델, 파라미터, 스크립트 사용법
-When-To-Read: 이미지 생성 요청, 파티션 텍스처 생성, ComfyUI 설정 변경, 모델 추가 시
-Keywords: comfyui, image-generation, texture, partition, rpg, checkpoint, model, stable-diffusion, hires-fix, upscale
+Description: 로컬 ComfyUI로 바닥 텍스처 생성 시 사용하는 모델, 파라미터, 스크립트 사용법. Juggernaut XL + 텍스처 프롬프트 방식이 확정 기준.
+When-To-Read: 이미지 생성 요청, 바닥 텍스처 생성, ComfyUI 설정 변경, 모델 추가, 컨셉 변경 시
+Keywords: comfyui, image-generation, texture, juggernaut, checkpoint, model, stable-diffusion, upscale, pbr, seamless
 Priority: high
 
 # 로컬 이미지 생성 가이드 (ComfyUI)
@@ -10,174 +10,187 @@ Priority: high
 
 - **ComfyUI 경로**: `tools/ComfyUI/`
 - **실행**: ComfyUI 서버가 `http://localhost:8188` 에서 동작 중이어야 함
-- **생성 스크립트**: `back/scripts/generate_partition_textures.py`
+- **바닥 텍스처 스크립트**: `back/scripts/gen_ground_textures.py`
+- **파티션 텍스처 스크립트**: `back/scripts/generate_partition_textures.py`
 
-## 현재 사용 모델
+---
 
-| 모델 | 파일 | 용도 |
+## ★ 확정 모델: Juggernaut XL v10
+
+> 2026-04-15 검증 완료. DreamShaper XL Lightning 대비 PBR 재질감, 반사/광택 표현이 압도적으로 우수.
+> 바닥 텍스처 목적에서는 Juggernaut XL이 기본 모델이다.
+
+| 모델 | 파일 | 용도 | 상태 |
+|------|------|------|------|
+| **Juggernaut XL v10** ★ 기본 | `juggernautXL_v10.safetensors` | 바닥 텍스처 (PBR 품질) | **확정** |
+| DreamShaper XL Lightning | `dreamshaperXL_lightningDPMSDE.safetensors` | 빠른 테스트용 (8 steps) | 보조 |
+| RPG v5 | `rpg_v5.safetensors` | 판타지 씬 생성 보조 | 보조 |
+
+경로: `tools/ComfyUI/models/checkpoints/`
+
+---
+
+## 확정 파이프라인: 512 → 4xUltrasharp → 2048px
+
+```
+EmptyLatentImage (512×512)
+  → KSampler (STEPS=22, CFG=6.0, dpmpp_2m, karras, denoise=1.0)
+  → VAEDecode
+  → ImageUpscaleWithModel (4xUltrasharp)   ← 512 → 2048px
+  → SaveImage
+```
+
+- **속도**: RTX 4060 Laptop 8GB 기준 약 12~15초/장
+- **출력**: 2048×2048px
+- **4096px 필요 시**: UltimateSDUpscale 추가 (약 10분, `gen_forest_ruins_4k.py` 참고)
+
+### 업스케일 모델
+
+| 모델 | 파일 | 경로 |
 |------|------|------|
-| **DreamShaper XL Lightning** ★ 기본 | `dreamshaperXL_lightningDPMSDE.safetensors` | 파티션 바닥 텍스처 |
-| RPG v5 | `rpg_v5.safetensors` | 대안 (--style village 프리셋) |
+| **4xUltrasharp V10** ★ 필수 | `4xUltrasharp_4xUltrasharpV10.pt` | `tools/ComfyUI/models/upscale_models/` |
 
-## 업스케일 모델
+---
 
-| 모델 | 파일 | 용도 |
-|------|------|------|
-| **4xUltrasharp V10** ★ 필수 | `4xUltrasharp_4xUltrasharpV10.pt` | hi-res fix 후 최종 업스케일 |
+## ★ 핵심 원칙: 텍스처 프롬프트 vs 씬 프롬프트
 
-경로: `tools/ComfyUI/models/upscale_models/`
+**이게 가장 중요한 규칙이다.**
 
-## 워크플로우 (hi-res fix + 4xUltrasharp)
+| 방식 | 프롬프트 예 | 결과 |
+|------|-----------|------|
+| ❌ 씬 프롬프트 | `top-down view of ancient forest ruins, trees, magic circle...` | 나무/오브젝트 포함, 바닥 텍스처 불적합 |
+| ✅ 텍스처 프롬프트 | `seamless tileable ground texture, flat overhead view, [재질], photorealistic PBR material` | 순수 바닥 재질, UV 매핑 적합 |
 
-참조 이미지(`ds_lava_canyon`, `ds_crystal_cave` 등)와 동일한 파이프라인.
+- `top-down 90 degree overhead view` 처럼 구도 강제 문구는 **모델을 혼란스럽게** 만든다
+- `seamless tileable ground texture, flat overhead view` 로 시작하면 모델이 텍스처 패턴으로 인식
+- 오브젝트(나무, 벽, 기둥) 제거는 negative로 처리
 
-```
-Pass 1: EmptyLatentImage (img_w × img_h)
-         → KSampler (STEPS=8, CFG=2.0, denoise=1.0)
-         → VAEDecode
+---
 
-Pass 2: ImageScaleBy 1.5x (lanczos)
-         → VAEEncode
-         → KSampler (STEPS=8, CFG=2.0, denoise=0.5) ← hi-res fix
-         → VAEDecode
+## 확정 프롬프트 구조
 
-Pass 3: ImageUpscaleWithModel (4xUltrasharp)
-         → ImageScale → min(img_w×2, 2048) × min(img_h×2, 2048)
-         → SaveImage
-
-Post:   PIL polygon 클리핑 (polygon 외부 → 검정)
-         feather=6 으로 경계 부드럽게
-```
-
-**이전 방식(VAEEncodeForInpaint)과 차이점:**
-- ring border 문제 원천 제거 (AI 생성 시 마스크 없음)
-- 퀄리티 대폭 향상 (2배 해상도 + 4xUltrasharp)
-- polygon 클리핑은 PIL post-process로 (Three.js가 최종 UV 처리)
-
-## 현재 설정값
+### Positive
 
 ```
-STEPS            = 8
-CFG              = 2.0
-SAMPLER          = dpmpp_sde
-SCHEDULER        = karras
-HIRESFIX_DENOISE = 0.5
-UPSCALE_MODEL    = 4xUltrasharp_4xUltrasharpV10.pt
-POLY_MASK_FEATHER= 6      ← PIL 클리핑 경계 feather
+seamless tileable ground texture, flat overhead view,
+[지형 재질 설명 — 돌/흙/이끼/얼음 등],
+[재질 세부 — 균열/이끼/물기/모래 등],
+[크기 다양성 — mixed large and small, irregular sizes],
+high detail, photorealistic PBR material
 ```
 
-## 프롬프트 가이드
+### Negative
 
-### Positive 구조
 ```
-그룹 image_prompt_base  (또는 --override-prompt 직접 지정)
-+ scale hint (면적 기반 자동 삽입)
-```
-
-- `image_prompt_base`는 `world_partition_group` 테이블에 저장
-- 프롬프트 스타일: `"top-down 90 degree overhead view, fantasy RPG world [지형], high detail, painterly illustration"`
-- 건물·소품·실내 묘사 금지 → 자연 지형(바닥, 암석, 초목, 용암, 빙하 등) 중심
-- **주의**: "crystal formations", "cavern", "canyon wall" 같은 수직 구도 단어는 top-down 지시어를 무시하고 side-view를 생성함. 대신 "crystal-covered ground floor", "cave floor seen from above", "overhead view of cave ground" 처럼 **바닥/floor** 중심으로 작성할 것
-
-### Negative (STYLE_NEGATIVE)
-```
-cartoon, anime, flat colors, isometric, bright daylight, cheerful,
-blurry, watermark, text, logo, frame, border, bad quality, ugly, deformed, duplicate,
-building interior, room, furniture, indoor, rooftop view
+cartoon, anime, 3D render, depth, perspective, side view, isometric,
+trees, plants, rocks above ground, objects, characters, buildings, walls,
+sky, horizon, shadow, bright light, bloom,
+blurry, watermark, text, logo, border, frame,
+ugly, deformed, bad quality, duplicate
 ```
 
-### 파티션 면적 → scale hint (자동 삽입)
-| 면적 | 힌트 |
-|------|------|
-| < 1,000 m² | `small NxNm ground area, detailed surface, seamless organic terrain` |
-| 1,000~10,000 m² | `medium NxNm ground area, varied natural ground, seamless organic terrain` |
-| > 10,000 m² | `large NxNm ground area, wide terrain with organic color variation, seamless` |
+---
+
+## 지형 타입별 프롬프트 레퍼런스
+
+### 검증된 타입 (2026-04-15)
+
+| 타입 | 핵심 키워드 | 결과 파일 |
+|------|-----------|---------|
+| **ice** ★ 최고 품질 | `frozen tundra ice ground, cracked ice sheets, snow-dusted angular rocks embedded in ice, pale blue atmospheric light, mixed large and small ice fragments, irregular cracks` | `jug_ice_preview.png` |
+| cobblestone | `angular irregular cobblestone pavement, mixed large and small stones, varied stone sizes randomly placed, sharp-edged flat stones, dirt and moss filling gaps` | `cobblestone_2k.png` |
+| moss_stone | `angular flat stone slabs with heavy green moss, irregular sized stone pieces scattered randomly, thick moss patches, mixed large slabs and small pebbles` | `moss_stone_2k.png` |
+| dirt_path | `natural dirt path with scattered flat stones, irregular flat pebbles and rocks of mixed sizes embedded in soil, packed earth with gravel` | `dirt_path_2k.png` |
+| dry_cracked | `dry cracked earth with irregular stone fragments, deep crack lines between dried mud polygons, flat angular pebbles scattered randomly` | `dry_cracked_2k.png` |
+
+### 신규 타입 추가 시 참고
+
+| 컨셉 | 권장 키워드 |
+|------|-----------|
+| 용암 지대 | `cooled lava ground, cracked obsidian surface, glowing orange cracks between dark basalt stones, igneous rock fragments` |
+| 설원 | `snow-covered frozen ground, compacted snow, ice crystals, frosted earth, pale white and blue tones` |
+| 모래 사막 | `desert sand ground, fine sand texture, small pebbles scattered, sand ripple patterns, warm beige and tan tones` |
+| 습지 | `swamp ground, dark muddy soil, wet moss, waterlogged earth, decomposed leaves, dark green and brown` |
+| 신전 바닥 | `ancient stone floor tiles, weathered marble, carved stone slabs, dusty cracks, geometric tile pattern` |
+
+---
+
+## 컨셉 변경 시 대응 방법
+
+게임 세계관이나 지형 컨셉이 바뀌어도 아래 순서만 따르면 된다.
+
+1. **모델은 그대로** — Juggernaut XL v10은 사실적 재질이면 모두 잘 표현
+2. **Positive 핵심 프레임 유지** — `seamless tileable ground texture, flat overhead view, ... photorealistic PBR material`
+3. **지형 재질 키워드만 교체** — 위 레퍼런스 테이블 또는 새로 작성
+4. **Negative는 그대로** — 오브젝트 제거 negative는 컨셉 무관하게 동일하게 유지
+5. **seed 변경으로 변형 생성** — 같은 프롬프트에서 seed만 바꾸면 다른 패턴 나옴
+
+### DreamShaper로 돌아가야 할 때
+
+- **빠른 프로토타입** — 8 steps, ~10초, 아이디어 확인용
+- **판타지 씬(오브젝트 포함)** — Juggernaut보다 판타지 표현 강함
+- 이 경우 `STEPS=8, CFG=2.0, SAMPLER=dpmpp_sde` 로 변경
+
+---
 
 ## 스크립트 사용법
+
+### gen_ground_textures.py (바닥 텍스처 전용)
+
+```bash
+# 전체 4개 타입 생성
+python back/scripts/gen_ground_textures.py
+
+# 특정 타입만
+python back/scripts/gen_ground_textures.py --keys cobblestone ice
+
+# 출력: front/public/ground/generated/{타입}_2k.png
+```
+
+스크립트 내 `CHECKPOINT`, `TILES` 딕셔너리에서 모델/프롬프트 수정.
+
+### generate_partition_textures.py (파티션 DB 연동)
 
 ```bash
 # 파티션 개별 생성
 python back/scripts/generate_partition_textures.py \
     --partition-keys seoul..2.v2.0040
 
-# 그룹 전체 파티션 개별 생성
-python back/scripts/generate_partition_textures.py \
-    --group-key seoul.dongjak.noryangjin2.group.g04 \
-    --per-partition
-
-# 프롬프트 직접 지정 (테스트용, DB 프롬프트 무시)
+# 모델 지정 (Juggernaut 사용 시)
 python back/scripts/generate_partition_textures.py \
     --partition-keys seoul..2.v2.0040 \
-    --override-prompt "top-down overhead view, fantasy RPG ancient forest ruins, ..."
-
-# 모델 지정
-python back/scripts/generate_partition_textures.py \
-    --partition-keys ... \
-    --checkpoint rpg_v5.safetensors
+    --checkpoint juggernautXL_v10.safetensors
 ```
 
-## 이미지 생성 품질이 낮게 나올 때
-
-1. **4xUltrasharp 모델 확인**: `tools/ComfyUI/models/upscale_models/4xUltrasharp_4xUltrasharpV10.pt` 존재 여부 확인
-2. **프롬프트 점검**: 건물·소품 묘사 제거, 자연 지형 중심으로 재작성
-3. **Negative 점검**: `STYLE_NEGATIVE` 에 `building interior, rooftop view` 포함 여부 확인
-4. **ComfyUI 재시작**: 모델 로딩 오류 시
-
-## 이미지 스케일
-
-- `METERS_PER_PIXEL = 0.5` → 1px = 0.5m (Pass 1 기준)
-- `MAX_ASPECT = 3.0` → 종횡비 3:1 초과 시 타일 분할
-- 최종 출력: Pass 1 해상도 × 2 (최대 2048px)
-
-## 타일링 처리
-
-- 긴 파티션(비율 > 3:1)은 타일 이미지 생성 후 Three.js UV repeat
-- 타일링 파티션: PIL 클리핑 없이 전체 이미지 사용
+---
 
 ## 출력 경로
 
-```
-front/public/world_partition/{g_short}/{p_short}.png
-예: front/public/world_partition/noryangjin2_g04/0040.png
-```
+| 용도 | 경로 |
+|------|------|
+| 바닥 텍스처 테스트 | `front/public/ground/generated/{name}_2k.png` |
+| 파티션 텍스처 | `front/public/world_partition/{g_short}/{p_short}.png` |
+| ComfyUI 원본 출력 | `tools/ComfyUI/output/` |
 
-## 출력 해상도 옵션
+**주의**: ComfyUI output 폴더에서 직접 urlretrieve로 다운로드 시 원본 파일을 덮어쓸 수 있음.
+파일 복사는 항상 `shutil.copy2` 또는 다른 경로에 저장.
 
-| 방법 | 출력 | VRAM | 품질 | 상태 |
-|------|------|------|------|------|
-| 512 → 4xUltrasharp | **2048** | 안전 | ★★★★ | 현재 기본 |
-| 512 → 4xUltrasharp → lanczos ×2 | **4096** | 안전 | ★★★ (보간) | 스크립트 옵션 |
-| 512 → 4xUltrasharp → UltimateSDUpscale | **4096** | 안전 | ★★★★★ | custom node 미설치 |
+---
 
-- **UltimateSDUpscale**: 2048 이미지를 타일 분할 → 타일별 img2img (denoise ~0.3) → 스티칭. AI가 4096 해상도로 디테일 재렌더.
-- 설치: `tools/ComfyUI/custom_nodes/` 에 ComfyUI_UltimateSDUpscale 클론 후 ComfyUI 재시작
-- RTX 4060 8GB 기준 4096 img2img 타일링은 VRAM 안전 (타일당 512 처리)
+## 하드웨어 기준 (RTX 4060 Laptop 8GB)
 
-## 생성 테스트 결과 (2026-04-15)
+| 파이프라인 | 시간 | VRAM | 품질 |
+|-----------|------|------|------|
+| Juggernaut XL + 4xUltrasharp → 2048px | ~12초 | ~6GB | ★★★★★ |
+| DreamShaper Lightning + 4xUltrasharp → 2048px | ~10초 | ~5GB | ★★★ |
+| + UltimateSDUpscale → 4096px | +10분 | ~7GB | ★★★★★ |
+| Flux.1 schnell fp8 → 2048px | ~40초 | ~8GB (빠듯) | ★★★★★ |
 
-### 마을길 (village_road) — DreamShaper XL Lightning + add-detail-xl LoRA
-
-| 항목 | 값 |
-|------|-----|
-| 모델 | dreamshaperXL_lightningDPMSDE |
-| LoRA | add-detail-xl (strength 0.7) |
-| Steps/CFG | 8 / 2.0 |
-| 출력 | 1024px (2048 생성 후 다운스케일 — 이후 수정) |
-| 결과 이미지 | `front/public/ground/generated/village_road.png` |
-
-**평가:**
-- 코블스톤 + 이끼 디테일 良 (add-detail-xl LoRA 효과 확인)
-- **문제**: 길이 S자 구도, 양옆 석벽 포함 → 바닥 텍스처 부적합
-- **원인**: 프롬프트에 `cobblestone village road` → 길 전체 구도를 생성, floor texture 개념 아님
-- **개선 방향**: `full ground coverage, no walls, no path edges, flat overhead texture` 추가
-- **zavy-ctsmtrc-sdxl LoRA 추가** 고려 (top-down 구도 강제 효과)
-
-**스크립트 수정 이력:**
-- `gen_seamless_tiles.py` 출력 해상도 1024→2048 수정 (4xUltrasharp 결과 다운스케일 제거)
+---
 
 ## 새 모델 추가
 
 1. CivitAI에서 `.safetensors` 다운로드
 2. `tools/ComfyUI/models/checkpoints/` 에 복사
 3. ComfyUI 자동 인식 (재시작 불필요)
-4. `--checkpoint` 파라미터로 지정
+4. 스크립트 내 `CHECKPOINT` 변수 또는 `--checkpoint` 파라미터로 지정

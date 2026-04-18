@@ -81,6 +81,88 @@ const findAdjacentGroupKeys = (currentGroupKey, partitions, radius = 700) => {
 // 파티션 종횡비 캡 (Python 동일 값)
 const MAX_PARTITION_ASPECT = 3.0;
 
+// ── 절벽 Triplanar + FBM ShaderMaterial ──────────────────────────────────────
+// 기법: Triplanar Mapping (UE5/Unity HDRP 표준)
+//   UV 좌표 완전 무시, world position으로 XZ/YZ/XY 3축 샘플링 후
+//   surface normal 크기 기반 블렌딩 → UV 반복·왜곡 원천 차단
+//   + FBM noise로 미세 명암 변화 추가
+const CLIFF_VERT = `
+varying vec3 vWorldPos;
+void main() {
+  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const CLIFF_FRAG = `
+#extension GL_OES_standard_derivatives : enable
+uniform sampler2D uTex;
+uniform float uScale;
+varying vec3 vWorldPos;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x),
+             mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  return vnoise(p*1.0)*0.50 + vnoise(p*2.1)*0.25
+       + vnoise(p*4.3)*0.15 + vnoise(p*8.7)*0.10;
+}
+
+void main() {
+  // normal 속성 없어도 face normal을 fragment derivative로 계산
+  vec3 dx = dFdx(vWorldPos);
+  vec3 dy = dFdy(vWorldPos);
+  vec3 faceNormal = normalize(cross(dx, dy));
+
+  // ── Triplanar: world pos로 3축 샘플링 ──
+  vec3 pos = vWorldPos * uScale;
+  vec4 cX = texture2D(uTex, pos.yz);
+  vec4 cY = texture2D(uTex, pos.xz);
+  vec4 cZ = texture2D(uTex, pos.xy);
+
+  // face normal 기반 blend (sharpness=4)
+  vec3 blend = pow(abs(faceNormal), vec3(4.0));
+  float bSum = dot(blend, vec3(1.0));
+  blend = (bSum > 0.0001) ? blend / bSum : vec3(0.0, 1.0, 0.0);
+
+  vec4 col = cX * blend.x + cY * blend.y + cZ * blend.z;
+
+  // ── FBM noise 명암 오버레이 ──
+  float n = fbm(vWorldPos.xz * 0.012 + vec2(vWorldPos.y * 0.035));
+  col.rgb *= mix(0.52, 1.05, n);
+
+  gl_FragColor = col;
+}
+`;
+
+// attach prop 전달 가능한 primitive 방식
+const CliffShaderMat = React.memo(({ texture, attach }) => {
+  const uniforms = useMemo(() => ({
+    uTex:   { value: null },
+    uScale: { value: 0.022 },
+  }), []);
+
+  useEffect(() => { uniforms.uTex.value = texture ?? null; }, [texture, uniforms]);
+
+  return (
+    <shaderMaterial
+      attach={attach}
+      vertexShader={CLIFF_VERT}
+      fragmentShader={CLIFF_FRAG}
+      uniforms={uniforms}
+      side={THREE.DoubleSide}
+      toneMapped={false}
+      depthWrite={true}
+    />
+  );
+});
+
 // 고도 스케일: 실제 100m → 10 world unit (노량진1동 5~92m → 게임 내 0.5~9.2 unit)
 // showElevation=false 시 effective scale = 0 → 전체 평지
 const ELEV_SCALE = 1.0;
@@ -91,13 +173,13 @@ const TILE_SIZE = 100.0;
 
 // theme_code → 텍스처 파일 매핑 (Phase 1 단순화: 5~6종 타일링)
 const THEME_TEXTURE_MAP = {
-  sanctuary_green:     '/ground/generated/forest_ground_v2.png',
-  ancient_stone_route: '/ground/generated/rocky_terrain_v2.png',
+  sanctuary_green:     '/ground/rune/image.png',
+  ancient_stone_route: '/ground/rune/image.png',
   water:               '/ground/ice/Lucid_Origin_frozen_tundra_landscape_from_directly_above_with__0.jpg',
-  urban_road:          '/ground/generated/rocky_terrain_v2.png',
-  residential:         '/ground/generated/dirt_mountain_path_v2.png',
-  special:             '/ground/generated/rocky_terrain_v2.png',
-  default:             '/ground/generated/forest_ground_v2.png',
+  urban_road:          '/ground/rune/image.png',
+  residential:         '/ground/rune/image.png',
+  special:             '/ground/rune/image.png',
+  default:             '/ground/rune/image.png',
 };
 const THEME_TEXTURE_PATHS = [...new Set(Object.values(THEME_TEXTURE_MAP))];
 
@@ -106,9 +188,9 @@ const ELEV_LOW_MAX  = 10;   // elevation_m < 10  → low  (저지대/수변)
 const ELEV_HIGH_MIN = 35;   // elevation_m >= 35 → high (고지대/산악)
 
 const ELEV_TEXTURE_MAP = {
-  elev_low:  '/ground/generated/forest_ground_v2.png',
-  elev_mid:  '/ground/generated/dirt_mountain_path_v2.png',
-  elev_high: '/ground/generated/rocky_terrain_v2.png',
+  elev_low:  '/ground/rune/image.png',
+  elev_mid:  '/ground/rune/image.png',
+  elev_high: '/ground/rune/image.png',
 };
 // low/mid/high 버킷별 색 tint (고도감 강조)
 const ELEV_TINT = {
@@ -374,6 +456,100 @@ const buildExtrudedPolygon = (outerRing, holes = [], yTop, yBot = -1.0, includeW
   return geo;
 };
 
+// ── 절벽 노이즈 유틸 ────────────────────────────────────────────────────────
+// 세계 좌표 기반 결정론적 value noise (외부 라이브러리 불필요)
+const _noiseHash = (ix, iy) => {
+  const n = Math.sin(ix * 127.1 + iy * 311.7) * 43758.5453123;
+  return n - Math.floor(n);
+};
+const _valueNoise2D = (x, y) => {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const n00 = _noiseHash(ix,   iy),   n10 = _noiseHash(ix+1, iy);
+  const n01 = _noiseHash(ix,   iy+1), n11 = _noiseHash(ix+1, iy+1);
+  return n00*(1-ux)*(1-uy) + n10*ux*(1-uy) + n01*(1-ux)*uy + n11*ux*uy;
+};
+// fBm: 4 옥타브 (결과 ≈ -0.9 ~ +0.9)
+const _fbm2D = (x, y) => {
+  let v = 0, amp = 0.5, freq = 1.0;
+  for (let i = 0; i < 4; i++) {
+    v += (_valueNoise2D(x * freq, y * freq) * 2 - 1) * amp;
+    freq *= 2.1; amp *= 0.5;
+  }
+  return v;
+};
+
+/**
+ * 절벽 엣지를 수평·수직 세분화하고 fBm 노이즈로 불규칙하게 만든 삼각형 배열 반환.
+ * - 상단(yHigh)·하단(yLow) 엣지는 변위 없음 → 인접 상단면/바닥과 갭 없음
+ * - 중간 레이어의 내부 정점에 법선 방향 XZ 변위 + Y 변위 적용
+ */
+const buildNoisyCliffWall = (p0, p1, yLow, yHigh) => {
+  const dx = p1.x - p0.x, dz = p1.z - p0.z;
+  const edgeLen = Math.sqrt(dx * dx + dz * dz);
+  if (edgeLen < 0.01) return { pos: [], uv: [] };
+
+  const heightDiff = yHigh - yLow;
+  // 수평 세분화: 5m 단위, 최대 30
+  const hSegs = Math.min(30, Math.max(1, Math.round(edgeLen / 5)));
+  // 수직 레벨: 고도차 3m마다 1단, 최소 2, 최대 5
+  const vLevels = Math.min(5, Math.max(2, Math.round(heightDiff / 3)));
+
+  // 엣지 단위벡터 및 오른쪽 법선
+  const nx = dz / edgeLen, nz = -dx / edgeLen;
+  // 노이즈 스케일: ~0.05/m → 절벽 불규칙 패턴 10~20m 주기
+  const NS = 0.05;
+
+  // 정점 그리드 [vLevels+1][hSegs+1]
+  // 상단(j=0)·하단(j=vLevels) 고정 → 인접 면과 갭 없음
+  // 중간 레이어만 noise 변위
+  const grid = [];
+  for (let j = 0; j <= vLevels; j++) {
+    const vt = j / vLevels;
+    const baseY = yHigh - heightDiff * vt;
+    const isEdge = (j === 0 || j === vLevels);
+    const env = isEdge ? 0 : (1 - Math.abs(vt * 2 - 1));
+
+    const row = [];
+    for (let i = 0; i <= hSegs; i++) {
+      const wt = i / hSegs;
+      const wx = p0.x + dx * wt, wz = p0.z + dz * wt;
+      if (isEdge) {
+        row.push({ x: wx, y: baseY, z: wz });
+      } else {
+        const n1 = _fbm2D(wx * NS,       wz * NS);
+        const n2 = _fbm2D(wx * NS + 50,  wz * NS + 50);
+        const n3 = _fbm2D(wx * NS * 1.8, wz * NS * 1.8 + 200);
+        row.push({
+          x: wx + nx * n1 * 2.5 * env + (dx / edgeLen) * n2 * 1.0 * env,
+          y: baseY + n3 * 1.2 * env,
+          z: wz + nz * n1 * 2.5 * env + (dz / edgeLen) * n2 * 1.0 * env,
+        });
+      }
+    }
+    grid.push(row);
+  }
+
+  const pos = [], uv = [];
+  for (let j = 0; j < vLevels; j++) {
+    for (let i = 0; i < hSegs; i++) {
+      const v00 = grid[j][i],   v10 = grid[j][i+1];
+      const v01 = grid[j+1][i], v11 = grid[j+1][i+1];
+      const u0 = (i     / hSegs) * (edgeLen / 5);
+      const u1 = ((i+1) / hSegs) * (edgeLen / 5);
+      // v=0 → 하단, v=높이/5 → 상단 (기존 UV 규칙 유지)
+      const vv0 = ((vLevels - j)     / vLevels) * (heightDiff / 5);
+      const vv1 = ((vLevels - j - 1) / vLevels) * (heightDiff / 5);
+      pos.push(v00.x, v00.y, v00.z,  v01.x, v01.y, v01.z,  v11.x, v11.y, v11.z);
+      uv.push(u0, vv0,  u0, vv1,  u1, vv1);
+      pos.push(v00.x, v00.y, v00.z,  v11.x, v11.y, v11.z,  v10.x, v10.y, v10.z);
+      uv.push(u0, vv0,  u1, vv1,  u1, vv0);
+    }
+  }
+  return { pos, uv };
+};
+
 /**
  * 그룹 레벨 엣지 중복제거 벽면 생성
  * buildAdjacentCliffs의 그룹 버전:
@@ -441,18 +617,22 @@ const buildGroupCliffsDeduplicated = (dbGroups, groupElevMap, activeGroupKeys, e
     }
 
     const heightDiff = yHigh - yLow;
-    const isCliff    = heightDiff > CLIFF_DIFF_THRESHOLD;
     const edgeLen    = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
     if (edgeLen < 0.01) continue;
-    const uS = edgeLen / 5, vS = heightDiff / 5;
     const buf = getThemeBuf(themeCode);
-    const pos = isCliff ? buf.cliffPos : buf.slopePos;
-    const uv  = isCliff ? buf.cliffUv  : buf.slopeUv;
 
-    pos.push(p0.x, yLow,  p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
-    uv.push(0, 0,  0, vS,  uS, vS);
-    pos.push(p0.x, yLow,  p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
-    uv.push(0, 0,  uS, vS,  uS, 0);
+    // 높이 1.5 이상 모든 벽에 노이즈 적용 (isCliff 기준 제거)
+    if (heightDiff > 1.5) {
+      const { pos: nPos, uv: nUv } = buildNoisyCliffWall(p0, p1, yLow, yHigh);
+      for (const v of nPos) buf.cliffPos.push(v);
+      for (const v of nUv)  buf.cliffUv.push(v);
+    } else {
+      const uS = edgeLen / 5, vS = heightDiff / 5;
+      buf.slopePos.push(p0.x, yLow, p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
+      buf.slopeUv.push(0, 0,  0, vS,  uS, vS);
+      buf.slopePos.push(p0.x, yLow, p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
+      buf.slopeUv.push(0, 0,  uS, vS,  uS, 0);
+    }
   }
 
   const result = [];
@@ -524,18 +704,20 @@ const buildAdjacentCliffs = (partitions, effectiveScale) => {
     }
 
     const heightDiff = yHigh - yLow;
-    const isCliff    = heightDiff > CLIFF_DIFF_THRESHOLD;
     const edgeLen    = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
-    const uScale     = edgeLen / 5;
-    const vScale     = heightDiff / 5;
+    if (edgeLen < 0.01) continue;
 
-    const pos = isCliff ? cliffPos : slopePos;
-    const uv  = isCliff ? cliffUv  : slopeUv;
-
-    pos.push(p0.x, yLow,  p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
-    uv.push(0, 0,  0, vScale,  uScale, vScale);
-    pos.push(p0.x, yLow,  p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
-    uv.push(0, 0,  uScale, vScale,  uScale, 0);
+    if (heightDiff > 1.5) {
+      const { pos: nPos, uv: nUv } = buildNoisyCliffWall(p0, p1, yLow, yHigh);
+      for (const v of nPos) cliffPos.push(v);
+      for (const v of nUv)  cliffUv.push(v);
+    } else {
+      const uScale = edgeLen / 5, vScale = heightDiff / 5;
+      slopePos.push(p0.x, yLow, p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
+      slopeUv.push(0, 0,  0, vScale,  uScale, vScale);
+      slopePos.push(p0.x, yLow, p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
+      slopeUv.push(0, 0,  uScale, vScale,  uScale, 0);
+    }
   }
 
   const result = [];
@@ -552,6 +734,123 @@ const buildAdjacentCliffs = (partitions, effectiveScale) => {
     result.push({ geo, isWall: true, isCliff: false, order: 4 });
   }
   return result;
+};
+
+/**
+ * 계단식 절벽 생성 (buildGroupCliffsDeduplicated + buildGroupTopRims 대체)
+ * - 파티션 경계에서 외측으로 N단 계단 돌출 → 갭 없음
+ * - 각 계단: 수직 벽 + 수평 레지 (noise 변위)
+ * - 상단·하단 엣지 완전 고정 → Z-fighting·빵꾸 원천 차단
+ * - centroid 기반 outward 방향 → CW/CCW 무관
+ */
+const buildGroupStaircaseCliffs = (dbGroups, groupElevMap, activeGroupKeys, effectiveScale) => {
+  if (!dbGroups?.length || effectiveScale === 0) return [];
+
+  const N_STEPS = 3;      // 계단 단수
+  const STEP_W  = 3.0;    // 한 레지 폭 (m, outward)
+  const NS      = 0.05;   // noise 스케일
+  const yBot    = -1.0;
+
+  const pos = [], uv = [];
+
+  for (const g of dbGroups) {
+    if (!activeGroupKeys.has(g.group_key)) continue;
+    if (!g.boundary_geojson) continue;
+
+    const ge = groupElevMap.get(g.group_key);
+    const avgElev = ge && ge.count > 0 ? ge.sum / ge.count : 0;
+    const yHigh    = BASE_Y + avgElev * effectiveScale;
+    const totalH   = yHigh - yBot;
+    const stepH    = totalH / N_STEPS;
+
+    const { type, coordinates } = g.boundary_geojson;
+    const outerRings = [];
+    if (type === 'Polygon') {
+      if (coordinates[0]) outerRings.push(coordinates[0]);
+    } else if (type === 'MultiPolygon') {
+      for (const poly of coordinates) if (poly[0]) outerRings.push(poly[0]);
+    }
+
+    for (const ring of outerRings) {
+      if (!ring || ring.length < 3) continue;
+
+      const pts = ring.map(([lng, lat]) => gpsToGame(lat, lng));
+      // centroid (outward 방향 결정용)
+      let cx = 0, cz = 0;
+      for (const p of pts) { cx += p.x; cz += p.z; }
+      cx /= pts.length; cz /= pts.length;
+
+      for (let ei = 0; ei < pts.length - 1; ei++) {
+        const p0 = pts[ei], p1 = pts[ei + 1];
+        const dx = p1.x - p0.x, dz = p1.z - p0.z;
+        const edgeLen = Math.sqrt(dx * dx + dz * dz);
+        if (edgeLen < 0.01) continue;
+
+        // outward = edge midpoint → away from centroid
+        const mx = (p0.x + p1.x) * 0.5, mz = (p0.z + p1.z) * 0.5;
+        const odx = mx - cx, odz = mz - cz;
+        const odLen = Math.sqrt(odx * odx + odz * odz) || 1;
+        const outX = odx / odLen, outZ = odz / odLen;
+
+        const hSegs = Math.min(20, Math.max(1, Math.round(edgeLen / 5)));
+
+        for (let k = 0; k < N_STEPS; k++) {
+          const wallTopY  = yHigh - k * stepH;
+          const wallBotY  = yHigh - (k + 1) * stepH;
+          const wallOff   = k * STEP_W; // boundary 에서 outward 거리
+
+          for (let si = 0; si < hSegs; si++) {
+            const wt0 = si / hSegs, wt1 = (si + 1) / hSegs;
+            const bx0 = p0.x + dx * wt0, bz0 = p0.z + dz * wt0;
+            const bx1 = p0.x + dx * wt1, bz1 = p0.z + dz * wt1;
+
+            // 이 단계 벽의 위치 (outward wallOff 만큼)
+            const wx0 = bx0 + outX * wallOff, wz0 = bz0 + outZ * wallOff;
+            const wx1 = bx1 + outX * wallOff, wz1 = bz1 + outZ * wallOff;
+
+            // ── 수직 벽 (wallBotY → wallTopY, 상하 고정) ───────────────
+            const uE = edgeLen / 5, vH = (wallTopY - wallBotY) / 5;
+            pos.push(wx0, wallBotY, wz0,  wx0, wallTopY, wz0,  wx1, wallTopY, wz1);
+            uv.push(0, 0,  0, vH,  uE, vH);
+            pos.push(wx0, wallBotY, wz0,  wx1, wallTopY, wz1,  wx1, wallBotY, wz1);
+            uv.push(0, 0,  uE, vH,  uE, 0);
+
+            // ── 수평 레지 (마지막 단계 제외) ────────────────────────────
+            // 레지: wallOff → wallOff+STEP_W outward, 높이 wallBotY + noise
+            if (k < N_STEPS - 1) {
+              const ledgeOff = wallOff + STEP_W;
+              const ox0 = bx0 + outX * ledgeOff, oz0 = bz0 + outZ * ledgeOff;
+              const ox1 = bx1 + outX * ledgeOff, oz1 = bz1 + outZ * ledgeOff;
+
+              // ledge 외측: noise Y + XZ
+              const nY0  = _fbm2D(ox0 * NS + 500, oz0 * NS + 500);
+              const nXZ0 = _fbm2D(ox0 * NS + 200, oz0 * NS + 200);
+              const nY1  = _fbm2D(ox1 * NS + 500, oz1 * NS + 500);
+              const nXZ1 = _fbm2D(ox1 * NS + 200, oz1 * NS + 200);
+
+              const lo0 = { x: ox0 + outX * nXZ0 * 1.2, y: wallBotY + nY0 * 0.8, z: oz0 + outZ * nXZ0 * 1.2 };
+              const lo1 = { x: ox1 + outX * nXZ1 * 1.2, y: wallBotY + nY1 * 0.8, z: oz1 + outZ * nXZ1 * 1.2 };
+              // ledge 내측: 벽 하단에 고정 (inner edge flat)
+              const li0 = { x: wx0, y: wallBotY, z: wz0 };
+              const li1 = { x: wx1, y: wallBotY, z: wz1 };
+
+              const lU = edgeLen / 5, lV = STEP_W / 5;
+              pos.push(li0.x, li0.y, li0.z,  lo0.x, lo0.y, lo0.z,  lo1.x, lo1.y, lo1.z);
+              uv.push(0, 0,  lV, 0,  lV, lU);
+              pos.push(li0.x, li0.y, li0.z,  lo1.x, lo1.y, lo1.z,  li1.x, li1.y, li1.z);
+              uv.push(0, 0,  lV, lU,  0, lU);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!pos.length) return [];
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(uv),  2));
+  return [{ geo, isWall: true, isCliff: true, order: 4 }];
 };
 
 /**
@@ -853,8 +1152,8 @@ const CityBlockContent = ({
   const [cliffTex, setCliffTex] = useState(null);
   const [slopeTex, setSlopeTex] = useState(null);
 
-  useEffect(() => { loadTex('/ground/cliff/image.png', setCliffTex); }, []);
-  useEffect(() => { loadTex('/ground/slope/image.png', setSlopeTex); }, []);
+  useEffect(() => { loadTex('/ground/rune/image.png', setCliffTex); }, []);
+  useEffect(() => { loadTex('/ground/rune/image.png', setSlopeTex); }, []);
 
   // 현재 그룹 + 인접 그룹 key 집합 (500ms 간격 갱신)
   const [activeGroupKeys, setActiveGroupKeys] = useState(() => new Set());
@@ -967,7 +1266,7 @@ const CityBlockContent = ({
         }
       }
 
-      // effectiveScale > 0: 벽면은 엣지 중복제거 방식으로 별도 생성 (Z-fighting 없음)
+      // effectiveScale > 0: 그룹 경계 벽면 (공유 엣지 = 고도차 벽, 외곽 엣지 = yBot까지 전체 벽)
       if (effectiveScale > 0) {
         result.push(...buildGroupCliffsDeduplicated(dbGroups, groupElevMap, activeGroupKeys, effectiveScale));
       }
@@ -1029,27 +1328,20 @@ const CityBlockContent = ({
             const topTex  = block.themeCode
               ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
               : (Array.isArray(textures) ? textures[block.texIdx ?? 0] : textures);
-            const wallTex = topTex ?? cliffTex ?? null;
-            const wallColor = wallTex ? '#ffffff' : '#7a6850';
             return (
               <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
-                <meshBasicMaterial attach="material-0" map={topTex}                       side={THREE.DoubleSide} toneMapped={false} depthWrite={true} />
-                <meshBasicMaterial attach="material-1" map={wallTex ?? undefined} color={wallColor} side={THREE.DoubleSide} toneMapped={false} depthWrite={true} />
+                <meshBasicMaterial attach="material-0" map={topTex} side={THREE.DoubleSide} toneMapped={false} depthWrite={true} />
+                <CliffShaderMat attach="material-1" texture={cliffTex} />
               </mesh>
             );
           }
 
-          // ── [B] 별도 cliff/slope 쿼드 (fallback: partition-level 또는 flat 모드) ──
+          // ── [B] 별도 cliff/slope 쿼드 ────────────────────────────────────────
           if (block.isWall) {
-            const wallTex  = block.themeCode
-              ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
-              : (block.isCliff ? (cliffTex ?? null) : (slopeTex ?? cliffTex ?? null));
-            const wallColor = wallTex ? '#ffffff' : (block.isCliff ? '#7a6850' : '#8a9a6a');
             return (
               <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
                 <meshBasicMaterial
-                  map={wallTex ?? undefined}
-                  color={wallColor}
+                  map={cliffTex}
                   side={THREE.DoubleSide}
                   toneMapped={false}
                   depthWrite={true}
