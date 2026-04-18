@@ -8,6 +8,8 @@ import sys, time, json, urllib.request, shutil
 from pathlib import Path
 from PIL import Image
 
+from comfy_output_utils import dated_comfy_prefix
+
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -211,7 +213,7 @@ def main():
 
     # ── 1. Center (img2img) ──────────────────────────────────────────────────
     print("\n[1/5] Center img2img 생성 중...")
-    wf_center = build_img2img(ref_input, "outpaint_center")
+    wf_center = build_img2img(ref_input, dated_comfy_prefix("outpaint_test/outpaint_center"))
     center_path = run_workflow(wf_center, "center")
     if not center_path:
         print("center 실패, 중단")
@@ -228,7 +230,7 @@ def main():
 
     for i, (direction, kr) in enumerate(zip(directions, labels_kr), start=2):
         print(f"\n[{i}/5] {kr} outpaint 생성 중...")
-        wf = build_outpaint(center_input, direction, f"outpaint_{direction}_full")
+        wf = build_outpaint(center_input, direction, dated_comfy_prefix(f"outpaint_test/outpaint_{direction}_full"))
         full_path = run_workflow(wf, f"{direction}_full")
         if full_path:
             crop_new_area(full_path, direction, orig_w, orig_h)

@@ -14,6 +14,8 @@ import sys, time, json, argparse, urllib.request, shutil
 from pathlib import Path
 from sqlalchemy import create_engine, text
 
+from comfy_output_utils import dated_comfy_prefix, resolve_comfy_output_file
+
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -120,14 +122,14 @@ def wait_for_job(prompt_id, timeout=300):
         time.sleep(2)
     raise TimeoutError(f"timeout: {prompt_id}")
 
-def copy_from_comfy(filename: str, dest: Path):
+def copy_from_comfy(filename: str, dest: Path, subfolder: str = ""):
     """ComfyUI output → 목적지로 직접 파일 복사 (urlretrieve 원본 덮어쓰기 방지)"""
-    src = ROOT / "tools" / "ComfyUI" / "output" / filename
+    src = resolve_comfy_output_file(ROOT / "tools" / "ComfyUI" / "output", filename, subfolder)
     if src.exists():
         shutil.copy2(src, dest)
     else:
         # fallback: HTTP 다운로드 (청크)
-        url = f"{COMFYUI}/view?filename={filename}&subfolder=&type=output"
+        url = f"{COMFYUI}/view?filename={filename}&subfolder={subfolder}&type=output"
         with urllib.request.urlopen(url) as r, open(dest, "wb") as f:
             while chunk := r.read(65536):
                 f.write(chunk)
@@ -204,7 +206,7 @@ def main():
         ps   = p_short(partition_key)
         seed = BASE_SEED + idx
         prompt = THEME_PROMPTS.get(theme_code, THEME_PROMPTS["sanctuary_green"])
-        prefix = f"nrj2_{gs}_{ps}"
+        prefix = dated_comfy_prefix(f"nrj2_{gs}_{ps}")
 
         out_dir = OUT_ROOT / gs
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -222,7 +224,7 @@ def main():
             if not imgs:
                 raise RuntimeError("이미지 출력 없음")
 
-            copy_from_comfy(imgs[0]["filename"], out_path)
+            copy_from_comfy(imgs[0]["filename"], out_path, imgs[0].get("subfolder", ""))
             url = f"/world_partition/{gs}/{ps}.png"
             update_db_url(partition_id, url)
             done += 1

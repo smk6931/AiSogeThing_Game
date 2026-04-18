@@ -163,6 +163,115 @@ const CliffShaderMat = React.memo(({ texture, attach }) => {
   );
 });
 
+// ── Ground Shader (fBm noise + edge darkening + optional AO/Normal) ──────────
+const GROUND_VERT = `
+varying vec2 vUv;
+varying vec3 vWorldPos;
+void main() {
+  vUv = uv;
+  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const GROUND_FRAG = `
+uniform sampler2D uDiffuse;
+uniform sampler2D uAO;
+uniform sampler2D uNormal;
+uniform bool uHasAO;
+uniform bool uHasNormal;
+uniform float uAOStrength;   // 0~1
+uniform float uNoiseStrength; // 0~1
+uniform vec3 uLightDir;      // normalized, world space
+
+varying vec2 vUv;
+varying vec3 vWorldPos;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
+             mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
+}
+float fbm(vec2 p) {
+  return vnoise(p)*0.50 + vnoise(p*2.1)*0.25
+       + vnoise(p*4.3)*0.15 + vnoise(p*8.7)*0.10;
+}
+
+void main() {
+  vec4 diff = texture2D(uDiffuse, vUv);
+
+  // fBm noise — world pos 기반이라 파티션 경계에서 끊기지 않음
+  float n = fbm(vWorldPos.xz * 0.018);
+  float noiseVar = mix(1.0, mix(0.78, 1.08, n), uNoiseStrength);
+
+  // AO
+  float ao = uHasAO
+    ? mix(1.0, texture2D(uAO, vUv).r, uAOStrength)
+    : 1.0;
+
+  // Normal map lighting
+  float ndotl = 1.0;
+  if (uHasNormal) {
+    vec3 nm = texture2D(uNormal, vUv).rgb * 2.0 - 1.0;
+    ndotl = clamp(dot(normalize(nm), uLightDir), 0.0, 1.0);
+    ndotl = 0.55 + ndotl * 0.45; // ambient 0.55, diffuse 0.45
+  }
+
+  gl_FragColor = vec4(diff.rgb * ao * ndotl * noiseVar, diff.a);
+}
+`;
+
+const LIGHT_DIR = new THREE.Vector3(-0.6, 1.0, -0.8).normalize();
+
+const GroundShaderMat = React.memo(({
+  diffuse, aoMap, normalMap,
+  noiseStrength = 0.55, aoStrength = 0.7,
+  stencilWrite, stencilRef, stencilFunc,
+  transparent, opacity, depthWrite, attach,
+}) => {
+  const uniforms = useMemo(() => ({
+    uDiffuse:      { value: null },
+    uAO:           { value: null },
+    uNormal:       { value: null },
+    uHasAO:        { value: false },
+    uHasNormal:    { value: false },
+    uAOStrength:   { value: aoStrength },
+    uNoiseStrength:{ value: noiseStrength },
+    uLightDir:     { value: LIGHT_DIR },
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { uniforms.uDiffuse.value = diffuse ?? null; }, [diffuse, uniforms]);
+  useEffect(() => {
+    uniforms.uAO.value = aoMap ?? null;
+    uniforms.uHasAO.value = !!aoMap;
+  }, [aoMap, uniforms]);
+  useEffect(() => {
+    uniforms.uNormal.value = normalMap ?? null;
+    uniforms.uHasNormal.value = !!normalMap;
+  }, [normalMap, uniforms]);
+
+  return (
+    <shaderMaterial
+      attach={attach}
+      vertexShader={GROUND_VERT}
+      fragmentShader={GROUND_FRAG}
+      uniforms={uniforms}
+      side={THREE.DoubleSide}
+      toneMapped={false}
+      transparent={transparent ?? false}
+      opacity={opacity ?? 1}
+      depthWrite={depthWrite ?? true}
+      stencilWrite={stencilWrite ?? false}
+      stencilRef={stencilRef ?? 0}
+      stencilFunc={stencilFunc ?? THREE.AlwaysStencilFunc}
+    />
+  );
+});
+
 // 고도 스케일: 실제 100m → 10 world unit (노량진1동 5~92m → 게임 내 0.5~9.2 unit)
 // showElevation=false 시 effective scale = 0 → 전체 평지
 const ELEV_SCALE = 1.0;
@@ -192,12 +301,7 @@ const ELEV_TEXTURE_MAP = {
   elev_mid:  '/ground/rune/image.png',
   elev_high: '/ground/rune/image.png',
 };
-// low/mid/high 버킷별 색 tint (고도감 강조)
-const ELEV_TINT = {
-  elev_low:  '#7aaa88',   // 푸른빛 저지대
-  elev_mid:  '#a09060',   // 중간 흙빛
-  elev_high: '#888070',   // 회갈색 고지대
-};
+
 const ELEV_TEXTURE_PATHS = [...new Set(Object.values(ELEV_TEXTURE_MAP))];
 
 // 노이즈 텍스처 (terrain 모드 오버레이용, 1회 생성 후 재사용)
@@ -1082,23 +1186,18 @@ const CityBlockContent = ({
             : (partTex
                 ?? (block.themeCode ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
                   : (Array.isArray(textures) ? textures[block.texIdx] : textures)));
-          const tint = isTerrainBlock ? (ELEV_TINT[block.elevBucket] ?? '#ffffff') : '#ffffff';
-          const isTransparent = !isTerrainBlock && block.transparent && !!partTex;
+const isTransparent = !isTerrainBlock && block.transparent && !!partTex;
           const useStencil = !showElevation;
           return (
           <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
-            <meshBasicMaterial
-              map={tex}
-              color={tint}
+            <GroundShaderMat
+              diffuse={tex}
               transparent={isTransparent}
-              alphaTest={isTransparent ? 0.1 : 0}
-              opacity={1}
+              opacity={isTransparent ? 0.95 : 1}
+              depthWrite={!isTransparent}
               stencilWrite={useStencil}
               stencilRef={useStencil ? 1 : 0}
               stencilFunc={useStencil ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc}
-              side={THREE.DoubleSide}
-              toneMapped={false}
-              depthWrite={!isTransparent}
             />
           </mesh>
           );

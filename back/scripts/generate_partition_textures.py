@@ -31,6 +31,7 @@ import io
 import urllib.request
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter
+from comfy_output_utils import dated_comfy_prefix
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -497,7 +498,7 @@ def build_workflow(positive: str, negative: str, seed: int,
             "image": ["12", 0], "upscale_method": "lanczos",
             "width": out_w, "height": out_h, "crop": "disabled",
         }},
-        "14": {"class_type": "SaveImage", "inputs": {"images": ["13", 0], "filename_prefix": "partition_tex"}},
+        "14": {"class_type": "SaveImage", "inputs": {"images": ["13", 0], "filename_prefix": dated_comfy_prefix("partition_tex")}},
     })
     return wf
 

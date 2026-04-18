@@ -7,6 +7,8 @@ DreamShaper XL Lightning + add-detail-xl LoRA + 4xUltrasharp + UltimateSDUpscale
 import sys, time, json, urllib.request
 from pathlib import Path
 
+from comfy_output_utils import dated_comfy_prefix
+
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -174,7 +176,7 @@ def build_workflow():
             "class_type": "SaveImage",
             "inputs": {
                 "images": ["10", 0],
-                "filename_prefix": "forest_ruins_4k",
+                "filename_prefix": dated_comfy_prefix("forest_ruins_4k"),
             },
         },
     }

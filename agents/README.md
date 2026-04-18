@@ -58,6 +58,9 @@ Priority: high | medium | low
   Claude와 Codex가 공통으로 따를 작업 절차, 역할 분리, 검증 흐름 문서
   공통 조언 방식, 공통 소통 규칙도 포함
   - `documentation_rules.md` — 문서 요청 시 `docs/` 카테고리 선택, 오늘 날짜 경로, 파일명 규칙
+- `testing/`
+  아직 확정 전인 테스트용 임시 컨텍스트
+  - `partition_satellite_img2img_testing.md` — 위성 reference, polygon clip, img2img, world_partition 매핑 테스트 규칙과 preview 파일 네이밍
 - `db/`
   DB 전략, 테이블 구조, 파티션 설계, ERD 등 월드 DB 관련 규칙
   - `db_naming_rules.md` — 테이블/컬럼/인덱스 네이밍 규칙 (새 테이블 설계 전 필독)

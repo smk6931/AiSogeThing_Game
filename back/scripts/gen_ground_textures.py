@@ -6,6 +6,8 @@
 import sys, time, json, urllib.request, argparse
 from pathlib import Path
 
+from comfy_output_utils import dated_comfy_prefix
+
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -167,7 +169,7 @@ def main():
 
     for i, (name, prompt) in enumerate(targets):
         print(f"[{i+1}/{len(targets)}] {name}")
-        wf   = build_workflow(prompt, SEED + i, f"tex_{name}")
+        wf   = build_workflow(prompt, SEED + i, dated_comfy_prefix(f"tex_{name}"))
         resp = comfy_post("/prompt", {"prompt": wf})
         pid  = resp["prompt_id"]
         images = wait_for_job(pid, timeout=300)

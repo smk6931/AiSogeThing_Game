@@ -5,6 +5,8 @@ denoise 0.45 = 구조 유지하면서 RPG 감성 추가
 import sys, time, json, urllib.request, shutil
 from pathlib import Path
 
+from comfy_output_utils import dated_comfy_prefix
+
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -116,7 +118,7 @@ def main():
         shutil.copy(src, COMFY_IN / input_name)
 
         print(f"\n[{i+1}/3] {name} img2img 중...")
-        wf = build_img2img(input_name, prompt, SEED + i, f"tile_v2_{name}")
+        wf = build_img2img(input_name, prompt, SEED + i, dated_comfy_prefix(f"tile_v2_{name}"))
         resp = comfy_post("/prompt", {"prompt": wf})
         pid  = resp["prompt_id"]
         print(f"  queued: {pid}")

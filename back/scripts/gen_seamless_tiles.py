@@ -6,6 +6,8 @@ DreamShaper XL Lightning + add-detail-xl LoRA + 4xUltrasharp
 import sys, time, json, urllib.request
 from pathlib import Path
 
+from comfy_output_utils import dated_comfy_prefix
+
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -182,7 +184,7 @@ def main():
     targets = list(TILES.items())
     for i, (name, prompt) in enumerate(targets):
         print(f"\n[{i+1}/{len(targets)}] {name} 생성 중...")
-        wf   = build_workflow(prompt, SEED + i, f"tile_{name}")
+        wf   = build_workflow(prompt, SEED + i, dated_comfy_prefix(f"tile_{name}"))
         resp = comfy_post("/prompt", {"prompt": wf})
         pid  = resp["prompt_id"]
         print(f"  queued: {pid}")
