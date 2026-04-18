@@ -112,7 +112,6 @@ const RpgWorld = ({
     highlightCurrentGroup = true,
     showCurrentGroupTexture = false,
     showCullRadius = false,
-    showGroupColors = false,
     showGroupArea = false,
     showPartitionFill = false,
     showElevation = false,
@@ -695,22 +694,21 @@ const RpgWorld = ({
         <Suspense fallback={null}>
           <PartitionBoundaryOverlay
             partitions={sharedPartitions}
-            visibleMicro={showMicroBoundaries || showGroupArea || showGroupColors}
-            visibleGroup={showGroupBoundaries || showGroupArea || showGroupColors}
+            visibleMicro={showMicroBoundaries || showGroupArea}
+            visibleGroup={showGroupBoundaries || showGroupArea}
             highlightCurrentGroup={highlightCurrentGroup}
             currentPartitionKey={currentRegionInfo?.currentPartition?.partition_key || null}
             currentGroupKey={currentRegionInfo?.currentPartition?.group_key || null}
             elevation={debugConfig.mapElevation + LAYER_Y.district_boundary}
-            microOpacity={(showGroupArea || showGroupColors) ? 0.55 : 0.24}
+            microOpacity={showGroupArea ? 0.55 : 0.24}
           />
         </Suspense>
       )}
 
-      {worldLoadStage >= 1 && (showGroupColors || showGroupArea || showPartitionFill) && (
+      {worldLoadStage >= 1 && (showGroupArea || showPartitionFill) && (
         <Suspense fallback={null}>
           <GroupColorOverlay
             partitions={sharedPartitions}
-            showGroupColors={showGroupColors}
             showGroupArea={showGroupArea}
             showPartitionFill={showPartitionFill}
             elevation={debugConfig.mapElevation + LAYER_Y.group_color}

@@ -31,7 +31,6 @@ export const LAYER_DEFAULTS = {
   highlightCurrentGroup:   false,   // ← 기본 OFF
   showCurrentGroupTexture: true,
   showCullRadius:          false,
-  showGroupColors:         false,
   showGroupArea:           false,
   showPartitionFill:       false,
   showElevation:           false,

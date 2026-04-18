@@ -1,9 +1,8 @@
 /**
  * GroupColorOverlay.jsx
  *
- * 3가지 디버그/분석용 파티션 시각화 레이어:
- *  showGroupColors  — 그룹별 컬러 fill + 이름/개수 라벨
- *  showGroupArea    — 그룹별 fill + 면적(m²) 라벨
+ * 2가지 디버그/분석용 파티션 시각화 레이어:
+ *  showGroupArea    — 그룹별 fill + 면적(m²) + 파티션 수 라벨
  *  showPartitionFill— 개별 파티션 landuse 색 fill + 경계선
  */
 import React, { useMemo } from 'react';
@@ -169,12 +168,11 @@ const labelBox = (borderColor) => ({
 // ══════════════════════════════════════════════════════════════════════════════
 const GroupColorOverlay = ({
   partitions = [],
-  showGroupColors = false,
   showGroupArea = false,
   showPartitionFill = false,
   elevation = 0.36,
 }) => {
-  const anyVisible = showGroupColors || showGroupArea || showPartitionFill;
+  const anyVisible = showGroupArea || showPartitionFill;
 
   // ── 그룹별 데이터 ────────────────────────────────────────────────────────
   const groupData = useMemo(() => {
@@ -211,23 +209,6 @@ const GroupColorOverlay = ({
 
   return (
     <group name="group-color-overlay" position={[0, elevation, 0]}>
-
-      {/* ── 그룹색: Fill ───────────────────────────────────────────────── */}
-      {showGroupColors && groupData.map((g) => g.geometry && (
-        <mesh key={`gc-${g.key}`} geometry={g.geometry} rotation={[-Math.PI / 2, 0, 0]} renderOrder={20}>
-          <meshBasicMaterial color={g.color} transparent opacity={0.28} depthWrite={false} depthTest={false} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
-
-      {/* ── 그룹색: 라벨 (그룹명 + 파티션 수) — distanceFactor 없이 고정 크기 */}
-      {showGroupColors && groupData.map((g) => (
-        <Html key={`gc-lbl-${g.key}`} position={[g.centroid.x, 2, g.centroid.z]} center zIndexRange={[20, 30]}>
-          <div style={labelBox(g.color)}>
-            <div style={{ color: g.color, fontWeight: 700, fontSize: 10 }}>{g.label}</div>
-            <div style={{ opacity: 0.8 }}>{g.members.length}개 파티션</div>
-          </div>
-        </Html>
-      ))}
 
       {/* ── 그룹영역: Fill + 면적 라벨 ────────────────────────────────── */}
       {showGroupArea && groupData.map((g) => g.geometry && (

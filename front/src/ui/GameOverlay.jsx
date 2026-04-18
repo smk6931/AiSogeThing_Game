@@ -62,7 +62,6 @@ const LAYER_BUTTONS = [
   { key: 'highlightCurrentGroup',   label: '강조',   icon: '✦', colorOn: 'rgba(80,220,180,0.7)' },
   { key: 'showCurrentGroupTexture', label: '그룹텍', icon: '◆', colorOn: 'rgba(220,160,30,0.8)' },
   { key: 'showCullRadius',          label: '컬링선', icon: '⊙', colorOn: 'rgba(255,60,60,0.8)'  },
-  { key: 'showGroupColors',         label: '그룹색', icon: '🌈', colorOn: 'rgba(180,80,220,0.75)' },
   { key: 'showGroupArea',           label: '그룹영역', icon: '◩', colorOn: 'rgba(100,180,255,0.75)' },
   { key: 'showPartitionFill',       label: '파티션', icon: '▦', colorOn: 'rgba(255,200,60,0.75)' },
   { key: 'showElevation',           label: '등고선', icon: '⛰', colorOn: 'rgba(139,90,43,0.85)' },
