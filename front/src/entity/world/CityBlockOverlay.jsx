@@ -1035,15 +1035,22 @@ const CityBlockContent = ({
         {blocks.map((block, index) => {
           // ── [A] Extruded 3D 메시 (showElevation ON, push/pull 방식) ────────────
           // geometry.groups[0]=상단면(partition tex), groups[1]=측면벽(cliff tex)
-          // depthWrite=true: GPU depth sorting → 카메라 회전 시 절벽 깜박임 없음
-          // DoubleSide 상단면: 카메라가 박스 내부를 향해도 top face가 텍스처를 렌더 → black hole 없음
           if (block.isExtruded) {
-            const topTex  = block.themeCode
-              ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
-              : (Array.isArray(textures) ? textures[block.texIdx ?? 0] : textures);
+            const partTex = block.partitionUrl ? partitionTextureMap.get(block.partitionUrl) : null;
+            const topTex  = partTex
+              ?? (block.themeCode ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
+                : (Array.isArray(textures) ? textures[block.texIdx ?? 0] : textures));
             return (
               <mesh key={`block-${index}`} geometry={block.geo} renderOrder={block.order}>
-                <meshBasicMaterial attach="material-0" map={topTex} side={THREE.DoubleSide} toneMapped={false} depthWrite={true} />
+                <meshBasicMaterial
+                  attach="material-0"
+                  map={topTex}
+                  side={THREE.DoubleSide}
+                  toneMapped={false}
+                  transparent
+                  opacity={0.88}
+                  depthWrite={false}
+                />
                 <CliffShaderMat attach="material-1" texture={cliffTex} />
               </mesh>
             );

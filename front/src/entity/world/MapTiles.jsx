@@ -131,8 +131,6 @@ const MapTiles = ({
     return nextTiles;
   }, [cameraMode, centerTile.x, centerTile.y, zoom]);
 
-  // showElevation ON: extruded 파티션 메시가 지형을 완전 덮으므로 지도 타일 숨김 (depth 충돌 방지)
-  if (showElevation) return null;
 
   return (
     <group>
