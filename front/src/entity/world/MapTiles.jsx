@@ -27,8 +27,10 @@ const tileToGps = (x, y, zoom) => {
   return { lat, lng };
 };
 
+const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile';
+
 const MapTile = ({ x, y, zoom, originGps, elevation = -0.05 }) => {
-  const url = `https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/${zoom}/${x}/${y}.png`;
+  const url = `${SATELLITE_TILE_URL}/${zoom}/${y}/${x}`;
   const texture = useTexture(url);
 
   useMemo(() => {

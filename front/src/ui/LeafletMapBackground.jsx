@@ -3,6 +3,8 @@ import { MapContainer, TileLayer, Polyline, Polygon, Tooltip, CircleMarker, useM
 import 'leaflet/dist/leaflet.css';
 import { GIS_ORIGIN, LAT_TO_M, LNG_TO_M } from '@entity/world/mapConfig';
 
+const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+
 // 맵의 중심을 캐릭터 위치에 맞게 업데이트하는 컴포넌트
 const MapController = ({ center, zoom }) => {
   const map = useMap();
@@ -80,7 +82,7 @@ const LeafletMapBackground = ({
       >
         <MapEvents onZoomChange={onZoomChange} />
         <TileLayer
-          url="https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png"
+          url={SATELLITE_TILE_URL}
         />
 
         {/* 서울 외곽 어둡게 마스크 (미니맵 시야 제한용, 옵션으로 켜고 끔) */}

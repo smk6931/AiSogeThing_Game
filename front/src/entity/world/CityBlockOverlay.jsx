@@ -429,7 +429,7 @@ const buildExtrudedPolygon = (outerRing, holes = [], yTop, yBot = -1.0, includeW
         const p0 = ring[i], p1 = ring[i + 1];
         const edgeLen = Math.sqrt((p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2);
         if (edgeLen < 0.01) continue;
-        const uS = edgeLen / 5, vS = heightDiff / 5;
+        const uS = edgeLen / TILE_SIZE, vS = heightDiff / TILE_SIZE;
         // tri 1
         positions[vi++] = p0.x; positions[vi++] = yBot;  positions[vi++] = p0.z;
         positions[vi++] = p0.x; positions[vi++] = yTop;  positions[vi++] = p0.z;
@@ -536,11 +536,10 @@ const buildNoisyCliffWall = (p0, p1, yLow, yHigh) => {
     for (let i = 0; i < hSegs; i++) {
       const v00 = grid[j][i],   v10 = grid[j][i+1];
       const v01 = grid[j+1][i], v11 = grid[j+1][i+1];
-      const u0 = (i     / hSegs) * (edgeLen / 5);
-      const u1 = ((i+1) / hSegs) * (edgeLen / 5);
-      // v=0 → 하단, v=높이/5 → 상단 (기존 UV 규칙 유지)
-      const vv0 = ((vLevels - j)     / vLevels) * (heightDiff / 5);
-      const vv1 = ((vLevels - j - 1) / vLevels) * (heightDiff / 5);
+      const u0 = (i     / hSegs) * (edgeLen / TILE_SIZE);
+      const u1 = ((i+1) / hSegs) * (edgeLen / TILE_SIZE);
+      const vv0 = ((vLevels - j)     / vLevels) * (heightDiff / TILE_SIZE);
+      const vv1 = ((vLevels - j - 1) / vLevels) * (heightDiff / TILE_SIZE);
       pos.push(v00.x, v00.y, v00.z,  v01.x, v01.y, v01.z,  v11.x, v11.y, v11.z);
       uv.push(u0, vv0,  u0, vv1,  u1, vv1);
       pos.push(v00.x, v00.y, v00.z,  v11.x, v11.y, v11.z,  v10.x, v10.y, v10.z);
@@ -614,7 +613,7 @@ const buildPartitionCliffs = (partitions, effectiveScale, partitionTexUrlMap) =>
       for (const v of nPos) buf.pos.push(v);
       for (const v of nUv)  buf.uv.push(v);
     } else {
-      const uS = edgeLen / 5, vS = heightDiff / 5;
+      const uS = edgeLen / TILE_SIZE, vS = heightDiff / TILE_SIZE;
       buf.pos.push(p0.x, yLow, p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
       buf.uv.push(0, 0,  0, vS,  uS, vS);
       buf.pos.push(p0.x, yLow, p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
