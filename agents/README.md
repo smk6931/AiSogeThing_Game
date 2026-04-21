@@ -46,6 +46,11 @@ Priority: high | medium | low
 - `game_design/`
   월드 구조, 파티션, 도로, 감성 규칙
   - `local_image_generation.md` — 로컬 ComfyUI 이미지 생성 설정 (모델, 파라미터, 스크립트 사용법, 출력 경로 규칙)
+  - `image_gen/` — 이미지 생성 실험 결과 폴더 (성공/중간/실패 3단계 분류)
+    - `image_gen/README.md` ← 이미지 생성 전 항상 여기서 시작
+    - `image_gen/success/` — 검증 완료, 그대로 재사용 가능
+    - `image_gen/partial/` — 조건부 사용, 주의사항 있음
+    - `image_gen/failure/` — 재시도 금지, 실패 원인 기록
   - `world_texture_terrain_direction.md` — 파티션 바닥 텍스처 방향 정리 (폴리곤별 이미지 방식 주의사항, 연속 지형 방향 결정)
   - `world_elevation_cliff_rules.md` — 등고선 렌더링(extruded polygon, push/pull 방식), 절벽 메시 생성, 카메라 회전 대응 규칙
 - `auth/`
@@ -61,6 +66,8 @@ Priority: high | medium | low
 - `testing/`
   아직 확정 전인 테스트용 임시 컨텍스트
   - `partition_satellite_img2img_testing.md` — 위성 reference, polygon clip, img2img, world_partition 매핑 테스트 규칙과 preview 파일 네이밍
+  - `ground_shader_ao_normal_testing.md` — GroundShaderMat (fBm noise + AO + Normal) 테스트 규칙, gen_normal_ao.py 사용법 (바닥 셰이더 수정 시 참고)
+  - `fantasy_art_img2img_texture_testing.md` — Pinterest 고퀄 판타지 RPG 아트 reference 기반 img2img 텍스처 생성 계획 분석, perspective 오염 리스크, 권장 파이프라인
 - `db/`
   DB 전략, 테이블 구조, 파티션 설계, ERD 등 월드 DB 관련 규칙
   - `db_naming_rules.md` — 테이블/컬럼/인덱스 네이밍 규칙 (새 테이블 설계 전 필독)

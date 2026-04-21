@@ -63,15 +63,16 @@ def gen_ao(gray: np.ndarray, radius: int = 8, strength: float = 0.8) -> np.ndarr
     어두운 영역(오목한 곳) → AO 낮음, 밝은 영역 → AO 높음.
     local contrast를 이용해 오목/볼록 추정.
     """
-    # 로컬 평균 대비 현재 값 차이 → 상대적 높이
+    # 로컬 평균 대비 현재 값 차이 → 오목(음수) / 볼록(양수)
     blurred = gaussian_filter(gray, sigma=radius)
-    diff = gray - blurred  # 양수: 돌출, 음수: 오목
+    diff = gray - blurred
 
-    # 오목한 곳 = diff 음수 → AO 감소
-    ao = np.clip(0.5 + diff * strength * 3.0, 0.0, 1.0)
+    # 오목한 곳(diff < 0)만 어둡게, 볼록한 곳은 1.0으로 클립
+    # → 평균 ~0.90, 깊은 틈만 0.5 이하
+    ao = np.clip(1.0 + diff * strength * 2.5, 0.0, 1.0)
 
     # 부드럽게
-    ao = gaussian_filter(ao, sigma=radius * 0.3)
+    ao = gaussian_filter(ao, sigma=radius * 0.25)
     ao = np.clip(ao, 0.0, 1.0)
 
     return (ao * 255).astype(np.uint8)
@@ -86,14 +87,14 @@ def process(src: Path, strength: float, ao_radius: int):
     # Normal map
     nrm = gen_normal(gray, strength=strength)
     nrm_img = Image.fromarray(nrm, mode="RGB")
-    out_normal = src.parent / "normal.png"
+    out_normal = src.parent / f"{src.stem}_normal{src.suffix}"
     nrm_img.save(out_normal)
     print(f"  normal → {out_normal}")
 
     # AO map
     ao = gen_ao(gray, radius=ao_radius)
     ao_img = Image.fromarray(ao, mode="L")
-    out_ao = src.parent / "ao.png"
+    out_ao = src.parent / f"{src.stem}_ao{src.suffix}"
     ao_img.save(out_ao)
     print(f"  ao     → {out_ao}")
 

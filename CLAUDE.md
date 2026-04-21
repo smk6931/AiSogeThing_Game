@@ -31,6 +31,7 @@
 - [`agents/game_design/world_partition_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_partition_rules.md)
 - [`agents/game_design/road_design_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/road_design_rules.md)
 - [`agents/game_design/local_image_generation.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/local_image_generation.md) — 파티션 텍스처 생성 스크립트, 모델, 출력 경로 규칙 (파티션 이미지 생성 작업 시 필독)
+- [`agents/game_design/image_gen/README.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/image_gen/README.md) — 이미지 생성 실험 인덱스: 성공/중간/실패 폴더 분기, 파라미터 빠른 참조 (이미지 생성 전 필독)
 - [`agents/frontend/asset_cache_rules.md`](C:/GitHub/AiSogeThing_Game/agents/frontend/asset_cache_rules.md) — Service Worker 에셋 영구 캐시, manifest 해시 갱신 절차 (GLB/텍스처 추가·변경 시 필독)
 - [`agents/game_design/world_texture_terrain_direction.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_texture_terrain_direction.md) — 바닥/파티션 텍스처 방향, 폴리곤별 이미지 방식 주의사항 (텍스처 구조 변경 시 필독)
 - [`agents/game_design/world_elevation_cliff_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_elevation_cliff_rules.md) — 등고선 extruded 렌더링, 절벽 메시, showElevation 토글 규칙 (등고선/절벽 수정 시 필독)

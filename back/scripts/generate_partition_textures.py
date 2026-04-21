@@ -156,6 +156,98 @@ STYLE_PRESETS: dict[str, dict] = {
             "side view, horizon, sky"
         ),
     },
+    # ── 4개 컨셉 타일 프리셋 (tile 모드 전용, 폴리곤 클리핑 없음) ────────────────────
+    "ice_rpg": {
+        "checkpoint": "juggernautXL_v10.safetensors",
+        "steps": 22, "cfg": 6.0, "sampler": "dpmpp_2m", "scheduler": "karras",
+        "positive": (
+            "isometric 2.5D top-down view, fantasy RPG map ground texture, "
+            "frozen tundra floor fills entire frame, cracked ice sheets with deep blue fractures, "
+            "snow-dusted flat ice surface, shallow frozen puddles, thin ice crystal formations low to ground, "
+            "pale blue and white color palette, soft cold light, painterly hand-drawn game art style, "
+            "high detail, Diablo 2 map art quality, ground surface only"
+        ),
+        "negative": (
+            "buildings, walls, towers, characters, NPCs, monsters, vehicles, "
+            "tall trees, large rocks above ground level, sky, horizon, "
+            "warm colors, fire, lava, dark shadows, blurry, "
+            "text, watermark, UI, border, frame, modern objects"
+        ),
+    },
+    "jungle_rpg": {
+        "checkpoint": "juggernautXL_v10.safetensors",
+        "steps": 22, "cfg": 6.0, "sampler": "dpmpp_2m", "scheduler": "karras",
+        "positive": (
+            "strict 90 degree top-down overhead view, flat ground plane fills entire frame, "
+            "fantasy RPG jungle floor texture, seamless tileable ground, "
+            "thick moss-covered earth viewed from directly above, "
+            "flat tree roots spreading across muddy ground, fallen tropical leaves on soil, "
+            "muddy footpath dirt, shallow puddles on jungle floor, "
+            "deep greens and dark browns, dappled light patches on ground, "
+            "painterly hand-drawn game art, high detail, ground surface only"
+        ),
+        "negative": (
+            "tree trunks, tree canopy, tall trees, side view of trees, forest scene, "
+            "buildings, walls, characters, NPCs, tall structures, "
+            "sky, horizon, perspective, angled camera, side view, "
+            "desert, snow, ice, blurry, text, watermark, UI, border, frame, modern objects"
+        ),
+    },
+    "urban_rpg": {
+        "checkpoint": "juggernautXL_v10.safetensors",
+        "steps": 22, "cfg": 6.0, "sampler": "dpmpp_2m", "scheduler": "karras",
+        "positive": (
+            "isometric 2.5D top-down view, fantasy RPG map ground texture, "
+            "fantasy medieval city plaza ground fills entire frame, "
+            "worn cobblestone pavement with moss between stones, dusty market square floor, "
+            "faded stone tile patterns, weathered flagstone with dirt-filled cracks, "
+            "scattered fallen leaves and debris on ground, stone drainage channels, "
+            "warm gray and brown tones, soft afternoon light, painterly hand-drawn game art, "
+            "high detail, Baldur's Gate map art quality, ground surface only"
+        ),
+        "negative": (
+            "buildings, rooftops, walls, towers, characters, NPCs, vehicles, carts, "
+            "tall market stalls, sky, horizon, snow, jungle, "
+            "blurry, text, watermark, UI, border, frame"
+        ),
+    },
+    "beach_rpg": {
+        "checkpoint": "juggernautXL_v10.safetensors",
+        "steps": 22, "cfg": 6.0, "sampler": "dpmpp_2m", "scheduler": "karras",
+        "positive": (
+            "isometric 2.5D top-down view, fantasy RPG map ground texture, "
+            "tropical beach ground fills entire frame, wet sand with tide foam patterns, "
+            "shallow crystal-clear tide pools on sand, scattered seashells and small coral pieces, "
+            "smooth sand ripple patterns near water, damp dark sand near shore edge, "
+            "warm sandy beige and turquoise tones, bright tropical light, painterly hand-drawn game art, "
+            "high detail, ground surface only"
+        ),
+        "negative": (
+            "buildings, boats, characters, NPCs, tall palm trees, large rocks above ground, "
+            "deep ocean water, sky, horizon, snow, ice, jungle, "
+            "blurry, text, watermark, UI, border, frame, modern objects"
+        ),
+    },
+    # --style 25d_rpg : JuggernautXL v10, 2.5D topview 판타지 RPG 맵 스타일 (1024px 출력 시 --max-image-size 512)
+    "25d_rpg": {
+        "checkpoint": "juggernautXL_v10.safetensors",
+        "steps": 22, "cfg": 6.0, "sampler": "dpmpp_2m", "scheduler": "karras",
+        "positive": (
+            "2.5D top-down view fantasy RPG map art, hand-painted game art style, "
+            "overhead angle looking straight down, flat ground plane fills entire frame, "
+            "fantasy Korean residential alleyways, worn stone pathways between old wooden houses, "
+            "clay tile rooftops visible from above, small garden courtyards, "
+            "mossy stone ground and packed earth, soft warm light, "
+            "vibrant natural colors, rich painterly detail, high quality game environment art"
+        ),
+        "negative": (
+            "characters, NPCs, animals, vehicles, modern buildings, modern objects, "
+            "text, watermark, UI, border, frame, logo, "
+            "side view, horizon, perspective distortion, fisheye, "
+            "photorealistic city, sci-fi, neon, dark, gloomy, "
+            "blurry, low quality, ugly, deformed, duplicate"
+        ),
+    },
     # --style juggernaut : JuggernautXL v10 고퀄 (40스텝, ruins 타겟)
     "juggernaut": {
         "checkpoint": "juggernautXL_v10.safetensors",
@@ -971,7 +1063,14 @@ if __name__ == "__main__":
                         help="정사각형 타일 생성 모드: polygon 클리핑 없음, seamless world-space UV 타일링용")
     parser.add_argument("--tile-px", type=int, default=512,
                         help="--tile 모드 Pass1 픽셀 크기 (기본 512 → 출력 1024px)")
+    parser.add_argument("--max-image-size", type=int, default=None,
+                        help="Pass1 최대 픽셀 크기 오버라이드 (기본 1024). 512 지정 시 최종 출력 1024px)")
     args = parser.parse_args()
+
+    # --max-image-size 오버라이드
+    if args.max_image_size:
+        MAX_IMAGE_SIZE = args.max_image_size
+        print(f"[CONFIG] MAX_IMAGE_SIZE 오버라이드: {MAX_IMAGE_SIZE}px (출력 {min(MAX_IMAGE_SIZE*2,2048)}px)")
 
     # --output-dir 오버라이드
     if args.output_dir:
