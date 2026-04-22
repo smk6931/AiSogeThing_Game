@@ -106,6 +106,9 @@ const worldApi = {
 
   // 도감: 특정 그룹의 파티션 목록
   getCodexGroupPartitions: async (groupId) => client.get(`/api/world/codex/group/${groupId}/partitions`),
+
+  // 도로: 특정 동의 world_road 목록
+  getDongRoads: async (dongId) => client.get(`/api/world/codex/dong/${dongId}/roads`),
 };
 
 export default worldApi;

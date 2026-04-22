@@ -37,6 +37,7 @@ image_gen/
 |----|------|------|------|------|
 | S-01 | [pinterest_img2img_dungeon.md](success/S-01_pinterest_img2img_dungeon.md) | Pinterest 씬 → img2img | ★★★★★ | 게임 아트 던전/특수 바닥 |
 | S-02 | [juggernaut_txt2img_pbr.md](success/S-02_juggernaut_txt2img_pbr.md) | txt2img seamless | ★★★★ | PBR 사실적 타일 텍스처 |
+| S-03 | [S-03_themed_partition_img2img_G11_G4.md](success/S-03_themed_partition_img2img_G11_G4.md) | ref→img2img→파티션 매핑 | ★★★★★ | 테마별 파티션 일괄 생성 (G11 dark_marble 1024px / G4 emerald_arcane 2048px) |
 
 ---
 
@@ -64,6 +65,8 @@ image_gen/
 | 용도 | 방법 | 모델 | LoRA | denoise | steps | 출력 |
 |------|------|------|------|---------|-------|------|
 | 게임 아트 특수 바닥 | img2img [S-01] | JugXL | zavy(0.6)+detail(0.5) | 0.85 | 28 | 1024px |
+| 파티션 테마 (표준) | img2img [S-03] | JugXL | zavy(0.6)+detail(0.5) | 0.85 | 28 | 1024px |
+| 파티션 테마 (고퀄) | img2img [S-03] `--hires` | JugXL | zavy(0.6)+detail(0.5) | 0.85 | 28 | **2048px** |
 | 사실적 PBR 타일 | txt2img [S-02] | JugXL | 없음 | 1.0 | 22 | 2048px |
 | 2.5D 테마 타일 | txt2img tile [M-01] | JugXL | zavy(0.7)+detail(0.6) | 1.0 | 30 | 1536px |
 

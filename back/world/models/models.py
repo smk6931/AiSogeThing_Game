@@ -106,6 +106,23 @@ class WorldPartitionGroup(Base):
     members = relationship("WorldPartitionGroupMember", back_populates="group", lazy="dynamic")
 
 
+class WorldRoad(Base):
+    __tablename__ = "world_road"
+
+    id                 = Column(BigInteger, primary_key=True, index=True)
+    road_key           = Column(String(160), nullable=False, unique=True, index=True)
+    dong_id            = Column(Integer, nullable=True, index=True)
+    osm_way_id         = Column(BigInteger, nullable=True)
+    road_type          = Column(String(32), nullable=False, index=True)  # arterial/collector/local/alley
+    boundary_geojson   = Column(JSON, nullable=False)
+    centerline_geojson = Column(JSON, nullable=True)
+    real_name          = Column(String(128), nullable=True)
+    width_m            = Column(Float, nullable=False, server_default="4.0")
+    elevation_m        = Column(Float, nullable=False, server_default="0.0")
+    movement_bonus     = Column(Float, nullable=False, server_default="1.0")
+    created_at         = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class WorldPartitionGroupMember(Base):
     __tablename__ = "world_partition_group_member"
 

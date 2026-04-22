@@ -32,8 +32,28 @@ Priority: high
 - 메인도로는 석판/포장길, 소로는 흙길/좁은 석길이 잘 맞는다.
 - 불투명도는 낮추고 바닥과 자연스럽게 섞는다.
 
-## 데이터 규칙
+## world_road DB 구조 (2026-04-22 구현)
 
-- 초기 튜닝은 JSON/zone 레이어에서 먼저 한다.
-- 폭, 타입, 재질 규칙이 안정되면 이후 `world_road_segment` 같은 DB 테이블로 이관한다.
+- 테이블: `world_road` — dong 단위로 관리 (`dong_id` FK)
+- 생성 방식: OSM `{dong_osm_id}_roads.json` 캐시 → `back/scripts/build_world_road.py`
+- 도로 타입 분류 (`road_type`):
+  - `arterial` — trunk/primary/secondary, 버퍼 12m
+  - `collector` — tertiary/residential/living_street, 버퍼 7m
+  - `local` — unclassified/service, 버퍼 4m
+  - `alley` — footway/path/pedestrian, 버퍼 2m
+- elevation_m: 인접 world_partition centroid들의 역거리 가중 평균으로 보간
+- movement_bonus: arterial=1.3, collector=1.1, local=1.0, alley=0.85
+- build 명령: `venv/Scripts/python back/scripts/build_world_road.py --dong-osm-id <osm_id> [--overwrite]`
+
+## 렌더링 규칙
+
+- 프론트: `CityBlockOverlay.jsx` → `dbRoads` → `roadMeshes` useMemo
+- renderOrder=6, depthWrite=false, DoubleSide (파티션 위에 float)
+- 현재 임시: `#555555` 단색. 추후 road_type별 텍스처 적용 예정
+- showElevation ON 시 elevation_m 반영, OFF 시 flat
+
+## Phase 4 (미구현 — 추후)
+
+- 파티션에서 도로 영역 빼기: `world_partition.terrain_geojson = ST_Difference(boundary_geojson, road_union)`
+- `world_partition`에 `terrain_geojson` 컬럼 추가 후 단일 SQL UPDATE로 처리 가능
 

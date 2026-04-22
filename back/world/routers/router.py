@@ -200,3 +200,8 @@ async def get_codex_dong_groups(dong_id: int):
 @router.get("/codex/group/{group_id}/partitions")
 async def get_codex_group_partitions(group_id: int):
     return await partition_repository.get_codex_group_partitions(group_id)
+
+
+@router.get("/codex/dong/{dong_id}/roads")
+async def get_codex_dong_roads(dong_id: int):
+    return await partition_repository.get_dong_roads(dong_id)

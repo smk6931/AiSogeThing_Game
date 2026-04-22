@@ -134,7 +134,82 @@ COMMON + "snow-covered frozen ground, compacted snow with icy patches, slight bl
 
 ---
 
-## 6. 실무 레퍼런스 (산업 기준)
+## 6. 불규칙 다중 스케일 석판 원칙 (Irregular Multi-Scale Slab)
+
+> 출처: `front/public/world_partition/noryangjin2_g04/ref_emerald_arcane.png` 기반 설계 검증 (2026-04-22)
+
+### 핵심 철학
+
+"균열이 있는 바닥"이 아니라 **"크기가 다른 석판 덩어리들이 쌓여 있는 바닥"** 으로 설계한다.  
+크기 다양성 자체가 입체감과 시각적 풍부함을 만든다.
+
+### 스케일 3계층 구조
+
+| 계층 | 상대 크기 | 역할 |
+|------|-----------|------|
+| 대형 석판 (Primary) | 텍스처 면적의 20~40% 차지 | 지형의 주요 구조 정의 |
+| 중형 석판 (Secondary) | 15~20% | 대형 석판 사이 채움 |
+| 소형 파편 (Fragment) | 5~10% | 균열 사이 작은 조각, 디테일 |
+
+- 세 계층이 **동시에** 화면에 보여야 함 → `mix of large boulder-sized chunks and small stone fragments`
+- 균일한 크기는 인공적으로 보임 → `irregular polygon slabs of wildly varying sizes` 강제
+
+### 균열 위계 (Crack Hierarchy)
+
+```
+1차 균열 (Primary)  — 넓고 깊은 선, 석판 경계 정의
+2차 균열 (Secondary) — 중간 폭, 석판 내부 갈라짐
+3차 균열 (Tertiary)  — 가는 실선, 표면 미세 균열
+```
+
+- 세 굵기가 모두 공존해야 자연스러움 → `wide primary cracks and thin hairline fractures coexisting`
+- 균일한 굵기의 균열 = 단조롭고 인공적
+
+### 발광 집중 원칙 (Glow Concentration)
+
+- 균열 교차점(3방향 이상 만나는 지점) = 최고 밝기
+- 균열 선 중간 = 중간 밝기
+- 석판 면 = 어둡거나 고유 재질 색만
+
+```
+프롬프트: intense amber gold luminescence pooling at crack intersections and junctions,
+          glow concentrated where multiple cracks converge, brighter at nodes
+```
+
+### 입체감 연출 방법 (Depth Without Geometry)
+
+평면 텍스처에서 입체감을 만드는 방법:
+- 석판 가장자리 → 어두운 테두리 (AO처럼)
+- 균열 내부 → 매우 어둡게 (깊은 공간처럼)
+- 발광 선이 깊이에서 올라오는 것처럼 표현
+
+```
+프롬프트: strong 3D relief depth between elevated stone slab surfaces,
+          recessed glowing gaps, deep shadows at slab edges
+```
+
+### img2img 적용 시 핵심 프롬프트 블록
+
+```
+large irregular polygon stone slabs of wildly varying sizes,
+mix of large boulder-sized chunks and small stone fragments between them,
+deep wide cracks and thin hairline fractures coexisting, variable crack width network,
+intense amber gold luminescence pooling at crack intersections and junctions,
+strong 3D relief depth between elevated stone slab surfaces, recessed glowing gaps,
+no central origin point, distributed irregular polygon fracture network
+```
+
+### Negative (이 원칙 위반 방지)
+
+```
+uniform same size tiles, regular grid pattern, uniform crack width,
+central radial pattern, starburst from center,
+flat surface no depth, no texture variation
+```
+
+---
+
+## 7. 실무 레퍼런스 (산업 기준)
 
 | 출처 | 핵심 룰 |
 |------|---------|

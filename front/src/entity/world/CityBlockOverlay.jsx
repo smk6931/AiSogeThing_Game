@@ -933,6 +933,7 @@ const CityBlockContent = ({
   zoneData,
   dbPartitions,
   dbGroups,
+  dbRoads,             // world_road 배열 (dong 단위)
   currentDong,
   currentDistrict,
   elevation,
@@ -1164,6 +1165,18 @@ const CityBlockContent = ({
     return result;
   }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation, groundMode, currentDong]);
 
+  // 도로 메시 (world_road → flat polygon, 파티션 위 order=6)
+  const roadMeshes = useMemo(() => {
+    if (!dbRoads?.length || !activeGroupKeys.size) return [];
+    const effectiveScale = showElevation ? ELEV_SCALE : 0;
+    return dbRoads.map((road) => {
+      const elevY = BASE_Y + (road.elevation_m ?? 0) * effectiveScale + 0.02;
+      const geo   = buildTerrainBlockFromGeoJson(road.boundary_geojson, false, null, null, elevY);
+      if (!geo) return null;
+      return { geo, roadType: road.road_type, key: road.road_key };
+    }).filter(Boolean);
+  }, [dbRoads, activeGroupKeys, showElevation]);
+
   // 동 경계 전체를 덮는 베이스 플레이트 — flat 모드에서 파티션 좌표 불일치 틈 메움
   // showElevation ON: extruded 메시가 자체 벽을 가지므로 불필요
   const dongBasePlate = useMemo(() => {
@@ -1260,6 +1273,18 @@ const isTransparent = !isTerrainBlock && block.transparent && !!partTex;
             />
           </mesh>
         )}
+
+        {/* 도로 메시 (world_road) — 파티션 위 order=6, 임시 어두운 회색 */}
+        {roadMeshes.map((road) => (
+          <mesh key={road.key} geometry={road.geo} renderOrder={6}>
+            <meshBasicMaterial
+              color="#555555"
+              side={THREE.DoubleSide}
+              toneMapped={false}
+              depthWrite={false}
+            />
+          </mesh>
+        ))}
       </group>
     </group>
   );
@@ -1283,6 +1308,7 @@ const CityBlockOverlay = ({
   const [texturePaths, setTexturePaths] = useState([]);
   const [dbPartitions, setDbPartitions] = useState([]);
   const [dbGroups, setDbGroups] = useState([]);
+  const [dbRoads, setDbRoads] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1353,6 +1379,18 @@ const CityBlockOverlay = ({
     return () => { cancelled = true; };
   }, [showSectorBlocks, currentDong?.id]);
 
+  // 도로 데이터 fetch (dong 단위, 캐시 없이 매번)
+  useEffect(() => {
+    let cancelled = false;
+    if (!showSectorBlocks || !currentDong?.id) { setDbRoads([]); return; }
+    worldApi.getDongRoads(currentDong.id)
+      .then((res) => {
+        if (!cancelled) setDbRoads(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => { if (!cancelled) setDbRoads([]); });
+    return () => { cancelled = true; };
+  }, [showSectorBlocks, currentDong?.id]);
+
   // partition별 개별 이미지 경로 추출
   const partitionUrls = useMemo(() => {
     const seen = new Set();
@@ -1387,6 +1425,7 @@ const CityBlockOverlay = ({
       zoneData={zoneData}
       dbPartitions={dbPartitions}
       dbGroups={dbGroups}
+      dbRoads={dbRoads}
       currentDong={currentDong}
       currentDistrict={currentDistrict}
       elevation={elevation}

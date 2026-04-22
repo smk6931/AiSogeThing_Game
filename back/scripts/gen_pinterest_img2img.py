@@ -205,6 +205,32 @@ THEMES: dict[str, dict] = {
             "sky, outdoor, blurry, watermark, text, UI, border, frame"
         ),
     },
+    "emerald_arcane_v2": {
+        # 레퍼런스: front/public/world_partition/noryangjin2_g04/ref_emerald_arcane.png
+        # 컨셉: emerald_arcane 업그레이드 — 크고 작은 불규칙 석판 덩어리 + 광폭/가는 균열 혼재
+        # 참조 이미지 특성: 다각형 석판이 크기별로 불규칙 분포, 균열 교차점에 금빛 집중, 단차 깊이감
+        "positive": (
+            "strict 90 degree top-down overhead view, flat ground plane fills entire frame edge to edge, "
+            "large irregular polygon stone slabs of varying sizes scattered across surface, "
+            "mix of large boulder-sized chunks and small stone fragments between them, "
+            "deep wide cracks and thin hairline fractures coexisting, variable crack width network, "
+            "intense amber gold luminescence pooling at crack intersections and junctions, "
+            "strong 3D relief depth between elevated stone slab surfaces, recessed glowing gaps, "
+            "rich dark teal jade green stone with inner subsurface glow, "
+            "no central origin point, distributed irregular polygon fracture network, "
+            "ancient arcane floor with massive cracked stone segments, "
+            "fantasy RPG mystical ground texture, painterly game art style, high detail, ground surface only"
+        ),
+        "negative": (
+            "radial burst pattern, central focal point, starburst cracks from center, "
+            "uniform small cracks only, uniform tile grid, regular repeating pattern, "
+            "crystal pillars standing upright, vertical rock walls, cave walls, ceiling, "
+            "characters, warriors, NPCs, monsters, "
+            "blue tones, cyan dominant, orange lava, red fire, "
+            "side view, isometric angle, diagonal perspective, horizon, "
+            "sky, outdoor, blurry, watermark, text, UI, border, frame"
+        ),
+    },
     "dark_marble": {
         # 레퍼런스: front/public/ground/texture/17.png
         # 컨셉: 어두운 남색/흑색 대리석, 전기 청록 균열 라인, 마법 던전 바닥

@@ -1,4 +1,4 @@
-# world 파티션 DB 쿼리 전담
+# world 파티션 + 도로 DB 쿼리 전담
 from core.database import fetch_all, fetch_one
 
 _PARTITION_COLUMNS = """
@@ -148,4 +148,25 @@ async def get_codex_group_partitions(group_id: int) -> list[dict]:
         ORDER BY p.partition_seq
         """,
         {"group_id": group_id},
+    )
+
+
+async def get_dong_roads(dong_id: int) -> list[dict]:
+    """dong 소속 world_road 전체 조회 (클라이언트에서 activeGroupKeys로 필터링)"""
+    return await fetch_all(
+        """
+        SELECT
+            id,
+            road_key,
+            road_type,
+            real_name,
+            width_m,
+            elevation_m,
+            movement_bonus,
+            boundary_geojson
+        FROM world_road
+        WHERE dong_id = :dong_id
+        ORDER BY road_type, id
+        """,
+        {"dong_id": dong_id},
     )
