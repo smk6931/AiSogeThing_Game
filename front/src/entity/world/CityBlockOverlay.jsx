@@ -889,7 +889,7 @@ const DongMask = ({ currentDong, currentDistrict, elevation }) => {
   );
 };
 
-// partition URL 개별 로드 — 404 시 null (useTexture는 크래시하므로 사용 불가)
+// partition URL 개별 로드 — 텍스처 완료 즉시 progressive 업데이트 (404 시 null)
 function usePartitionTextures(urls) {
   const [texMap, setTexMap] = useState(() => new Map());
   const urlKey = urls.join('|');
@@ -898,12 +898,6 @@ function usePartitionTextures(urls) {
     if (!urls.length) { setTexMap(new Map()); return; }
     const loader = new THREE.TextureLoader();
     const loaded = new Map();
-    let remaining = urls.length;
-
-    const onDone = (url, tex) => {
-      loaded.set(url, tex);
-      if (--remaining === 0) setTexMap(new Map(loaded));
-    };
 
     urls.forEach((url) => {
       loader.load(
@@ -912,10 +906,14 @@ function usePartitionTextures(urls) {
           tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
           tex.anisotropy = 16;
           tex.needsUpdate = true;
-          onDone(url, tex);
+          loaded.set(url, tex);
+          setTexMap(new Map(loaded)); // 한 장 완료마다 즉시 반영
         },
         undefined,
-        () => onDone(url, null),  // 404 → null, 크래시 없음
+        () => {
+          loaded.set(url, null); // 404 → null, 크래시 없음
+          setTexMap(new Map(loaded));
+        },
       );
     });
 
@@ -1181,6 +1179,7 @@ const CityBlockContent = ({
           // ── [A] Extruded 3D 메시 (showElevation ON, push/pull 방식) ────────────
           // geometry.groups[0]=상단면(partition tex), groups[1]=측면벽(cliff tex)
           if (block.isExtruded) {
+            if (block.partitionUrl && !partitionTextureMap.has(block.partitionUrl)) return null;
             const partTex = block.partitionUrl ? partitionTextureMap.get(block.partitionUrl) : null;
             const topTex  = partTex
               ?? (block.themeCode ? (themeTexMap[block.themeCode] ?? themeTexMap.default)
@@ -1203,6 +1202,7 @@ const CityBlockContent = ({
 
           // ── [B] 별도 cliff/slope 쿼드 ────────────────────────────────────────
           if (block.isWall) {
+            if (block.partitionUrl && !partitionTextureMap.has(block.partitionUrl)) return null;
             const wallTex = (block.partitionUrl ? partitionTextureMap.get(block.partitionUrl) : null)
               ?? (block.themeCode ? (themeTexMap[block.themeCode] ?? themeTexMap.default) : cliffTex);
             return (
@@ -1222,6 +1222,8 @@ const CityBlockContent = ({
           // partition 모드: 기존 partTex → themeTexMap → pool 순서
           const isTerrainBlock = groundMode === 'terrain' && block.elevBucket;
           const partTex = block.partitionUrl ? partitionTextureMap.get(block.partitionUrl) : null;
+          // partitionUrl 지정됐지만 아직 로드 안 됨 → rune 플래시 방지를 위해 스킵
+          if (block.partitionUrl && !partitionTextureMap.has(block.partitionUrl)) return null;
           const tex = isTerrainBlock
             ? (elevTexMap[block.elevBucket] ?? elevTexMap.elev_mid)
             : (partTex
