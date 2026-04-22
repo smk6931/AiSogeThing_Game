@@ -560,7 +560,7 @@ const buildExtrudedPolygon = (outerRing, holes = [], yTop, yBot = -1.0, includeW
   return geo;
 };
 
-// ── 절벽 노이즈 유틸 ────────────────────────────────────────────────────────
+// ── 절벽/지형 노이즈 유틸 ───────────────────────────────────────────────────
 // 세계 좌표 기반 결정론적 value noise (외부 라이브러리 불필요)
 const _noiseHash = (ix, iy) => {
   const n = Math.sin(ix * 127.1 + iy * 311.7) * 43758.5453123;
@@ -582,6 +582,34 @@ const _fbm2D = (x, y) => {
     freq *= 2.1; amp *= 0.5;
   }
   return v;
+};
+
+/**
+ * GeoJSON ring [lng, lat][] 을 centroid 기준으로 distanceM 미터 균등 확장.
+ * 법선 방향 offset(self-intersection 위험) 대신 centroid scale 사용 → 오목 폴리곤도 안전.
+ * fBm 노이즈로 각 정점의 확장 비율에 ±20% 변화 → 유기적인 경계 윤곽.
+ * 파티션 경계 gap을 인접 top face 오버랩으로 메꾸는 용도.
+ */
+const expandRingFromCentroid = (ring, distanceM = 3.0) => {
+  if (!ring || ring.length < 3) return ring;
+  const pts = ring.map(([lng, lat]) => gpsToGame(lat, lng));
+
+  // centroid
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
+
+  // centroid → 각 정점까지 평균 거리
+  const avgDist = pts.reduce((s, p) => s + Math.sqrt((p.x - cx) ** 2 + (p.z - cz) ** 2), 0) / pts.length || 1;
+
+  return ring.map((_coord, i) => {
+    const p = pts[i];
+    // fBm 노이즈로 정점별 확장량 ±20% 변화
+    const noise  = _fbm2D(p.x * 0.025, p.z * 0.025) * 0.2;
+    const scale  = (avgDist + distanceM * (1.0 + noise)) / avgDist;
+    const newX   = cx + (p.x - cx) * scale;
+    const newZ   = cz + (p.z - cz) * scale;
+    return [GIS_ORIGIN.lng + newX / LNG_TO_M, GIS_ORIGIN.lat - newZ / LAT_TO_M];
+  });
 };
 
 /**
@@ -712,17 +740,12 @@ const buildPartitionCliffs = (partitions, effectiveScale, partitionTexUrlMap) =>
     if (edgeLen < 0.01) continue;
 
     const buf = getTexBuf(partUrl, themeCode);
-    if (heightDiff > 1.5) {
-      const { pos: nPos, uv: nUv } = buildNoisyCliffWall(p0, p1, yLow, yHigh);
-      for (const v of nPos) buf.pos.push(v);
-      for (const v of nUv)  buf.uv.push(v);
-    } else {
-      const uS = edgeLen / TILE_SIZE, vS = heightDiff / TILE_SIZE;
-      buf.pos.push(p0.x, yLow, p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
-      buf.uv.push(0, 0,  0, vS,  uS, vS);
-      buf.pos.push(p0.x, yLow, p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
-      buf.uv.push(0, 0,  uS, vS,  uS, 0);
-    }
+    // 깔끔한 수직 쿼드 — 노이즈 변위 없이 partition polygon 경계를 그대로 따름
+    const uS = edgeLen / TILE_SIZE, vS = heightDiff / TILE_SIZE;
+    buf.pos.push(p0.x, yLow, p0.z,  p0.x, yHigh, p0.z,  p1.x, yHigh, p1.z);
+    buf.uv.push(0, 0,  0, vS,  uS, vS);
+    buf.pos.push(p0.x, yLow, p0.z,  p1.x, yHigh, p1.z,  p1.x, yLow,  p1.z);
+    buf.uv.push(0, 0,  uS, vS,  uS, 0);
   }
 
   const result = [];
@@ -1087,6 +1110,24 @@ const CityBlockContent = ({
       if (effectiveScale > 0) {
         const partitionsToWall = dbPartitions.filter(p => activeGroupKeys.has(p.group_key));
         result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap));
+
+        // ── basal slab: 동 전체를 최저 그룹 고도 바로 아래로 깔아서 그룹 간 gap 차폐 ──
+        // 폴리곤 확장 없이 기존 dongCoords 그대로 사용 → 아티팩트 없음
+        if (currentDong?.coords?.length) {
+          let minElevY = Infinity;
+          for (const [key, e] of groupElevMap) {
+            if (!activeGroupKeys.has(key) || e.count === 0) continue;
+            const ey = BASE_Y + (e.sum / e.count) * effectiveScale;
+            if (ey < minElevY) minElevY = ey;
+          }
+          if (minElevY === Infinity) minElevY = BASE_Y;
+          const basalGeo = buildTerrainBlock(
+            currentDong.coords, currentDong.holes ?? [], false, null, null, minElevY - 0.08,
+          );
+          if (basalGeo) {
+            result.push({ geo: basalGeo, themeCode: 'default', order: 3, transparent: false });
+          }
+        }
       }
     } else if (showSectorBlocks && dbPartitions?.length > 0) {
       // ── fallback: micro 파티션 단위 렌더링 (그룹 boundary 없을 때) ────
@@ -1123,7 +1164,7 @@ const CityBlockContent = ({
     }
 
     return result;
-  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation, groundMode]);
+  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation, groundMode, currentDong]);
 
   // 동 경계 전체를 덮는 베이스 플레이트 — flat 모드에서 파티션 좌표 불일치 틈 메움
   // showElevation ON: extruded 메시가 자체 벽을 가지므로 불필요

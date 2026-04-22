@@ -52,6 +52,7 @@ Priority: high | medium | low
     - `image_gen/partial/` — 조건부 사용, 주의사항 있음
     - `image_gen/failure/` — 재시도 금지, 실패 원인 기록
   - `world_texture_terrain_direction.md` — 파티션 바닥 텍스처 방향 정리 (폴리곤별 이미지 방식 주의사항, 연속 지형 방향 결정)
+  - `ground_texture_design_guidelines.md` — AAA 게임 기준 바닥 텍스처 설계 원칙: 인간 스케일, PBR 알베도, 노말맵 친화, 경로/쉼터 통합, 공동 프롬프트 구조 (텍스처 프롬프트 작성 시 필독)
   - `world_elevation_cliff_rules.md` — 등고선 렌더링(extruded polygon, push/pull 방식), 절벽 메시 생성, 카메라 회전 대응 규칙
 - `auth/`
   로그인, 회원가입, 계정 생성 흐름 규칙
