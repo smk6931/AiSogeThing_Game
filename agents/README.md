@@ -64,6 +64,9 @@ Priority: high | medium | low
   Claude와 Codex가 공통으로 따를 작업 절차, 역할 분리, 검증 흐름 문서
   공통 조언 방식, 공통 소통 규칙도 포함
   - `documentation_rules.md` — 문서 요청 시 `docs/` 카테고리 선택, 오늘 날짜 경로, 파일명 규칙
+- `reference/`
+  외부 데이터·에셋·API 소스 목록. 외부 리소스 필요 시 여기서 먼저 찾는다.
+  - `external_sources.md` — Polyhaven(텍스처), 국토지리정보원(DEM), OSM, CivitAI 모델 소스 및 검증된 slug 목록
 - `testing/`
   아직 확정 전인 테스트용 임시 컨텍스트
   - `partition_satellite_img2img_testing.md` — 위성 reference, polygon clip, img2img, world_partition 매핑 테스트 규칙과 preview 파일 네이밍

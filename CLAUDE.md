@@ -35,6 +35,7 @@
 - [`agents/frontend/asset_cache_rules.md`](C:/GitHub/AiSogeThing_Game/agents/frontend/asset_cache_rules.md) — Service Worker 에셋 영구 캐시, manifest 해시 갱신 절차 (GLB/텍스처 추가·변경 시 필독)
 - [`agents/game_design/world_texture_terrain_direction.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_texture_terrain_direction.md) — 바닥/파티션 텍스처 방향, 폴리곤별 이미지 방식 주의사항 (텍스처 구조 변경 시 필독)
 - [`agents/game_design/ground_texture_design_guidelines.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/ground_texture_design_guidelines.md) — AAA 게임 기준 바닥 텍스처 설계 원칙: 인간 스케일, PBR 알베도, 노말맵 친화, 공동 프롬프트 구조 (텍스처 프롬프트 작성 시 필독)
+- [`agents/reference/external_sources.md`](C:/GitHub/AiSogeThing_Game/agents/reference/external_sources.md) — 외부 데이터·에셋·API 소스: Polyhaven 텍스처 API, 국토지리정보원, OSM, CivitAI 모델 (외부 리소스 필요 시 필독)
 - [`agents/game_design/world_elevation_cliff_rules.md`](C:/GitHub/AiSogeThing_Game/agents/game_design/world_elevation_cliff_rules.md) — 등고선 extruded 렌더링, 절벽 메시, showElevation 토글 규칙 (등고선/절벽 수정 시 필독)
 - [`agents/process/workflow_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/workflow_rules.md)
 - [`agents/process/tool_split_rules.md`](C:/GitHub/AiSogeThing_Game/agents/process/tool_split_rules.md)

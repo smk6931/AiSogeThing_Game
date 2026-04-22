@@ -46,6 +46,7 @@ SAMPLER      = "dpmpp_2m"
 SCHEDULER    = "karras"
 DENOISE      = 0.85
 OUT_PX       = 1024
+OUT_PX_HIRES = 2048
 
 # ── 테마 프리셋 ────────────────────────────────────────────────────────────────
 THEMES: dict[str, dict] = {
@@ -177,6 +178,53 @@ THEMES: dict[str, dict] = {
             "characters, NPCs, monsters, "
             "side view, perspective, diagonal view, isometric angle, "
             "sky, horizon, blurry, watermark, text, UI, border, frame, logo"
+        ),
+    },
+    "emerald_arcane": {
+        # 레퍼런스: front/public/ground/texture/15.png
+        # 컨셉: 에메랄드 녹색 대형 석판 + 금빛 균열 라인, 학자/마법사 구역 바닥
+        # 방사형 패턴 방지: distributed crack network 강조
+        "positive": (
+            "strict 90 degree top-down overhead view, flat ground plane fills entire frame edge to edge, "
+            "dark emerald green cracked stone floor texture, "
+            "golden glowing luminescent crack lines distributed irregularly across entire surface, "
+            "irregular branching crack network spread uniformly, no central origin point, "
+            "deep dark green jade stone slabs with warm gold glowing fissures, "
+            "ancient arcane scholar hall floor, mystical enchanted stone tiles, "
+            "distributed fracture pattern across flat surface, varied crack widths, "
+            "dark teal and forest green stone with bright amber gold veins, "
+            "fantasy RPG arcane scholarly ground texture, painterly game art style, high detail, ground surface only"
+        ),
+        "negative": (
+            "radial burst pattern, central focal point, starburst cracks from center, "
+            "crystal pillars standing upright, vertical structures, "
+            "characters, warriors, NPCs, monsters, "
+            "cave walls, rock walls, ceiling, "
+            "blue tones, cyan glow, orange lava, red fire, "
+            "side view, isometric angle, diagonal perspective, horizon, "
+            "sky, outdoor, blurry, watermark, text, UI, border, frame"
+        ),
+    },
+    "dark_marble": {
+        # 레퍼런스: front/public/ground/texture/17.png
+        # 컨셉: 어두운 남색/흑색 대리석, 전기 청록 균열 라인, 마법 던전 바닥
+        "positive": (
+            "strict 90 degree top-down overhead view, flat ground plane fills entire frame edge to edge, "
+            "dark navy black obsidian marble stone floor texture, "
+            "electric cyan blue glowing luminescent crack lines bleeding through dark stone surface, "
+            "bioluminescent fracture pattern radiating across deep dark midnight blue stone, "
+            "dark cracked marble with vivid teal glowing veins, "
+            "magical mystical dungeon floor, ancient enchanted stone with glowing fissures, "
+            "deep shadows between crack edges, high contrast dark stone and bright cyan glow, "
+            "fantasy RPG mystical ground texture, painterly game art style, high detail, ground surface only"
+        ),
+        "negative": (
+            "crystal pillars standing upright, tall crystal towers, vertical structures, "
+            "characters, warriors, NPCs, monsters, "
+            "cave walls, rock walls, ceiling, stalactites, stalagmites, "
+            "orange lava, red fire, warm tones, "
+            "side view, isometric angle, diagonal perspective, horizon, "
+            "sky, outdoor, blurry, watermark, text, UI, border, frame"
         ),
     },
     "lava": {
@@ -406,6 +454,8 @@ if __name__ == "__main__":
                         help="파티션 매핑 모드: partition_key 목록")
     parser.add_argument("--denoise", type=float, default=None,
                         help=f"denoise 강도 오버라이드 (기본값: {DENOISE})")
+    parser.add_argument("--hires", action="store_true",
+                        help=f"2048px 고품질 출력 (기본값: {OUT_PX}px)")
     args = parser.parse_args()
 
     ref_path = Path(args.ref)
@@ -416,12 +466,15 @@ if __name__ == "__main__":
     positive  = THEMES[args.theme]["positive"]
     negative  = THEMES[args.theme]["negative"]
     denoise   = args.denoise if args.denoise is not None else DENOISE
+    out_px    = OUT_PX_HIRES if args.hires else OUT_PX
     ref_filename = upload_image(ref_path)
+
+    globals()["OUT_PX"] = out_px
 
     print(f"[REF] {ref_path.name} → ComfyUI input")
     print(f"[THEME] {args.theme}")
     print(f"[CONFIG] {CHECKPOINT} | LoRA: {LORA_1}({LORA_1_STR}) + {LORA_2}({LORA_2_STR})")
-    print(f"[CONFIG] steps={STEPS}, cfg={CFG}, denoise={denoise}, out={OUT_PX}px")
+    print(f"[CONFIG] steps={STEPS}, cfg={CFG}, denoise={denoise}, out={out_px}px")
 
     if args.partition_keys:
         # 파티션 매핑 모드
