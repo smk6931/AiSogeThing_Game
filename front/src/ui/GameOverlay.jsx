@@ -61,6 +61,7 @@ const LAYER_BUTTONS = [
   { key: 'showMicroBoundaries',     label: '미세선', icon: '┼', colorOn: 'rgba(240,190,90,0.7)' },
   { key: 'highlightCurrentGroup',   label: '강조',   icon: '✦', colorOn: 'rgba(80,220,180,0.7)' },
   { key: 'showCurrentGroupTexture', label: '그룹텍', icon: '◆', colorOn: 'rgba(220,160,30,0.8)' },
+  { key: 'showRoadLayer',           label: '도로텍', icon: '▬', colorOn: 'rgba(120,120,140,0.85)' },
   { key: 'showCullRadius',          label: '컬링선', icon: '⊙', colorOn: 'rgba(255,60,60,0.8)'  },
   { key: 'showGroupArea',           label: '그룹영역', icon: '◩', colorOn: 'rgba(100,180,255,0.75)' },
   { key: 'showPartitionFill',       label: '파티션', icon: '▦', colorOn: 'rgba(255,200,60,0.75)' },

@@ -30,6 +30,7 @@ export const LAYER_DEFAULTS = {
   showMicroBoundaries:     false,
   highlightCurrentGroup:   false,   // ← 기본 OFF
   showCurrentGroupTexture: true,
+  showRoadLayer:           false,
   showCullRadius:          false,
   showGroupArea:           false,
   showPartitionFill:       false,
