@@ -649,6 +649,7 @@ const RpgWorld = ({
             visible={showCurrentGroupTexture || showRoadLayer}
             showPartitionLayer={showCurrentGroupTexture}
             showRoadLayer={showRoadLayer}
+            roadTypeFilters={roadTypeFilters}
             showOriginalBlocks={false}
             showSectorBlocks
             currentGroupOnly

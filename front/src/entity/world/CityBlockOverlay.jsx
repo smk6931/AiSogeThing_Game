@@ -277,6 +277,17 @@ const GroundShaderMat = React.memo(({
 const ELEV_SCALE = 1.0;
 const BASE_Y = 0.55;
 
+// road_type별 시각 분기 — 게임 다크 시안 톤 안에서 무채색 + 미세 색상차로 구분
+// 상단(top), 측벽(side), 그리고 ROAD_TYPES 토글 키(uiKey: major/mid/alley/pedestrian)
+const ROAD_TYPE_STYLE = {
+  arterial:  { top: '#6b6e75', side: '#454850', uiKey: 'major' },
+  collector: { top: '#555861', side: '#3a3d44', uiKey: 'mid' },
+  local:     { top: '#4a4540', side: '#332f2c', uiKey: 'alley' },
+  alley:     { top: '#3d342c', side: '#2a231d', uiKey: 'pedestrian' },
+};
+const DEFAULT_ROAD_STYLE = { top: '#555555', side: '#333333', uiKey: 'mid' };
+const getRoadStyle = (rt) => ROAD_TYPE_STYLE[rt] || DEFAULT_ROAD_STYLE;
+
 // world-space UV tile size (meters) — 인접 파티션이 같은 theme이면 텍스처가 끊김 없이 이어짐
 const TILE_SIZE = 100.0;
 
@@ -968,6 +979,7 @@ const CityBlockContent = ({
   groundMode = 'partition',
   showPartitionLayer = true,
   showRoadLayer = false,
+  roadTypeFilters = {},
 }) => {
   const textures = useTexture(texturePaths);  // pool 텍스처 — 항상 존재하므로 안전
   const texCount = Array.isArray(textures) ? textures.length : 1;
@@ -1223,6 +1235,11 @@ const CityBlockContent = ({
     const effectiveScale = showElevation ? ELEV_SCALE : 0;
     const result = [];
     for (const road of dbRoads) {
+      const style = getRoadStyle(road.road_type);
+      // ROAD_TYPES 토글 재활용 — uiKey 토글 OFF면 해당 타입 도로 숨김
+      // roadTypeFilters[uiKey]가 명시적으로 false일 때만 차단 (undefined는 통과)
+      if (roadTypeFilters[style.uiKey] === false) continue;
+
       const b = road.boundary_geojson;
       if (!b?.coordinates?.length) continue;
       const outer = b.coordinates[0];
@@ -1246,16 +1263,16 @@ const CityBlockContent = ({
         const holes = b.coordinates.slice(1);
         const geo = buildExtrudedPolygon(outer, holes, elevY, BASE_Y, true);
         if (!geo) continue;
-        result.push({ geo, roadType: road.road_type, key: road.road_key, isExtruded: true });
+        result.push({ geo, roadType: road.road_type, style, key: road.road_key, isExtruded: true });
       } else {
         // flat
         const geo = buildTerrainBlockFromGeoJson(b, false, null, null, elevY);
         if (!geo) continue;
-        result.push({ geo, roadType: road.road_type, key: road.road_key, isExtruded: false });
+        result.push({ geo, roadType: road.road_type, style, key: road.road_key, isExtruded: false });
       }
     }
     return result;
-  }, [dbRoads, activeGroupBBoxes, showElevation, showRoadLayer]);
+  }, [dbRoads, activeGroupBBoxes, showElevation, showRoadLayer, roadTypeFilters]);
 
   // 동 경계 전체를 덮는 베이스 플레이트 — flat 모드에서 파티션 좌표 불일치 틈 메움
   // showElevation ON: extruded 메시가 자체 벽을 가지므로 불필요
@@ -1354,16 +1371,16 @@ const isTransparent = !isTerrainBlock && block.transparent && !!partTex;
           </mesh>
         )}
 
-        {/* 도로 메시 (world_road) — extruded 시 상단(#555)+측벽(#333), flat 시 단일 재질 */}
+        {/* 도로 메시 (world_road) — road_type별 색 분기. extruded 시 상단/측벽 다른 색 */}
         {roadMeshes.map((road) => road.isExtruded ? (
           <mesh key={road.key} geometry={road.geo} renderOrder={6}>
-            <meshBasicMaterial attach="material-0" color="#555555" side={THREE.DoubleSide} toneMapped={false} />
-            <meshBasicMaterial attach="material-1" color="#333333" side={THREE.DoubleSide} toneMapped={false} />
+            <meshBasicMaterial attach="material-0" color={road.style.top}  side={THREE.DoubleSide} toneMapped={false} />
+            <meshBasicMaterial attach="material-1" color={road.style.side} side={THREE.DoubleSide} toneMapped={false} />
           </mesh>
         ) : (
           <mesh key={road.key} geometry={road.geo} renderOrder={6}>
             <meshBasicMaterial
-              color="#555555"
+              color={road.style.top}
               side={THREE.DoubleSide}
               toneMapped={false}
               depthWrite={false}
@@ -1391,6 +1408,7 @@ const CityBlockOverlay = ({
   groundMode = 'partition',
   showPartitionLayer = true,
   showRoadLayer = false,
+  roadTypeFilters = {},
 }) => {
   const [texturePaths, setTexturePaths] = useState([]);
   const [dbPartitions, setDbPartitions] = useState([]);
@@ -1524,6 +1542,7 @@ const CityBlockOverlay = ({
       groundMode={groundMode}
       showPartitionLayer={showPartitionLayer}
       showRoadLayer={showRoadLayer}
+      roadTypeFilters={roadTypeFilters}
     />
   );
 };

@@ -189,25 +189,9 @@ def split_road_by_partitions(road_poly, partitions: list) -> list:
         })
         consumed = inter if consumed is None else consumed.union(inter)
 
-    # 동 경계 안에 있지만 어느 파티션에도 안 속한 영역 (실제로 거의 없음 — 파티션이 동을 거의 채움)
-    # 면적 비교는 4326 deg² 단위. 1m² ≈ 1e-13 deg² 수준이라 임계값을 그렇게 작게 둔다.
-    if consumed is not None:
-        leftover = road_poly.difference(consumed)
-        if not leftover.is_empty and leftover.area > 1e-13:
-            elev = _idw_elevation(leftover.centroid, partitions)
-            segments.append({
-                "geom":         leftover,
-                "partition_id": None,
-                "elevation_m":  elev,
-            })
-    elif not road_poly.is_empty:
-        # 어느 파티션과도 안 겹치는 도로 전체 → IDW 보간
-        elev = _idw_elevation(road_poly.centroid, partitions)
-        segments.append({
-            "geom":         road_poly,
-            "partition_id": None,
-            "elevation_m":  elev,
-        })
+    # 파티션 없는 영역(예: 한강 위 올림픽대로/노들로) 도로는 무시.
+    # 이전엔 leftover/IDW로 추가했지만, 결과가 거대 polygon (~20000m²)이 되어
+    # 시각적으로 도로가 강 위에 떠있는 것처럼 보임 → 그냥 안 그리는 게 자연스러움.
     return segments
 
 
@@ -277,9 +261,11 @@ async def run(dong_osm_id: int, dry_run: bool, overwrite: bool):
         partitions = await get_partitions_full(session, dong_id)
         print(f"[INFO] 파티션: {len(partitions)}개 (segment 분할 + elevation 출처)")
 
-        # 도로 변환 + segment 분할 + 저장
-        saved_segments = 0
-        ways_total = 0
+        # 도로 변환 + 저장
+        # segment 수 ≤ MERGE_THRESHOLD: way 단위 통합 단일 row (짧은 도로 — 평균 elevation, 단차 분산)
+        # segment 수 >  MERGE_THRESHOLD: segment 단위 row 유지 (긴 도로 — 파티션별 elevation 정합)
+        MERGE_THRESHOLD = 3
+        saved = 0
         skipped = 0
         for rd in raw_roads:
             road_type = HIGHWAY_TO_TYPE[rd["highway"]]
@@ -300,63 +286,106 @@ async def run(dong_osm_id: int, dry_run: bool, overwrite: bool):
             if not segments:
                 skipped += 1
                 continue
-            ways_total += 1
 
             centerline = {"type": "LineString", "coordinates": rd["coords"]}
 
-            for seg_idx, seg in enumerate(segments):
-                seg_geom = seg["geom"]
-                # 4326 deg² 단위. 1e-13 ≈ 1m² 수준 노이즈 컷.
-                if seg_geom.is_empty or seg_geom.area < 1e-13:
+            # 저장 모드 결정
+            if len(segments) <= MERGE_THRESHOLD:
+                # === 통합 모드: way 단위 단일 row, 면적 가중 평균 elevation ===
+                total_area = sum(s["geom"].area for s in segments if not s["geom"].is_empty)
+                if total_area <= 0:
+                    skipped += 1
                     continue
-                # 너무 잘게 쪼개진 segment 제거
-                if not seg_geom.is_valid:
-                    seg_geom = seg_geom.buffer(0)
-                    if seg_geom.is_empty:
+                avg_elev = round(sum(
+                    s["elevation_m"] * s["geom"].area for s in segments
+                ) / total_area, 2)
+
+                union_geom = unary_union([s["geom"] for s in segments])
+                if union_geom.is_empty:
+                    skipped += 1
+                    continue
+                polys = list(union_geom.geoms) if union_geom.geom_type == "MultiPolygon" else [union_geom]
+
+                for idx, geom in enumerate(polys):
+                    if geom.is_empty or geom.area < 1e-13:
                         continue
+                    if not geom.is_valid:
+                        geom = geom.buffer(0)
+                        if geom.is_empty:
+                            continue
 
-                road_key = f"{dong_osm_id}_r_{rd['osm_way_id']}_s{seg_idx}"
-                boundary = mapping(seg_geom)
+                    suffix = f"_p{idx}" if len(polys) > 1 else ""
+                    road_key = f"{dong_osm_id}_r_{rd['osm_way_id']}{suffix}"
+                    saved += await _insert_road(
+                        session, dry_run,
+                        road_key=road_key, dong_id=dong_id, osm_way_id=rd["osm_way_id"],
+                        road_type=road_type, partition_id=None,
+                        geom=geom, centerline=centerline,
+                        real_name=rd["name"], width_m=width_m,
+                        elevation_m=avg_elev, mode_label=f"merge x{len(segments)}",
+                    )
+            else:
+                # === segment 모드: 긴 도로 — 각 파티션별 elevation 그대로 ===
+                for seg_idx, seg in enumerate(segments):
+                    geom = seg["geom"]
+                    if geom.is_empty or geom.area < 1e-13:
+                        continue
+                    if not geom.is_valid:
+                        geom = geom.buffer(0)
+                        if geom.is_empty:
+                            continue
 
-                if dry_run:
-                    print(f"  [DRY] {road_key} | {road_type} | elev={seg['elevation_m']}m | "
-                          f"part={seg['partition_id']} | {rd['name'] or '-'}")
-                    saved_segments += 1
-                    continue
-
-                await session.execute(text("""
-                    INSERT INTO world_road
-                      (road_key, dong_id, osm_way_id, road_type, partition_id,
-                       boundary_geojson, centerline_geojson,
-                       real_name, width_m, elevation_m, movement_bonus)
-                    VALUES
-                      (:road_key, :dong_id, :osm_way_id, :road_type, :partition_id,
-                       :boundary, :centerline,
-                       :real_name, :width_m, :elevation_m, :movement_bonus)
-                    ON CONFLICT (road_key) DO UPDATE SET
-                      boundary_geojson  = EXCLUDED.boundary_geojson,
-                      elevation_m       = EXCLUDED.elevation_m,
-                      partition_id      = EXCLUDED.partition_id,
-                      road_type         = EXCLUDED.road_type
-                """), {
-                    "road_key":       road_key,
-                    "dong_id":        dong_id,
-                    "osm_way_id":     rd["osm_way_id"],
-                    "road_type":      road_type,
-                    "partition_id":   seg["partition_id"],
-                    "boundary":       json.dumps(boundary),
-                    "centerline":     json.dumps(centerline),
-                    "real_name":      rd["name"],
-                    "width_m":        width_m,
-                    "elevation_m":    seg["elevation_m"],
-                    "movement_bonus": TYPE_TO_MOVEMENT[road_type],
-                })
-                saved_segments += 1
+                    road_key = f"{dong_osm_id}_r_{rd['osm_way_id']}_s{seg_idx}"
+                    saved += await _insert_road(
+                        session, dry_run,
+                        road_key=road_key, dong_id=dong_id, osm_way_id=rd["osm_way_id"],
+                        road_type=road_type, partition_id=seg["partition_id"],
+                        geom=geom, centerline=centerline,
+                        real_name=rd["name"], width_m=width_m,
+                        elevation_m=seg["elevation_m"], mode_label=f"seg{seg_idx}/{len(segments)}",
+                    )
 
         if not dry_run:
             await session.commit()
 
-        print(f"[DONE] way={ways_total}개 → segment={saved_segments}개 저장 / 스킵 way={skipped} / dry_run={dry_run}")
+        print(f"[DONE] row={saved}개 저장 / 스킵 way={skipped} / dry_run={dry_run}")
+
+
+async def _insert_road(session, dry_run, *, road_key, dong_id, osm_way_id, road_type,
+                       partition_id, geom, centerline, real_name, width_m,
+                       elevation_m, mode_label):
+    if dry_run:
+        print(f"  [DRY] {road_key} | {road_type} | elev={elevation_m}m | "
+              f"part={partition_id} | mode={mode_label} | {real_name or '-'}")
+        return 1
+    await session.execute(text("""
+        INSERT INTO world_road
+          (road_key, dong_id, osm_way_id, road_type, partition_id,
+           boundary_geojson, centerline_geojson,
+           real_name, width_m, elevation_m, movement_bonus)
+        VALUES
+          (:road_key, :dong_id, :osm_way_id, :road_type, :partition_id,
+           :boundary, :centerline,
+           :real_name, :width_m, :elevation_m, :movement_bonus)
+        ON CONFLICT (road_key) DO UPDATE SET
+          boundary_geojson  = EXCLUDED.boundary_geojson,
+          elevation_m       = EXCLUDED.elevation_m,
+          partition_id      = EXCLUDED.partition_id,
+          road_type         = EXCLUDED.road_type
+    """), {
+        "road_key":       road_key,
+        "dong_id":        dong_id,
+        "osm_way_id":     osm_way_id,
+        "road_type":      road_type,
+        "partition_id":   partition_id,
+        "boundary":       json.dumps(mapping(geom)),
+        "centerline":     json.dumps(centerline),
+        "real_name":      real_name,
+        "width_m":        width_m,
+        "elevation_m":    elevation_m,
+        "movement_bonus": TYPE_TO_MOVEMENT[road_type],
+    })
+    return 1
 
 
 if __name__ == "__main__":
