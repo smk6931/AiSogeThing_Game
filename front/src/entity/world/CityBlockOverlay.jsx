@@ -716,29 +716,43 @@ const EDGE_RF = 2;
  * 파티션 단위 절벽 — partition 개별 texture_image_url을 벽면에 그대로 사용
  * - 공유 엣지 → 높은 쪽 파티션의 텍스처 사용
  * - 외곽 엣지 → 해당 파티션의 텍스처 사용
+ *
+ * useTerrainGeoJson=true: 도로 차집합(terrain_geojson) 기준으로 엣지 수집.
+ *   - 도로가 파티션을 깎아 outer ring이 줄어든 경우: 새 outer 엣지 사용 → 도로 옆에 정확히 벽 생성
+ *   - 도로가 파티션 안쪽에 hole을 만든 경우: hole ring 엣지도 수집 → 도로 박스 위로 뜬 평면의 가장자리 벽 보충
+ *   - 도로가 파티션을 분할한 경우(MultiPolygon): 분할된 각 폴리곤의 outer 엣지로 처리
  */
-const buildPartitionCliffs = (partitions, effectiveScale, partitionTexUrlMap) => {
+const buildPartitionCliffs = (partitions, effectiveScale, partitionTexUrlMap, useTerrainGeoJson = false) => {
   if (effectiveScale === 0 || !partitions?.length) return [];
 
   const edgeMap = new Map();
   for (const partition of partitions) {
-    const b = partition.boundary_geojson;
-    if (!b?.coordinates?.[0]) continue;
+    const source = (useTerrainGeoJson && partition.terrain_geojson) || partition.boundary_geojson;
+    if (!source?.coordinates?.length) continue;
     const elevY     = BASE_Y + (partition.elevation_m ?? 0) * effectiveScale;
     const partUrl   = partitionTexUrlMap?.get(partition.partition_key) ?? null;
     const themeCode = partition.group_theme_code || 'default';
-    const outer     = b.coordinates[0];
 
-    for (let i = 0; i < outer.length - 1; i++) {
-      const p0 = gpsToGame(outer[i][1],     outer[i][0]);
-      const p1 = gpsToGame(outer[i + 1][1], outer[i + 1][0]);
-      const r0x = Math.round(p0.x * EDGE_RF), r0z = Math.round(p0.z * EDGE_RF);
-      const r1x = Math.round(p1.x * EDGE_RF), r1z = Math.round(p1.z * EDGE_RF);
-      if (r0x === r1x && r0z === r1z) continue;
-      const key = (r0x < r1x || (r0x === r1x && r0z < r1z))
-        ? `${r0x},${r0z}|${r1x},${r1z}` : `${r1x},${r1z}|${r0x},${r0z}`;
-      if (!edgeMap.has(key)) edgeMap.set(key, { p0, p1, sides: [] });
-      edgeMap.get(key).sides.push({ elevY, partUrl, themeCode });
+    // Polygon → [[outer, ...holes]], MultiPolygon → [[outer, ...holes], ...]
+    const polys = source.type === 'MultiPolygon' ? source.coordinates : [source.coordinates];
+
+    for (const poly of polys) {
+      if (!poly?.length) continue;
+      // 모든 ring(outer + holes) 처리. hole ring은 본 파티션에만 존재 → solo edge → 바닥(yBot)까지 떨어짐
+      for (const ring of poly) {
+        if (!ring || ring.length < 2) continue;
+        for (let i = 0; i < ring.length - 1; i++) {
+          const p0 = gpsToGame(ring[i][1],     ring[i][0]);
+          const p1 = gpsToGame(ring[i + 1][1], ring[i + 1][0]);
+          const r0x = Math.round(p0.x * EDGE_RF), r0z = Math.round(p0.z * EDGE_RF);
+          const r1x = Math.round(p1.x * EDGE_RF), r1z = Math.round(p1.z * EDGE_RF);
+          if (r0x === r1x && r0z === r1z) continue;
+          const key = (r0x < r1x || (r0x === r1x && r0z < r1z))
+            ? `${r0x},${r0z}|${r1x},${r1z}` : `${r1x},${r1z}|${r0x},${r0z}`;
+          if (!edgeMap.has(key)) edgeMap.set(key, { p0, p1, sides: [] });
+          edgeMap.get(key).sides.push({ elevY, partUrl, themeCode });
+        }
+      }
     }
   }
 
@@ -1150,7 +1164,7 @@ const CityBlockContent = ({
       // effectiveScale > 0: 파티션 단위 절벽 (개별 texture_image_url 사용)
       if (effectiveScale > 0) {
         const partitionsToWall = dbPartitions.filter(p => activeGroupKeys.has(p.group_key));
-        result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap));
+        result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap, showRoadLayer));
 
         // ── basal slab: 동 전체를 최저 그룹 고도 바로 아래로 깔아서 그룹 간 gap 차폐 ──
         // 폴리곤 확장 없이 기존 dongCoords 그대로 사용 → 아티팩트 없음
@@ -1190,7 +1204,7 @@ const CityBlockContent = ({
 
       if (effectiveScale > 0) {
         const partitionsToWall = dbPartitions.filter(p => targetGroupKeys.has(p.group_key));
-        result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap));
+        result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap, showRoadLayer));
       }
     } else if (showPartitionLayer && showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
       // dbPartitions 없을 때 fallback (currentGroupOnly는 그룹 단독 렌더 — 전체 sectors 대체 불가)
