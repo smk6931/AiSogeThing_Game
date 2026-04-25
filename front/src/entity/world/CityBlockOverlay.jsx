@@ -277,6 +277,17 @@ const GroundShaderMat = React.memo(({
 const ELEV_SCALE = 1.0;
 const BASE_Y = 0.55;
 
+// road_type별 시각 분기 — 게임 다크 시안 톤 안에서 무채색 + 미세 색상차로 구분
+// 상단(top), 측벽(side), 그리고 ROAD_TYPES 토글 키(uiKey: major/mid/alley/pedestrian)
+const ROAD_TYPE_STYLE = {
+  arterial:  { top: '#6b6e75', side: '#454850', uiKey: 'major' },
+  collector: { top: '#555861', side: '#3a3d44', uiKey: 'mid' },
+  local:     { top: '#4a4540', side: '#332f2c', uiKey: 'alley' },
+  alley:     { top: '#3d342c', side: '#2a231d', uiKey: 'pedestrian' },
+};
+const DEFAULT_ROAD_STYLE = { top: '#555555', side: '#333333', uiKey: 'mid' };
+const getRoadStyle = (rt) => ROAD_TYPE_STYLE[rt] || DEFAULT_ROAD_STYLE;
+
 // world-space UV tile size (meters) — 인접 파티션이 같은 theme이면 텍스처가 끊김 없이 이어짐
 const TILE_SIZE = 100.0;
 
@@ -445,6 +456,23 @@ const buildTerrainBlockFromGeoJson = (boundaryGeoJson, fitUV = false, uvBounds =
   const outerCoords = outer.map(([lng, lat]) => [lat, lng]);
   const holeCoords = holes.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
   return buildTerrainBlock(outerCoords, holeCoords, fitUV, uvBounds, uvRepeat, elevY);
+};
+
+// Polygon 또는 MultiPolygon 대응. terrain_geojson(ST_Difference 결과)은 MultiPolygon이 될 수 있음.
+const buildTerrainBlocksFromGeoJson = (gjson, fitUV = false, uvBounds = null, uvRepeat = null, elevY = BASE_Y) => {
+  if (!gjson?.coordinates?.length) return [];
+  const polys = gjson.type === 'MultiPolygon' ? gjson.coordinates : [gjson.coordinates];
+  const result = [];
+  for (const poly of polys) {
+    if (!poly?.length) continue;
+    const [outer, ...holes] = poly;
+    if (!outer || outer.length < 3) continue;
+    const outerCoords = outer.map(([lng, lat]) => [lat, lng]);
+    const holeCoords  = holes.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
+    const geo = buildTerrainBlock(outerCoords, holeCoords, fitUV, uvBounds, uvRepeat, elevY);
+    if (geo) result.push(geo);
+  }
+  return result;
 };
 
 // Polygon / MultiPolygon GeoJSON → 하나의 merged BufferGeometry (그룹 단위 바닥용, flat 모드)
@@ -688,29 +716,43 @@ const EDGE_RF = 2;
  * 파티션 단위 절벽 — partition 개별 texture_image_url을 벽면에 그대로 사용
  * - 공유 엣지 → 높은 쪽 파티션의 텍스처 사용
  * - 외곽 엣지 → 해당 파티션의 텍스처 사용
+ *
+ * useTerrainGeoJson=true: 도로 차집합(terrain_geojson) 기준으로 엣지 수집.
+ *   - 도로가 파티션을 깎아 outer ring이 줄어든 경우: 새 outer 엣지 사용 → 도로 옆에 정확히 벽 생성
+ *   - 도로가 파티션 안쪽에 hole을 만든 경우: hole ring 엣지도 수집 → 도로 박스 위로 뜬 평면의 가장자리 벽 보충
+ *   - 도로가 파티션을 분할한 경우(MultiPolygon): 분할된 각 폴리곤의 outer 엣지로 처리
  */
-const buildPartitionCliffs = (partitions, effectiveScale, partitionTexUrlMap) => {
+const buildPartitionCliffs = (partitions, effectiveScale, partitionTexUrlMap, useTerrainGeoJson = false) => {
   if (effectiveScale === 0 || !partitions?.length) return [];
 
   const edgeMap = new Map();
   for (const partition of partitions) {
-    const b = partition.boundary_geojson;
-    if (!b?.coordinates?.[0]) continue;
+    const source = (useTerrainGeoJson && partition.terrain_geojson) || partition.boundary_geojson;
+    if (!source?.coordinates?.length) continue;
     const elevY     = BASE_Y + (partition.elevation_m ?? 0) * effectiveScale;
     const partUrl   = partitionTexUrlMap?.get(partition.partition_key) ?? null;
     const themeCode = partition.group_theme_code || 'default';
-    const outer     = b.coordinates[0];
 
-    for (let i = 0; i < outer.length - 1; i++) {
-      const p0 = gpsToGame(outer[i][1],     outer[i][0]);
-      const p1 = gpsToGame(outer[i + 1][1], outer[i + 1][0]);
-      const r0x = Math.round(p0.x * EDGE_RF), r0z = Math.round(p0.z * EDGE_RF);
-      const r1x = Math.round(p1.x * EDGE_RF), r1z = Math.round(p1.z * EDGE_RF);
-      if (r0x === r1x && r0z === r1z) continue;
-      const key = (r0x < r1x || (r0x === r1x && r0z < r1z))
-        ? `${r0x},${r0z}|${r1x},${r1z}` : `${r1x},${r1z}|${r0x},${r0z}`;
-      if (!edgeMap.has(key)) edgeMap.set(key, { p0, p1, sides: [] });
-      edgeMap.get(key).sides.push({ elevY, partUrl, themeCode });
+    // Polygon → [[outer, ...holes]], MultiPolygon → [[outer, ...holes], ...]
+    const polys = source.type === 'MultiPolygon' ? source.coordinates : [source.coordinates];
+
+    for (const poly of polys) {
+      if (!poly?.length) continue;
+      // 모든 ring(outer + holes) 처리. hole ring은 본 파티션에만 존재 → solo edge → 바닥(yBot)까지 떨어짐
+      for (const ring of poly) {
+        if (!ring || ring.length < 2) continue;
+        for (let i = 0; i < ring.length - 1; i++) {
+          const p0 = gpsToGame(ring[i][1],     ring[i][0]);
+          const p1 = gpsToGame(ring[i + 1][1], ring[i + 1][0]);
+          const r0x = Math.round(p0.x * EDGE_RF), r0z = Math.round(p0.z * EDGE_RF);
+          const r1x = Math.round(p1.x * EDGE_RF), r1z = Math.round(p1.z * EDGE_RF);
+          if (r0x === r1x && r0z === r1z) continue;
+          const key = (r0x < r1x || (r0x === r1x && r0z < r1z))
+            ? `${r0x},${r0z}|${r1x},${r1z}` : `${r1x},${r1z}|${r0x},${r0z}`;
+          if (!edgeMap.has(key)) edgeMap.set(key, { p0, p1, sides: [] });
+          edgeMap.get(key).sides.push({ elevY, partUrl, themeCode });
+        }
+      }
     }
   }
 
@@ -768,13 +810,13 @@ const buildPartitionCliffs = (partitions, effectiveScale, partitionTexUrlMap) =>
 // group_key 단위 geometry 빌드 (캐시 우선)
 // partitionTexIndexMap: Map<partition_key, texIndex> — ComfyUI 생성 이미지가 있는 파티션의 텍스처 인덱스
 // poolCount: 풀 텍스처 개수 (fallback hash 계산에 사용)
-const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndexMap, poolCount, effectiveScale = ELEV_SCALE, groundMode = 'partition') => {
+const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndexMap, poolCount, effectiveScale = ELEV_SCALE, groundMode = 'partition', useTerrainGeoJson = false) => {
   const mapSize = partitionTexIndexMap ? partitionTexIndexMap.size : 0;
   // elevation 합산 + scale + groundMode를 캐시 키에 포함
   const elevSum = allPartitions
     .filter(p => p.group_key === groupKey)
     .reduce((s, p) => s + (p.elevation_m ?? 0), 0);
-  const cacheKey = `${groupKey}:${texCount}:${mapSize}:${elevSum.toFixed(1)}:${effectiveScale}:${groundMode}`;
+  const cacheKey = `${groupKey}:${texCount}:${mapSize}:${elevSum.toFixed(1)}:${effectiveScale}:${groundMode}:${useTerrainGeoJson ? 't' : 'b'}`;
   if (groupGeometryCache.has(cacheKey)) return groupGeometryCache.get(cacheKey);
 
   const fallbackCount = poolCount || texCount;
@@ -813,15 +855,19 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
 
     const elevY = BASE_Y + (partition.elevation_m ?? 0) * effectiveScale;
 
+    // 도로 레이어 ON 시에만 terrain_geojson(도로 차집합) 사용. OFF면 원본 boundary
+    const renderGeoJson = (useTerrainGeoJson && partition.terrain_geojson) || partition.boundary_geojson;
+
     // ── terrain 모드: 고도 버킷 기반 텍스처, world-space UV (fitUV=false) ──
     if (groundMode === 'terrain') {
       const elev = partition.elevation_m ?? 0;
       const elevBucket = elev < ELEV_LOW_MAX ? 'elev_low'
         : elev < ELEV_HIGH_MIN ? 'elev_mid'
         : 'elev_high';
-      const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, false, null, null, elevY);
-      if (!geo) continue;
-      result.push({ geo, themeCode: elevBucket, elevBucket, order: 5, transparent: false });
+      const geos = buildTerrainBlocksFromGeoJson(renderGeoJson, false, null, null, elevY);
+      for (const geo of geos) {
+        result.push({ geo, themeCode: elevBucket, elevBucket, order: 5, transparent: false });
+      }
       continue;
     }
 
@@ -834,8 +880,8 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
     const uvRepeat = (hasOwnImage && !isSharedGroupImage)
       ? computePartitionRepeat(partition)
       : null;
-    const geo = buildTerrainBlockFromGeoJson(partition.boundary_geojson, hasOwnImage, uvBounds, uvRepeat, elevY);
-    if (!geo) continue;
+    const geos = buildTerrainBlocksFromGeoJson(renderGeoJson, hasOwnImage, uvBounds, uvRepeat, elevY);
+    if (!geos.length) continue;
 
     // partitionTexUrlMap: Map<partition_key, url> — 파일 존재 여부는 렌더 시점에 판단
     const partitionUrl = hasOwnImage ? partitionTexIndexMap.get(partition.partition_key) : null;
@@ -847,7 +893,9 @@ const getGroupGeometries = (groupKey, allPartitions, texCount, partitionTexIndex
       partition.partition_seq || 0,
     ].join('|'));
     const texIdx = seed % fallbackCount;  // fallback (partitionUrl 로드 실패 시 사용)
-    result.push({ geo, texIdx, themeCode: partition.group_theme_code || 'default', partitionUrl, order: 5, transparent: !!partitionUrl });
+    for (const geo of geos) {
+      result.push({ geo, texIdx, themeCode: partition.group_theme_code || 'default', partitionUrl, order: 5, transparent: !!partitionUrl });
+    }
   }
 
   groupGeometryCache.set(cacheKey, result);
@@ -943,6 +991,9 @@ const CityBlockContent = ({
   currentGroupOnly = false,
   showElevation = false,
   groundMode = 'partition',
+  showPartitionLayer = true,
+  showRoadLayer = false,
+  roadTypeFilters = {},
 }) => {
   const textures = useTexture(texturePaths);  // pool 텍스처 — 항상 존재하므로 안전
   const texCount = Array.isArray(textures) ? textures.length : 1;
@@ -1064,8 +1115,13 @@ const CityBlockContent = ({
     // showElevation on/off에 따른 effective scale
     const effectiveScale = showElevation ? ELEV_SCALE : 0;
 
-    // 그룹 boundary 렌더링: currentGroupOnly 모드에서는 파티션 단위로 폴백
-    if (showSectorBlocks && dbGroups?.length > 0 && activeGroupKeys.size > 0 && !currentGroupOnly) {
+    // ⚠️ 임시 결합 (2026-04-25): showRoadLayer 한 변수가 세 군데 동작을 동시 제어한다.
+    //   1) roadMeshes useMemo — 도로 메시 생성 여부
+    //   2) getGroupGeometries(..., useTerrainGeoJson=showRoadLayer) — 파티션이 terrain_geojson 사용 여부
+    //   3) ↓ 아래 분기 조건 — 도로텍 ON 시 그룹 boundary 분기 비활성화
+    // 정상화 = world_partition_group.terrain_geojson 추가 또는 도로 세그먼트 분할.
+    // 자세한 내용: agents/game_design/road_design_rules.md 의 "임시: 도로/파티션 렌더 결합" 섹션.
+    if (showPartitionLayer && showSectorBlocks && dbGroups?.length > 0 && activeGroupKeys.size > 0 && !currentGroupOnly && !showRoadLayer) {
       // ── 그룹 평균 elevation 계산 (파티션별 elevation_m 평균) ──────────
       const groupElevMap = new Map();
       for (const p of dbPartitions) {
@@ -1108,7 +1164,7 @@ const CityBlockContent = ({
       // effectiveScale > 0: 파티션 단위 절벽 (개별 texture_image_url 사용)
       if (effectiveScale > 0) {
         const partitionsToWall = dbPartitions.filter(p => activeGroupKeys.has(p.group_key));
-        result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap));
+        result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap, showRoadLayer));
 
         // ── basal slab: 동 전체를 최저 그룹 고도 바로 아래로 깔아서 그룹 간 gap 차폐 ──
         // 폴리곤 확장 없이 기존 dongCoords 그대로 사용 → 아티팩트 없음
@@ -1128,7 +1184,7 @@ const CityBlockContent = ({
           }
         }
       }
-    } else if (showSectorBlocks && dbPartitions?.length > 0) {
+    } else if (showPartitionLayer && showSectorBlocks && dbPartitions?.length > 0) {
       // ── fallback: micro 파티션 단위 렌더링 (그룹 boundary 없을 때) ────
       const keysToRender = activeGroupKeys.size > 0
         ? activeGroupKeys
@@ -1142,15 +1198,15 @@ const CityBlockContent = ({
           })();
 
       for (const groupKey of targetGroupKeys) {
-        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexUrlMap, poolCount, effectiveScale, groundMode);
+        const geos = getGroupGeometries(groupKey, dbPartitions, texCount, partitionTexUrlMap, poolCount, effectiveScale, groundMode, showRoadLayer);
         result.push(...geos);
       }
 
       if (effectiveScale > 0) {
         const partitionsToWall = dbPartitions.filter(p => targetGroupKeys.has(p.group_key));
-        result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap));
+        result.push(...buildPartitionCliffs(partitionsToWall, effectiveScale, partitionTexUrlMap, showRoadLayer));
       }
-    } else if (showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
+    } else if (showPartitionLayer && showSectorBlocks && !currentGroupOnly && zoneData?.zones?.sectors) {
       // dbPartitions 없을 때 fallback (currentGroupOnly는 그룹 단독 렌더 — 전체 sectors 대체 불가)
       const sectors = zoneData.zones.sectors || [];
       sectors.forEach((feature, idx) => {
@@ -1163,19 +1219,74 @@ const CityBlockContent = ({
     }
 
     return result;
-  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation, groundMode, currentDong]);
+  }, [showOriginalBlocks, showSectorBlocks, zoneData, dbPartitions, dbGroups, texCount, activeGroupKeys, partitionTexUrlMap, poolCount, showElevation, groundMode, currentDong, showPartitionLayer, showRoadLayer]);
+
+  // 활성 그룹들의 lng/lat bbox (도로 컬링용)
+  const activeGroupBBoxes = useMemo(() => {
+    if (!dbGroups?.length || !activeGroupKeys.size) return [];
+    const boxes = [];
+    for (const g of dbGroups) {
+      if (!activeGroupKeys.has(g.group_key) || !g.boundary_geojson) continue;
+      const { type, coordinates } = g.boundary_geojson;
+      const polys = type === 'Polygon' ? [coordinates]
+                  : type === 'MultiPolygon' ? coordinates : [];
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const poly of polys) {
+        for (const [lng, lat] of poly[0]) {
+          if (lng < minX) minX = lng; if (lng > maxX) maxX = lng;
+          if (lat < minY) minY = lat; if (lat > maxY) maxY = lat;
+        }
+      }
+      if (minX < Infinity) boxes.push({ minX, minY, maxX, maxY });
+    }
+    return boxes;
+  }, [dbGroups, activeGroupKeys]);
 
   // 도로 메시 (world_road → flat polygon, 파티션 위 order=6)
+  // activeGroupBBoxes와 bbox 겹침 체크로 동 전체가 아닌 플레이어 주변만 렌더링
   const roadMeshes = useMemo(() => {
-    if (!dbRoads?.length || !activeGroupKeys.size) return [];
+    if (!showRoadLayer || !dbRoads?.length || !activeGroupBBoxes.length) return [];
     const effectiveScale = showElevation ? ELEV_SCALE : 0;
-    return dbRoads.map((road) => {
+    const result = [];
+    for (const road of dbRoads) {
+      const style = getRoadStyle(road.road_type);
+      // ROAD_TYPES 토글 재활용 — uiKey 토글 OFF면 해당 타입 도로 숨김
+      // roadTypeFilters[uiKey]가 명시적으로 false일 때만 차단 (undefined는 통과)
+      if (roadTypeFilters[style.uiKey] === false) continue;
+
+      const b = road.boundary_geojson;
+      if (!b?.coordinates?.length) continue;
+      const outer = b.coordinates[0];
+      if (!outer?.length) continue;
+
+      // bbox 컬링 (활성 그룹과 겹침)
+      let rMinX = Infinity, rMinY = Infinity, rMaxX = -Infinity, rMaxY = -Infinity;
+      for (const [lng, lat] of outer) {
+        if (lng < rMinX) rMinX = lng; if (lng > rMaxX) rMaxX = lng;
+        if (lat < rMinY) rMinY = lat; if (lat > rMaxY) rMaxY = lat;
+      }
+      const overlaps = activeGroupBBoxes.some(bx =>
+        !(rMaxX < bx.minX || rMinX > bx.maxX || rMaxY < bx.minY || rMinY > bx.maxY)
+      );
+      if (!overlaps) continue;
+
       const elevY = BASE_Y + (road.elevation_m ?? 0) * effectiveScale + 0.02;
-      const geo   = buildTerrainBlockFromGeoJson(road.boundary_geojson, false, null, null, elevY);
-      if (!geo) return null;
-      return { geo, roadType: road.road_type, key: road.road_key };
-    }).filter(Boolean);
-  }, [dbRoads, activeGroupKeys, showElevation]);
+
+      if (effectiveScale > 0) {
+        // showElevation ON: 0m 바닥 → elevY 까지 박스 extrude (상단+측벽)
+        const holes = b.coordinates.slice(1);
+        const geo = buildExtrudedPolygon(outer, holes, elevY, BASE_Y, true);
+        if (!geo) continue;
+        result.push({ geo, roadType: road.road_type, style, key: road.road_key, isExtruded: true });
+      } else {
+        // flat
+        const geo = buildTerrainBlockFromGeoJson(b, false, null, null, elevY);
+        if (!geo) continue;
+        result.push({ geo, roadType: road.road_type, style, key: road.road_key, isExtruded: false });
+      }
+    }
+    return result;
+  }, [dbRoads, activeGroupBBoxes, showElevation, showRoadLayer, roadTypeFilters]);
 
   // 동 경계 전체를 덮는 베이스 플레이트 — flat 모드에서 파티션 좌표 불일치 틈 메움
   // showElevation ON: extruded 메시가 자체 벽을 가지므로 불필요
@@ -1274,11 +1385,16 @@ const isTransparent = !isTerrainBlock && block.transparent && !!partTex;
           </mesh>
         )}
 
-        {/* 도로 메시 (world_road) — 파티션 위 order=6, 임시 어두운 회색 */}
-        {roadMeshes.map((road) => (
+        {/* 도로 메시 (world_road) — road_type별 색 분기. extruded 시 상단/측벽 다른 색 */}
+        {roadMeshes.map((road) => road.isExtruded ? (
+          <mesh key={road.key} geometry={road.geo} renderOrder={6}>
+            <meshBasicMaterial attach="material-0" color={road.style.top}  side={THREE.DoubleSide} toneMapped={false} />
+            <meshBasicMaterial attach="material-1" color={road.style.side} side={THREE.DoubleSide} toneMapped={false} />
+          </mesh>
+        ) : (
           <mesh key={road.key} geometry={road.geo} renderOrder={6}>
             <meshBasicMaterial
-              color="#555555"
+              color={road.style.top}
               side={THREE.DoubleSide}
               toneMapped={false}
               depthWrite={false}
@@ -1304,6 +1420,9 @@ const CityBlockOverlay = ({
   partitions = null,  // RpgWorld에서 주입 — null이면 자체 fetch
   showElevation = false,
   groundMode = 'partition',
+  showPartitionLayer = true,
+  showRoadLayer = false,
+  roadTypeFilters = {},
 }) => {
   const [texturePaths, setTexturePaths] = useState([]);
   const [dbPartitions, setDbPartitions] = useState([]);
@@ -1435,6 +1554,9 @@ const CityBlockOverlay = ({
       currentGroupOnly={currentGroupOnly}
       showElevation={showElevation}
       groundMode={groundMode}
+      showPartitionLayer={showPartitionLayer}
+      showRoadLayer={showRoadLayer}
+      roadTypeFilters={roadTypeFilters}
     />
   );
 };

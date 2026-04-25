@@ -23,7 +23,8 @@ _PARTITION_COLUMNS = """
     centroid_lat,
     centroid_lng,
     elevation_m,
-    boundary_geojson
+    boundary_geojson,
+    terrain_geojson
 """
 
 

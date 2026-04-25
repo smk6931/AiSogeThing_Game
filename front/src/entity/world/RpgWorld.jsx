@@ -111,6 +111,7 @@ const RpgWorld = ({
     showGroupBoundaries = true,
     highlightCurrentGroup = true,
     showCurrentGroupTexture = false,
+    showRoadLayer = false,
     showCullRadius = false,
     showGroupArea = false,
     showPartitionFill = false,
@@ -645,7 +646,10 @@ const RpgWorld = ({
         <Suspense fallback={null}>
           <CityBlockOverlay
             zoneData={sharedZoneData}
-            visible={showCurrentGroupTexture}
+            visible={showCurrentGroupTexture || showRoadLayer}
+            showPartitionLayer={showCurrentGroupTexture}
+            showRoadLayer={showRoadLayer}
+            roadTypeFilters={roadTypeFilters}
             showOriginalBlocks={false}
             showSectorBlocks
             currentGroupOnly
